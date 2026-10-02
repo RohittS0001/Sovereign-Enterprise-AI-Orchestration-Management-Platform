@@ -1,0 +1,58 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# Local data
+data/*
+!data/**/
+!.gitkeep
+
+# Models and large ML artifacts
+models/*
+!models/**/
+!.gitkeep
+*.safetensors
+*.bin
+*.gguf
+*.pt
+*.pth
+
+# Hugging Face / ML caches
+.cache/
+hf_cache/
+transformers_cache/
+
+# Logs
+logs/
+*.log
+
+# Frontend
+node_modules/
+dist/
+build/
+.next/
+.vite/
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
