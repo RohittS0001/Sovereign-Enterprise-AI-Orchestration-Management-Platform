@@ -17,3 +17,10 @@ psycopg[binary]==3.3.6
 pytest==9.1.1
 pytest-asyncio==1.4.0
 ruff==0.16.8
+
+# Gmail 
+
+google-api-python-client
+google-auth
+google-auth-httplib2
+google-auth-oauthlib

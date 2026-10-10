@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     jira_email: str = ""
     jira_api_token: str = ""
 
+    # Gmail
+    gmail_client_id: str = ""
+    gmail_client_secret: str =""
+    gmail_refresh_token: str = ""
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

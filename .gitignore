@@ -11,8 +11,10 @@ htmlcov/
 .venv/
 venv/
 
-# Environment variables / secrets
+# Local environment and Google OAuth credentials
 .env
+credentials.json
+token.json
 .env.*
 !.env.example
 

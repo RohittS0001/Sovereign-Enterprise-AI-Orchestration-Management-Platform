@@ -11,6 +11,7 @@ from backend.app.integrations.jira.schemas import UpdateIssueRequest
 from backend.app.integrations.jira.schemas import TransitionIssueRequest
 from backend.app.integrations.jira.schemas import AddCommentRequest
 from backend.app.integrations.jira.schemas import LinkIssuesRequest
+
 @pytest.fixture
 def jira_client() -> AsyncMock:
     return AsyncMock()
