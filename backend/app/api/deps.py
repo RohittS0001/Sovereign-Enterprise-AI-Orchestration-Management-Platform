@@ -18,6 +18,8 @@ from backend.app.core.security.rate_limit import RateLimiter
 from backend.app.core.security.tokens import decode_access_token
 from backend.app.db.models import User
 from backend.app.db.session import Database
+from backend.app.llm.base import AgentModels
+from backend.app.mcp.registry.tool_registry import ToolRegistry
 from backend.app.services.auth_service import ClientInfo
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/v1/auth/login")
@@ -96,3 +98,20 @@ def require_permissions(*required: Permission) -> Callable[..., Awaitable[Princi
         return principal
 
     return dependency
+
+
+def get_agent_models(request: Request) -> AgentModels:
+    models: AgentModels | None = request.app.state.agent_models
+    if models is None:
+        raise ServiceUnavailableError(
+            "No language model is configured (set LLM1_MODEL_NAME and LLM_BASE_URL)"
+        )
+    return models
+
+
+def get_tool_registry(request: Request) -> ToolRegistry:
+    return request.app.state.tool_registry
+
+
+AgentModelsDep = Annotated[AgentModels, Depends(get_agent_models)]
+ToolRegistryDep = Annotated[ToolRegistry, Depends(get_tool_registry)]

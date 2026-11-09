@@ -43,12 +43,40 @@ class Settings(BaseSettings):
     login_rate_limit_window_seconds: int = Field(default=60, ge=1)
     agent_rate_limit_per_minute: int = Field(default=30, ge=1)
 
-    # Local LLMs
+    # Local LLMs (served by Ollama or any OpenAI-compatible server such as vLLM)
+    llm_provider: Literal["ollama", "openai_compatible"] = "ollama"
+    llm_base_url: str = "http://localhost:11434"
+    llm_api_key: SecretStr = SecretStr("")
+    llm_timeout_seconds: float = Field(default=120.0, gt=0)
+    llm_temperature: float = Field(default=0.0, ge=0, le=2)
+    # LLM 1 plans and calls tools; LLM 2 writes answers and reports (falls back to LLM 1).
     llm1_model_path: str = ""
     llm1_model_name: str = ""
     llm2_model_path: str = ""
     llm2_model_name: str = ""
     embedding_model_name: str = ""
+
+    # Agent loop limits
+    agent_max_iterations: int = Field(default=4, ge=1, le=20)
+    agent_max_steps: int = Field(default=10, ge=1, le=50)
+    agent_observation_max_chars: int = Field(default=6000, ge=500)
+
+    # Tool execution
+    tool_timeout_seconds: float = Field(default=30.0, gt=0)
+    tool_read_retries: int = Field(default=2, ge=0, le=5)
+    tool_retry_backoff_seconds: float = Field(default=0.5, ge=0)
+
+    # Human approval of agent write actions
+    approval_ttl_hours: int = Field(default=72, ge=1)
+    # False enforces "four eyes": someone other than the requester must approve.
+    approval_allow_self_approval: bool = True
+    # Write tools the agent may run without approval (e.g. ["jira.add_comment"]).
+    approval_exempt_tools: list[str] = Field(default_factory=list)
+
+    # Guardrails
+    # Secrets, card numbers and government IDs are always masked before reaching the
+    # LLM or the audit log. Set this to also mask email addresses and phone numbers.
+    guardrails_redact_contact_info: bool = False
 
     # Jira
     jira_base_url: str = ""
@@ -131,6 +159,10 @@ class Settings(BaseSettings):
         return bool(
             self.jira_base_url and self.jira_email and self.jira_api_token.get_secret_value()
         )
+
+    @property
+    def llm_configured(self) -> bool:
+        return bool(self.llm1_model_name and self.llm_base_url)
 
     @property
     def gmail_configured(self) -> bool:

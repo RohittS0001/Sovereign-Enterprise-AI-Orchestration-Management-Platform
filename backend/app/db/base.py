@@ -35,6 +35,8 @@ class Base(DeclarativeBase):
     type_annotation_map = {
         datetime: DateTime(timezone=True),
         dict[str, Any]: JSON,
+        list[dict[str, Any]]: JSON,
+        list[str]: JSON,
         uuid.UUID: Uuid,
     }
 

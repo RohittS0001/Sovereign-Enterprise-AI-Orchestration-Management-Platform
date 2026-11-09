@@ -1,0 +1,18 @@
+"""Audit action names, kept in one place so reports and filters stay consistent."""
+
+AUTH_LOGIN = "auth.login"
+AUTH_LOGOUT = "auth.logout"
+AUTH_PASSWORD_CHANGE = "auth.password_change"  # noqa: S105 (action name)
+AUTH_REFRESH_REUSE = "auth.refresh_reuse"
+USER_CREATE = "user.create"
+USER_UPDATE = "user.update"
+AGENT_RUN = "agent.run"
+TOOL_INVOKE = "tool.invoke"
+APPROVAL_REQUEST = "approval.request"
+APPROVAL_DECIDE = "approval.decide"
+APPROVAL_EXECUTE = "approval.execute"
+
+SUCCESS = "success"
+FAILURE = "failure"
+DENIED = "denied"
+PENDING = "pending"

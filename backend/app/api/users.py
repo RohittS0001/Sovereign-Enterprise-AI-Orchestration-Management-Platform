@@ -4,6 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 
 from backend.app.api.deps import CurrentUserDep, SessionDep, require_permissions
+from backend.app.audit import actions
+from backend.app.audit.service import AuditService
 from backend.app.core.security.permissions import Permission
 from backend.app.schemas.auth import UserCreate, UserPage, UserRead, UserUpdate
 from backend.app.services.user_service import UserService
@@ -31,8 +33,21 @@ async def list_users(
 
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-async def create_user(body: UserCreate, session: SessionDep) -> UserRead:
-    return UserRead.model_validate(await UserService(session).create(body))
+async def create_user(
+    body: UserCreate, session: SessionDep, acting_user: CurrentUserDep
+) -> UserRead:
+    user = await UserService(session).create(body)
+    await AuditService(session).record(
+        actions.USER_CREATE,
+        status=actions.SUCCESS,
+        actor_type="human",
+        actor_user_id=acting_user.id,
+        resource_type="user",
+        resource_id=str(user.id),
+        details={"email": user.email, "role": user.role.value},
+    )
+    await session.commit()
+    return UserRead.model_validate(user)
 
 
 @router.get("/{user_id}", response_model=UserRead)
@@ -48,4 +63,14 @@ async def update_user(
     acting_user: CurrentUserDep,
 ) -> UserRead:
     user = await UserService(session).update(user_id, body, acting_user=acting_user)
+    await AuditService(session).record(
+        actions.USER_UPDATE,
+        status=actions.SUCCESS,
+        actor_type="human",
+        actor_user_id=acting_user.id,
+        resource_type="user",
+        resource_id=str(user.id),
+        details={"changes": body.model_dump(mode="json", exclude_unset=True)},
+    )
+    await session.commit()
     return UserRead.model_validate(user)

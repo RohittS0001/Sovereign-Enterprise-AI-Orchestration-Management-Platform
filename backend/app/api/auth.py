@@ -7,6 +7,9 @@ from backend.app.api.deps import (
     SessionDep,
     SettingsDep,
 )
+from backend.app.audit import actions
+from backend.app.audit.service import AuditService
+from backend.app.core.exceptions.exceptions import AuthenticationError
 from backend.app.core.security.permissions import Principal
 from backend.app.schemas.auth import (
     ChangePasswordRequest,
@@ -38,7 +41,26 @@ async def login(
         )
 
     service = AuthService(session, settings)
-    user = await service.authenticate(body.email, body.password)
+    audit = AuditService(session)
+    try:
+        user = await service.authenticate(body.email, body.password)
+    except AuthenticationError:
+        await audit.record(
+            actions.AUTH_LOGIN,
+            status=actions.FAILURE,
+            actor_type="human",
+            details={"email": body.email, "ip": client.ip_address},
+        )
+        await session.commit()
+        raise
+
+    await audit.record(
+        actions.AUTH_LOGIN,
+        status=actions.SUCCESS,
+        actor_type="human",
+        actor_user_id=user.id,
+        details={"ip": client.ip_address},
+    )
     return await service.issue_tokens(user, client)
 
 
@@ -78,4 +100,11 @@ async def change_password(
     await AuthService(session, settings).change_password(
         user, body.current_password, body.new_password
     )
+    await AuditService(session).record(
+        actions.AUTH_PASSWORD_CHANGE,
+        status=actions.SUCCESS,
+        actor_type="human",
+        actor_user_id=user.id,
+    )
+    await session.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

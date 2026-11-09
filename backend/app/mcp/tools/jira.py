@@ -3,6 +3,7 @@ from typing import Any, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
+from backend.app.core.exceptions.exceptions import IntegrationError
 from backend.app.integrations.jira.schemas import (
     AddCommentRequest,
     AssignIssueRequest,
@@ -64,6 +65,13 @@ class JiraTools:
             return ToolResult(
                 status=ToolStatus.ERROR,
                 error=f"Invalid Jira input for {operation}: {exc}",
+            )
+        except IntegrationError as exc:
+            status = exc.upstream_status
+            return ToolResult(
+                status=ToolStatus.ERROR,
+                error=f"Failed to {operation}: {exc}",
+                retryable=status is None or status == 429 or status >= 500,
             )
         except Exception as exc:
             return ToolResult(

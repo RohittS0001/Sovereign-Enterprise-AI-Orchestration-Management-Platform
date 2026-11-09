@@ -5,6 +5,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.agent import router as agent_router
+from backend.app.api.approvals import router as approvals_router
+from backend.app.api.audit import router as audit_router
 from backend.app.api.auth import router as auth_router
 from backend.app.api.health import router as health_router
 from backend.app.api.users import router as users_router
@@ -18,17 +20,34 @@ from backend.app.core.middleware.request_context import (
 from backend.app.core.middleware.security_headers import SecurityHeadersMiddleware
 from backend.app.core.security.rate_limit import RateLimiter
 from backend.app.db.session import Database
+from backend.app.llm.base import AgentModels
+from backend.app.llm.factory import build_agent_models
+from backend.app.mcp.catalog import build_tool_registry
+from backend.app.mcp.registry.tool_registry import ToolRegistry
 
 logger = get_logger(__name__)
 
 
-def create_app(settings: Settings | None = None, database: Database | None = None) -> FastAPI:
-    """Build the FastAPI application. Tests pass their own settings and database."""
+def create_app(
+    settings: Settings | None = None,
+    database: Database | None = None,
+    *,
+    agent_models: AgentModels | None = None,
+    tool_registry: ToolRegistry | None = None,
+) -> FastAPI:
+    """Build the FastAPI application. Tests inject settings, database, models and tools."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_format)
 
+    # The app only cleans up resources it created; injected ones belong to the caller.
+    owns_database = database is None
+    owns_models = agent_models is None
     if database is None and settings.database_url:
         database = Database(settings.database_url, echo=settings.database_echo)
+    if agent_models is None:
+        agent_models = build_agent_models(settings)
+    if tool_registry is None:
+        tool_registry = build_tool_registry(settings)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -46,8 +65,13 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
             logger.warning("DATABASE_URL is not set; login and user APIs are unavailable")
         elif not await database.ping():
             logger.error("Database is not reachable at startup", extra={"db": database.backend})
+        if agent_models is None:
+            logger.warning("No LLM configured (LLM1_MODEL_NAME); the agent endpoint is disabled")
+        logger.info("Agent tools available", extra={"tools": tool_registry.list_tools()})
         yield
-        if database is not None:
+        if owns_models and agent_models is not None:
+            await agent_models.close()
+        if owns_database and database is not None:
             await database.dispose()
         logger.info("Shutting down %s", settings.app_name)
 
@@ -61,6 +85,8 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.state.settings = settings
     app.state.database = database
     app.state.rate_limiter = RateLimiter()
+    app.state.agent_models = agent_models
+    app.state.tool_registry = tool_registry
 
     app.add_middleware(
         CORSMiddleware,
@@ -80,6 +106,8 @@ def create_app(settings: Settings | None = None, database: Database | None = Non
     app.include_router(auth_router)
     app.include_router(users_router)
     app.include_router(agent_router)
+    app.include_router(approvals_router)
+    app.include_router(audit_router)
 
     return app
 

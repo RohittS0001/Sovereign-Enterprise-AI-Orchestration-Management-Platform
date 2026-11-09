@@ -7,6 +7,8 @@ from datetime import timedelta
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.audit import actions
+from backend.app.audit.service import AuditService
 from backend.app.core.config.settings import Settings
 from backend.app.core.exceptions.exceptions import AuthenticationError
 from backend.app.core.logging.logger import get_logger
@@ -82,6 +84,13 @@ class AuthService:
         if record.revoked_at is not None:
             # A rotated token was replayed: assume it was stolen and end every session.
             await revoke_user_sessions(self.session, record.user_id)
+            await AuditService(self.session).record(
+                actions.AUTH_REFRESH_REUSE,
+                status=actions.DENIED,
+                actor_type="human",
+                actor_user_id=record.user_id,
+                details={"ip": client.ip_address, "action": "all_sessions_revoked"},
+            )
             await self.session.commit()
             logger.warning("Refresh token reuse detected", extra={"user_id": str(record.user_id)})
             raise AuthenticationError("Refresh token has been revoked")
