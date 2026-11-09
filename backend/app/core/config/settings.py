@@ -91,14 +91,26 @@ class Settings(BaseSettings):
     gmail_redirect_uri: str = ""
     gmail_credentials_file: Path = PROJECT_ROOT / "credentials.json"
     gmail_token_file: Path = PROJECT_ROOT / "token.json"
+    # Drafts may only be addressed to these domains (empty = any).
+    gmail_allowed_recipient_domains: list[str] = Field(default_factory=list)
 
-    # Keka
+    # Keka (HRMS). Base URL looks like https://<company>.keka.com/api/v1
     keka_base_url: str = ""
+    keka_token_url: str = "https://login.keka.com/connect/token"  # noqa: S105 (URL)
     keka_client_id: str = ""
     keka_client_secret: SecretStr = SecretStr("")
+    keka_api_key: SecretStr = SecretStr("")
+    keka_timeout_seconds: float = Field(default=30.0, gt=0)
 
-    # GitHub
+    # GitHub (or GitHub Enterprise: https://<host>/api/v3)
     github_token: SecretStr = SecretStr("")
+    github_api_url: str = "https://api.github.com"
+    # "owner/repo" entries the agent may access (empty = anything the token can see).
+    github_allowed_repos: list[str] = Field(default_factory=list)
+    github_timeout_seconds: float = Field(default=30.0, gt=0)
+
+    # Demo mode: every integration is served from a built-in synthetic dataset.
+    demo_mode: bool = False
 
     _jwt_secret_generated: bool = PrivateAttr(default=False)
 
@@ -158,6 +170,19 @@ class Settings(BaseSettings):
     def jira_configured(self) -> bool:
         return bool(
             self.jira_base_url and self.jira_email and self.jira_api_token.get_secret_value()
+        )
+
+    @property
+    def github_configured(self) -> bool:
+        return bool(self.github_token.get_secret_value() and self.github_api_url)
+
+    @property
+    def keka_configured(self) -> bool:
+        return bool(
+            self.keka_base_url
+            and self.keka_client_id
+            and self.keka_client_secret.get_secret_value()
+            and self.keka_api_key.get_secret_value()
         )
 
     @property

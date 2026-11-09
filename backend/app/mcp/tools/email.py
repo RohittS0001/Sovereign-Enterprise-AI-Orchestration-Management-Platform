@@ -7,6 +7,7 @@ from backend.app.integrations.email.client import GmailClient
 from backend.app.integrations.email.service import EmailService
 from backend.app.mcp.schemas.common import ToolResult, ToolStatus
 from backend.app.mcp.schemas.email import (
+    CreateDraftInput,
     EmailMessageSummary,
     EmailProfileOutput,
     GetEmailInput,
@@ -23,8 +24,54 @@ class EmailTools:
     event loop responsive.
     """
 
-    def __init__(self, service: EmailService | None = None) -> None:
+    def __init__(
+        self,
+        service: EmailService | None = None,
+        allowed_recipient_domains: list[str] | None = None,
+    ) -> None:
         self.service = service or EmailService()
+        self.allowed_domains = {d.lower().lstrip("@") for d in allowed_recipient_domains or []}
+
+    async def create_draft(self, payload: dict[str, Any]) -> ToolResult:
+        """Draft an email for a person to review and send from Gmail."""
+        try:
+            inputs = CreateDraftInput.model_validate(payload)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid draft input: {exc}")
+
+        recipients = [*inputs.to, *inputs.cc]
+        if self.allowed_domains:
+            blocked = sorted(
+                r for r in recipients if r.rsplit("@", 1)[-1].lower() not in self.allowed_domains
+            )
+            if blocked:
+                return ToolResult(
+                    status=ToolStatus.ERROR,
+                    error=f"Recipients outside allowed domains: {', '.join(blocked)}",
+                )
+
+        try:
+            draft = await asyncio.to_thread(
+                self.service.create_draft,
+                to=list(inputs.to),
+                cc=list(inputs.cc),
+                subject=inputs.subject,
+                body=inputs.body,
+                thread_id=inputs.thread_id,
+            )
+        except Exception as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Failed to create Gmail draft: {exc}")
+
+        return ToolResult(
+            status=ToolStatus.SUCCESS,
+            data={
+                "draft_id": draft.get("id"),
+                "message_id": (draft.get("message") or {}).get("id"),
+                "to": recipients,
+                "subject": inputs.subject,
+                "status": "draft_created",
+            },
+        )
 
     async def get_profile(self, payload: dict[str, Any] | None = None) -> ToolResult:
         """Return the authenticated Gmail account profile."""

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 class SearchEmailsInput(BaseModel):
@@ -36,6 +36,24 @@ class SearchEmailsOutput(BaseModel):
     messages: list[EmailMessageSummary] = Field(default_factory=list)
     next_page_token: str | None = None
     result_size_estimate: int = 0
+
+
+class CreateDraftInput(BaseModel):
+    """Input for drafting (not sending) an email."""
+
+    to: list[EmailStr] = Field(min_length=1, max_length=20)
+    cc: list[EmailStr] = Field(default_factory=list, max_length=20)
+    subject: str = Field(min_length=1, max_length=200)
+    body: str = Field(min_length=1, max_length=20000)
+    thread_id: str | None = Field(default=None, description="Reply within this Gmail thread")
+
+    @field_validator("subject")
+    @classmethod
+    def _single_line(cls, value: str) -> str:
+        # Newlines in a header would allow header injection.
+        if any(ch in value for ch in (chr(13), chr(10))):
+            raise ValueError("subject must be a single line")
+        return value
 
 
 class GetEmailOutput(BaseModel):

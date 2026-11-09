@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from backend.app.integrations.jira.client import JiraClient
@@ -31,15 +32,21 @@ def to_adf(text: str) -> dict[str, Any]:
 class JiraService:
     """Business-level Jira operations built on top of JiraClient."""
 
-    def __init__(self, client: JiraClient | None = None) -> None:
+    def __init__(
+        self,
+        client: JiraClient | None = None,
+        *,
+        client_factory: Callable[[], JiraClient] = JiraClient,
+    ) -> None:
         # The real client is created on first use so the service (and the tools that
         # wrap it) can be constructed even when Jira is not configured.
         self._client = client
+        self._client_factory = client_factory
 
     @property
     def client(self) -> JiraClient:
         if self._client is None:
-            self._client = JiraClient()
+            self._client = self._client_factory()
         return self._client
 
     async def close(self) -> None:

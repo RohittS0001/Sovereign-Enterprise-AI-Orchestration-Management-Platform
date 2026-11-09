@@ -44,7 +44,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/**" = ["S101", "S105", "S106", "S107", "E731"]
+# Long literals in test fixtures read better unwrapped.
+"tests/**" = ["S101", "S105", "S106", "S107", "E731", "E501"]
 "scripts/**" = ["T201"]
 # Regex patterns read better unwrapped.
 "backend/app/guardrails/injection.py" = ["E501"]

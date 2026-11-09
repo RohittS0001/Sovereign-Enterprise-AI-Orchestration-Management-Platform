@@ -145,7 +145,9 @@ def test_catalog_registers_tools_with_permissions(test_settings: Settings) -> No
     assert specs["jira.create_task"].operation == ToolOperation.WRITE
     assert specs["jira.create_task"].permission == Permission.PROJECTS_WRITE
     assert specs["gmail.get_email"].permission == Permission.EMAIL_READ
-    assert len([s for s in specs.values() if s.is_write]) == 8
+    # 8 Jira writes + gmail.create_draft
+    assert len([s for s in specs.values() if s.is_write]) == 9
+    assert specs["gmail.create_draft"].permission == Permission.EMAIL_SEND
     assert all(s.description and s.input_model for s in specs.values())
 
 

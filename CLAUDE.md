@@ -9,8 +9,9 @@ FastAPI backend in `backend/app`; an agent answers questions by calling tools ov
 with human approval for writes, RBAC, and a tamper-evident audit log.
 
 Work proceeds in phases, one local commit each (never push unless asked):
-done — 1 foundation, 2 database/auth/RBAC, 3 LangGraph agent + approvals + audit + guardrails.
-Planned — 4 GitHub + Keka integrations and Gmail drafting, 5 RAG (pgvector, hybrid search, citations,
+done — 1 foundation, 2 database/auth/RBAC, 3 LangGraph agent + approvals + audit + guardrails,
+4 GitHub + Keka integrations, Gmail drafting, demo mode.
+Planned — 5 RAG (pgvector, hybrid search, citations,
 permission-aware), 6 org features (project risk score, workload/capacity, forecasts, scheduled reports,
 Jira-vs-GitHub contradiction checks, usage tracking), 7 React+TS (Vite) frontend incl. streamed agent
 steps, 8 evaluation (DeepEval/Ragas, red-team, CI gates) + observability, 9 Docker Compose, GitHub
@@ -70,19 +71,32 @@ in `agents/*/prompts/`. Step ids `S1..` are global across iterations. Tool resul
 (`orchestration/observations.py`: drops noisy Jira/Google keys, flattens ADF), redacted, truncated,
 injection-scanned, and wrapped in `<untrusted_data>` before any model sees them.
 
-**Tool layering — follow this chain for any new integration (Phase 4: GitHub, Keka):**
-1. `integrations/<x>/client.py` — HTTP only; map failures to `IntegrationError(integration=, upstream_status=)`;
-   accept an injectable `transport` for tests.
+**Tool layering — follow this chain for any new integration (Jira, GitHub, Keka, Gmail exist):**
+1. `integrations/<x>/client.py` — subclass `integrations/common/http.py:HttpIntegrationClient` (error →
+   `IntegrationError` with upstream status, empty 201/204, Retry-After/`x-ratelimit-reset` waits for GETs,
+   `_auth_headers`/`_on_unauthorized` hooks — Keka uses them for its cached OAuth token). Accept `transport`.
 2. `integrations/<x>/service.py` — business operations; validate identifiers used in URLs/queries
-   (see `integrations/jira/validators.py`); build the client lazily so construction never needs config.
+   (`jira/validators.py`, `github/service.py:validate_repository`); trim payloads to useful fields
+   (GitHub/Keka summarizers; Keka also drops personal data). Build the client lazily via
+   `client_factory` so construction never needs config.
 3. `mcp/schemas/<x>.py` — Pydantic input models (these become the JSON schema shown to the planner).
-4. `mcp/tools/<x>.py` — validate input, call service, **return `ToolResult`, never raise**; set
-   `retryable=True` for timeouts/429/5xx. Run blocking SDKs via `asyncio.to_thread` (see Gmail).
-5. `mcp/catalog.py` — register as `<integration>.<operation>` with description, `input_model`,
-   `ToolOperation.READ|WRITE`, and a `Permission`; only when `settings.<x>_configured`.
-6. `mcp/registry/tool_registry.py` handles validation, timeouts and read-only retries;
+4. `mcp/tools/<x>.py` — wrap calls in `mcp/tools/common.py:run_tool` (validation, `IntegrationError` →
+   retryable `ToolResult`); **never raise**. Blocking SDKs go through `asyncio.to_thread` (Gmail).
+5. `integrations/hub.py:build_integration_hub(settings)` — add the service when `settings.<x>_configured`,
+   with a `client_factory` built from *the given* settings (never the global `settings`), plus a health
+   check in `IntegrationHub.check`. Then register tools in `mcp/catalog.py` as `<integration>.<operation>`
+   with description, `input_model`, `ToolOperation.READ|WRITE` and a `Permission`.
+6. Add a matching in-memory service to `integrations/demo/services.py` (+ data in `demo/dataset.json`,
+   dates written as `{today±N}`) so demo mode and evaluation keep covering every tool.
+7. `mcp/registry/tool_registry.py` handles validation, timeouts and read-only retries;
    `orchestration/tool_gateway.py` enforces permission → validation → approval (agent writes become
    `ApprovalRequest`s) → execution, audits every outcome, and commits after each call.
+
+**Integrations at runtime.** `create_app` builds an `IntegrationHub` (`app.state.integrations`, live or
+demo services) and the tool registry from it. `DEMO_MODE=true` serves all integrations from the synthetic
+dataset (writes are in-memory only). `GET /api/v1/integrations?check=true` (admin) reports mode, tools
+and live health. Enterprise scoping: `GITHUB_ALLOWED_REPOS` (also rewrites search scope qualifiers),
+`GMAIL_ALLOWED_RECIPIENT_DOMAINS`; Gmail can only create drafts, never send.
 
 **Approvals** (`services/approval_service.py`, `/api/v1/approvals`). Approving executes the stored call
 through the registry and records the result; the run is marked completed once no approval is pending

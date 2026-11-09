@@ -6,12 +6,17 @@ tool that cannot work.
 
 from backend.app.core.config.settings import Settings
 from backend.app.core.security.permissions import Permission
+from backend.app.integrations.hub import IntegrationHub, build_integration_hub
 from backend.app.mcp.registry.tool_registry import ToolRegistry
 from backend.app.mcp.schemas import email as email_schemas
+from backend.app.mcp.schemas import github as github_schemas
 from backend.app.mcp.schemas import jira as jira_schemas
+from backend.app.mcp.schemas import keka as keka_schemas
 from backend.app.mcp.schemas.common import ToolOperation
 from backend.app.mcp.tools.email import EmailTools
+from backend.app.mcp.tools.github import GitHubTools
 from backend.app.mcp.tools.jira import JiraTools
+from backend.app.mcp.tools.keka import KekaTools
 
 READ, WRITE = ToolOperation.READ, ToolOperation.WRITE
 
@@ -93,23 +98,105 @@ def register_email_tools(registry: ToolRegistry, tools: EmailTools) -> None:
         operation=READ,
         permission=read,
     )
+    registry.register(
+        "gmail.create_draft",
+        tools.create_draft,
+        description=(
+            "Draft (never send) an email in the connected mailbox for a person to review and "
+            "send from Gmail. Use only when the user asks for an email to be prepared."
+        ),
+        input_model=email_schemas.CreateDraftInput,
+        operation=WRITE,
+        permission=Permission.EMAIL_SEND,
+    )
+
+
+def register_github_tools(registry: ToolRegistry, tools: GitHubTools) -> None:
+    s = github_schemas
+    for name, handler, model, description in (
+        ("github.list_pull_requests", tools.list_pull_requests, s.ListPullRequestsInput,
+         "List pull requests of a repository (state, author, reviewers, age, labels)."),
+        ("github.get_pull_request", tools.get_pull_request, s.GetPullRequestInput,
+         "Get one pull request with its reviews (approved / changes requested / pending)."),
+        ("github.search_pull_requests", tools.search_pull_requests, s.SearchPullRequestsInput,
+         "Search pull requests across allowed repositories, e.g. by Jira key 'PHX-7'."),
+        ("github.list_commits", tools.list_commits, s.ListCommitsInput,
+         "List recent commits of a repository, optionally by branch, author or date range."),
+        ("github.list_workflow_runs", tools.list_workflow_runs, s.ListWorkflowRunsInput,
+         "List CI/CD (GitHub Actions) runs with status and conclusion, e.g. failing builds."),
+        ("github.get_commit_checks", tools.get_commit_checks, s.GetCommitChecksInput,
+         "Summarize CI checks (passed/failed) for a branch or commit."),
+    ):  # fmt: skip
+        registry.register(
+            name, handler, description=description, input_model=model,
+            operation=READ, permission=Permission.PROJECTS_READ,
+        )  # fmt: skip
+    registry.register(
+        "github.add_pr_comment",
+        tools.add_pr_comment,
+        description="Add a comment to a pull request.",
+        input_model=s.AddPullRequestCommentInput,
+        operation=WRITE,
+        permission=Permission.PROJECTS_WRITE,
+    )
+
+
+def register_keka_tools(registry: ToolRegistry, tools: KekaTools) -> None:
+    s = keka_schemas
+    for name, handler, model, description in (
+        ("keka.search_employees", tools.search_employees, s.SearchEmployeesInput,
+         "Find employees (name, email, job title, department, manager) in the HR system."),
+        ("keka.get_employee", tools.get_employee, s.GetEmployeeInput,
+         "Get one employee's work profile by Keka employee id."),
+        ("keka.get_leave_requests", tools.get_leave_requests, s.DateRangeInput,
+         "Leave requests overlapping a date range (max 90 days), optionally for given employees. "
+         "Use for availability and capacity questions."),
+        ("keka.get_leave_balances", tools.get_leave_balances, s.GetLeaveBalancesInput,
+         "Remaining leave balances, optionally for given employees."),
+        ("keka.get_attendance", tools.get_attendance, s.DateRangeInput,
+         "Attendance records in a date range (max 90 days), optionally for given employees."),
+    ):  # fmt: skip
+        registry.register(
+            name, handler, description=description, input_model=model,
+            operation=READ, permission=Permission.PEOPLE_READ,
+        )  # fmt: skip
 
 
 def build_tool_registry(
     settings: Settings,
+    hub: IntegrationHub | None = None,
     *,
     jira_tools: JiraTools | None = None,
     email_tools: EmailTools | None = None,
+    github_tools: GitHubTools | None = None,
+    keka_tools: KekaTools | None = None,
 ) -> ToolRegistry:
+    """Register tools for every active integration (explicit tool objects win)."""
+    hub = hub or build_integration_hub(settings)
     registry = ToolRegistry(
         default_timeout=settings.tool_timeout_seconds,
         read_retries=settings.tool_read_retries,
         retry_backoff=settings.tool_retry_backoff_seconds,
     )
 
-    if jira_tools is not None or settings.jira_configured:
-        register_jira_tools(registry, jira_tools or JiraTools())
-    if email_tools is not None or settings.gmail_configured:
-        register_email_tools(registry, email_tools or EmailTools())
+    if jira_tools is None and hub.jira is not None:
+        jira_tools = JiraTools(service=hub.jira)
+    if github_tools is None and hub.github is not None:
+        github_tools = GitHubTools(service=hub.github)
+    if keka_tools is None and hub.keka is not None:
+        keka_tools = KekaTools(service=hub.keka)
+    if email_tools is None and hub.email is not None:
+        email_tools = EmailTools(
+            service=hub.email, allowed_recipient_domains=settings.gmail_allowed_recipient_domains
+        )
+
+    if jira_tools is not None:
+        register_jira_tools(registry, jira_tools)
+    if github_tools is not None:
+        register_github_tools(registry, github_tools)
+    if keka_tools is not None:
+        register_keka_tools(registry, keka_tools)
+    if email_tools is not None:
+        register_email_tools(registry, email_tools)
 
     return registry

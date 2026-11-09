@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Any
 
 from backend.app.integrations.email.client import GmailClient
@@ -6,13 +7,19 @@ from backend.app.integrations.email.client import GmailClient
 class EmailService:
     """Business logic for Gmail operations."""
 
-    def __init__(self, client: GmailClient | None = None) -> None:
+    def __init__(
+        self,
+        client: GmailClient | None = None,
+        *,
+        client_factory: Callable[[], GmailClient] = GmailClient,
+    ) -> None:
         self._client = client
+        self._client_factory = client_factory
 
     @property
     def client(self) -> GmailClient:
         if self._client is None:
-            self._client = GmailClient()
+            self._client = self._client_factory()
         return self._client
 
     def get_profile(self) -> dict[str, Any]:
@@ -35,3 +42,7 @@ class EmailService:
     def get_message(self, message_id: str) -> dict[str, Any]:
         """Retrieve a Gmail message by its ID."""
         return self.client.get_message(message_id)
+
+    def create_draft(self, **fields: Any) -> dict[str, Any]:
+        """Create a draft (to, subject, body, cc, thread_id); never sends it."""
+        return self.client.create_draft(**fields)

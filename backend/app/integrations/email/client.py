@@ -1,8 +1,10 @@
 import base64
+from email.message import EmailMessage
 from typing import Any
 
 from googleapiclient.discovery import build
 
+from backend.app.core.config.settings import Settings
 from backend.app.integrations.email.auth import load_gmail_credentials
 
 
@@ -13,9 +15,10 @@ class GmailClient:
     worker thread (see ``EmailTools``) so they do not block the event loop.
     """
 
-    def __init__(self, service: Any = None) -> None:
+    def __init__(self, service: Any = None, settings: Settings | None = None) -> None:
         # Built on first use so constructing the client never triggers credential loading.
         self._service_instance = service
+        self._settings = settings
 
     @property
     def _service(self) -> Any:
@@ -23,7 +26,7 @@ class GmailClient:
             self._service_instance = build(
                 "gmail",
                 "v1",
-                credentials=load_gmail_credentials(),
+                credentials=load_gmail_credentials(self._settings),
                 cache_discovery=False,
             )
         return self._service_instance
@@ -62,6 +65,35 @@ class GmailClient:
             self._service.users()
             .messages()
             .get(userId="me", id=message_id, format="full")
+            .execute()
+        )
+
+    def create_draft(
+        self,
+        *,
+        to: list[str],
+        subject: str,
+        body: str,
+        cc: list[str] | None = None,
+        thread_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Create (not send) a plain-text draft in the authenticated mailbox."""
+        message = EmailMessage()
+        message["To"] = ", ".join(to)
+        if cc:
+            message["Cc"] = ", ".join(cc)
+        message["Subject"] = subject
+        message.set_content(body)
+
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode("ascii")
+        draft_message: dict[str, Any] = {"raw": raw}
+        if thread_id:
+            draft_message["threadId"] = thread_id
+
+        return (
+            self._service.users()
+            .drafts()
+            .create(userId="me", body={"message": draft_message})
             .execute()
         )
 
