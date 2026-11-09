@@ -60,6 +60,8 @@ ignore = [
 "scripts/**" = ["T201", "S603", "S607"]  # dev tooling runs fixed commands
 # Regex patterns read better unwrapped.
 "backend/app/domains/governance/guardrails/injection.py" = ["E501"]
+"backend/app/integrations/connectors/*" = ["E501"]  # compact declarative specs
+"backend/app/tools/connectors.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend", "evaluation", "scripts", "tests"]

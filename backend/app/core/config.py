@@ -6,7 +6,9 @@ from pathlib import Path
 from typing import Literal, Self
 
 from pydantic import Field, PrivateAttr, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import SettingsConfigDict
+
+from backend.app.core.connector_settings import ConnectorSettings
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 
@@ -15,7 +17,7 @@ LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 LogFormat = Literal["json", "text"]
 
 
-class Settings(BaseSettings):
+class Settings(ConnectorSettings):
     # Application
     app_name: str = "Sovereign Enterprise AI Orchestration & Management Platform"
     version: str = "0.1.0"

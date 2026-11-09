@@ -1,1 +1,29 @@
-{}
+{
+  "_comment": "Synthetic data for the connectors beyond the core four. Dates use {today±N}.",
+  "tracker": {
+    "linear": {
+      "work_items": [
+        {"key": "PLAT-41", "title": "Rotate payment gateway TLS certificates", "status": "In Progress", "category": "in_progress", "assignee": "Dev R", "priority": "Urgent", "points": 3, "due": "{today+2}", "updated": "{today-1}", "url": "https://linear.app/acme/issue/PLAT-41", "project": "PLAT"},
+        {"key": "PLAT-44", "title": "Load test the refunds service before PHX launch", "status": "Todo", "category": "todo", "assignee": "Sara K", "priority": "High", "points": 5, "due": "{today+6}", "updated": "{today-2}", "url": "https://linear.app/acme/issue/PLAT-44", "project": "PLAT"},
+        {"key": "PLAT-38", "title": "Upgrade Postgres to 17 in staging", "status": "Done", "category": "done", "assignee": "Dev R", "priority": "Medium", "points": 2, "updated": "{today-5}", "url": "https://linear.app/acme/issue/PLAT-38", "project": "PLAT"}
+      ]
+    },
+    "gitlab": {
+      "work_items": [
+        {"key": "acme/mobile-app#212", "title": "Show refund status in the order screen", "status": "opened", "category": "in_progress", "assignee": "Meera S", "priority": "priority::high", "due": "{today+4}", "updated": "{today-1}", "url": "https://gitlab.com/acme/mobile-app/-/issues/212", "project": "acme/mobile-app"},
+        {"key": "acme/mobile-app#215", "title": "Crash when the payment sheet is dismissed twice", "status": "opened", "category": "todo", "assignee": null, "priority": "priority::critical", "updated": "{today}", "url": "https://gitlab.com/acme/mobile-app/-/issues/215", "project": "acme/mobile-app"}
+      ],
+      "pull_requests": [
+        {"repository": "acme/mobile-app", "number": 88, "title": "Refund status badge (#212)", "state": "opened", "author": "Meera S", "updated": "{today-1}", "url": "https://gitlab.com/acme/mobile-app/-/merge_requests/88"}
+      ]
+    },
+    "azure_devops": {
+      "work_items": [
+        {"key": "1042", "title": "Ledger reconciliation export for finance", "status": "Active", "category": "in_progress", "assignee": "Arjun M", "priority": "2", "points": 5, "updated": "{today-3}", "url": "https://dev.azure.com/acme/Finance/_workitems/edit/1042", "project": "Finance"}
+      ],
+      "pull_requests": [
+        {"repository": "ledger-service", "number": 311, "title": "Add CSV export for reconciliation", "state": "active", "author": "Arjun M", "updated": "{today-2}", "url": "https://dev.azure.com/acme/Finance/_git/ledger-service/pullrequest/311"}
+      ]
+    }
+  }
+}

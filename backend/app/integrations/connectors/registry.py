@@ -2,6 +2,7 @@
 
 from backend.app.core.config import Settings
 from backend.app.integrations.connectors.spec import ConnectorSpec
+from backend.app.integrations.connectors.trackers import TRACKER_SPECS
 
 CORE_SPECS: tuple[ConnectorSpec, ...] = (
     ConnectorSpec(
@@ -38,8 +39,8 @@ CORE_SPECS: tuple[ConnectorSpec, ...] = (
     ),
 )  # fmt: skip
 
-# Connectors beyond the core four, grouped by category (filled in by their modules).
-CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = ()
+# Connectors beyond the core four, grouped by category.
+CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (*TRACKER_SPECS,)
 
 ALL_SPECS: tuple[ConnectorSpec, ...] = CORE_SPECS + CONNECTOR_SPECS
 

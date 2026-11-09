@@ -47,3 +47,53 @@ Google Cloud OAuth client; servers set the refresh token, local dev runs `python
 - Required: `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`
 - Optional: `GMAIL_REDIRECT_URI`, `GMAIL_CREDENTIALS_FILE`, `GMAIL_TOKEN_FILE`, `GMAIL_ALLOWED_RECIPIENT_DOMAINS`
 - API docs: https://developers.google.com/gmail/api
+
+## Issue trackers & code hosting
+
+### Linear (`linear`)
+
+Linear → Settings → API → Personal API keys; LINEAR_TEAM_KEYS limits teams (e.g. ["ENG"]).
+
+- Required: `LINEAR_API_KEY`
+- Optional: `LINEAR_API_URL`, `LINEAR_TEAM_KEYS`
+- API docs: https://developers.linear.app/docs/graphql/working-with-the-graphql-api
+
+### GitLab (`gitlab`)
+
+Personal/project access token with read_api scope; self-managed: set GITLAB_URL.
+
+- Required: `GITLAB_TOKEN`
+- Optional: `GITLAB_URL`, `GITLAB_PROJECTS`
+- API docs: https://docs.gitlab.com/api/rest/
+
+### Azure DevOps (`azure_devops`)
+
+User settings → Personal access tokens (Work Items: Read, Code: Read).
+
+- Required: `AZURE_DEVOPS_ORG_URL`, `AZURE_DEVOPS_PAT`
+- Optional: `AZURE_DEVOPS_PROJECTS`
+- API docs: https://learn.microsoft.com/rest/api/azure/devops/
+
+### Asana (`asana`)
+
+Asana → My settings → Apps → Developer console → Personal access token.
+
+- Required: `ASANA_TOKEN`
+- Optional: `ASANA_PROJECTS`
+- API docs: https://developers.asana.com/reference/rest-api-reference
+
+### ClickUp (`clickup`)
+
+ClickUp → Settings → Apps → API token; CLICKUP_LISTS = list ids to read.
+
+- Required: `CLICKUP_TOKEN`
+- Optional: `CLICKUP_LISTS`
+- API docs: https://developer.clickup.com/reference
+
+### Bitbucket Cloud (`bitbucket`)
+
+Atlassian account → API tokens (Bitbucket scopes: repository, pull request read).
+
+- Required: `BITBUCKET_WORKSPACE`, `BITBUCKET_USERNAME`, `BITBUCKET_API_TOKEN`
+- Optional: `BITBUCKET_REPOS`
+- API docs: https://developer.atlassian.com/cloud/bitbucket/rest/

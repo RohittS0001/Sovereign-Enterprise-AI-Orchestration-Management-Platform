@@ -7,6 +7,7 @@ tool that cannot work.
 from backend.app.core.config import Settings
 from backend.app.core.security.permissions import Permission
 from backend.app.integrations.hub import IntegrationHub, build_integration_hub
+from backend.app.tools import connectors as cx
 from backend.app.tools.analytics import (
     AnalyticsTools,
     ListProjectsInput,
@@ -27,6 +28,26 @@ from backend.app.tools.knowledge import KnowledgeTools, SearchKnowledgeInput
 from backend.app.tools.registry import ToolRegistry
 
 READ, WRITE = ToolOperation.READ, ToolOperation.WRITE
+
+
+def register_connector_tools(registry: ToolRegistry, hub: IntegrationHub) -> None:
+    """Category tools for the connectors beyond the core four (only active categories)."""
+    tools = cx.ConnectorTools(hub)
+    read = Permission.PROJECTS_READ
+    sources = tools.sources("tracker")
+    if sources:
+        names = ", ".join(sources)
+        for name, handler, model, description in (
+            ("tracker.search_work_items", tools.search_work_items, cx.SearchWorkItemsInput,
+             f"Search work items in other trackers ({names}): by project/team, text, status. "
+             "Use jira.* for Jira."),
+            ("tracker.get_work_item", tools.get_work_item, cx.GetWorkItemInput,
+             f"Get one work item from a tracker ({names}) by its key."),
+            ("tracker.list_pull_requests", tools.list_pull_requests, cx.ListPullRequestsInput,
+             f"List merge/pull requests in other code hosts ({names}). Use github.* for GitHub."),
+        ):  # fmt: skip
+            registry.register(name, handler, description=description, input_model=model,
+                              operation=READ, permission=read)  # fmt: skip
 
 
 def register_jira_tools(registry: ToolRegistry, tools: JiraTools) -> None:
@@ -208,6 +229,7 @@ def build_tool_registry(
         register_keka_tools(registry, keka_tools)
     if email_tools is not None:
         register_email_tools(registry, email_tools)
+    register_connector_tools(registry, hub)
     if knowledge_tools is not None:
         registry.register(
             "knowledge.search",
