@@ -12,8 +12,10 @@ from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.health import router as health_router
 from backend.app.api.v1.integrations import router as integrations_router
 from backend.app.api.v1.knowledge import router as knowledge_router
+from backend.app.api.v1.mcp import router as mcp_router
 from backend.app.api.v1.projects import router as projects_router
 from backend.app.api.v1.reports import router as reports_router
+from backend.app.api.v1.tokens import router as tokens_router
 from backend.app.api.v1.usage import router as usage_router
 from backend.app.api.v1.users import router as users_router
 from backend.app.core.config import Settings, get_settings
@@ -51,7 +53,7 @@ def create_app(
 ) -> FastAPI:
     """Build the FastAPI application. Tests inject settings, database, models and tools."""
     settings = settings or get_settings()
-    configure_logging(settings.log_level, settings.log_format)
+    configure_logging(settings.log_level, settings.log_format, settings.log_stream)
     configure_tracing(settings)
 
     # The app only cleans up resources it created; injected ones belong to the caller.
@@ -160,6 +162,8 @@ def create_app(
     app.include_router(projects_router)
     app.include_router(reports_router)
     app.include_router(usage_router)
+    app.include_router(tokens_router)
+    app.include_router(mcp_router)
 
     return app
 

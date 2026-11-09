@@ -35,7 +35,7 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 - [ ] **HR & finance** — Darwinbox, Zoho People, BambooHR, Workday (alongside Keka);
       Zoho Books, Tally, SAP for budget and actuals (enables earned value management)
 - [ ] **CRM** — Salesforce / HubSpot: which customer commitments depend on which project
-- [ ] **MCP server** — expose the platform's governed tools (permissions, approvals, audit) to
+- [x] **MCP server** (code mode, see docs/mcp.md) — expose the platform's governed tools (permissions, approvals, audit) to
       Claude, IDEs and internal bots
 
 ## Backlog B — Moonshots

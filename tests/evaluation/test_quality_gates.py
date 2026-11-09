@@ -156,3 +156,24 @@ def test_reports_are_written(tmp_path) -> None:
 def test_metric_thresholds(value, higher, passed) -> None:
     threshold = 0.8 if higher else 0.0
     assert Metric("m", value, threshold, higher_is_better=higher).passed is passed
+
+
+async def test_codemode_gate() -> None:
+    from evaluation.suites import codemode
+
+    result = await codemode.run()
+    assert_passed(result)
+    assert sum(c.id.startswith("escape-") for c in result.cases) >= 20
+
+
+async def test_codemode_detects_scripts_running_as_the_human(monkeypatch) -> None:
+    from backend.app.core.security.permissions import Principal
+    from evaluation.suites import codemode
+
+    # Regression: scripts acting with the user's own principal would skip approvals.
+    monkeypatch.setattr(Principal, "as_agent", lambda self: self)
+
+    result = await codemode.run()
+
+    assert not result.passed
+    assert "governance-write-needs-approval" in {c.id for c in result.cases if not c.passed}

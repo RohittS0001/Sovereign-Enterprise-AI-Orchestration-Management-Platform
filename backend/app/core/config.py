@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     environment: Environment = "development"
     log_level: LogLevel = "INFO"
     log_format: LogFormat = "json"
+    log_stream: Literal["stdout", "stderr"] = "stdout"
 
     # Backend
     host: str = "127.0.0.1"
@@ -145,6 +146,15 @@ class Settings(BaseSettings):
     metrics_token: SecretStr = SecretStr("")  # if set, /metrics requires "Bearer <token>"
     otel_exporter_otlp_endpoint: str = ""  # e.g. http://localhost:4318 (Jaeger, Tempo, collector)
     otel_service_name: str = "sovereign-api"
+
+    # MCP server (code mode) at /mcp and over stdio; clients use personal access tokens.
+    mcp_enabled: bool = True
+    mcp_rate_limit_per_minute: int = Field(default=30, ge=1)
+    mcp_code_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    mcp_max_steps: int = Field(default=200_000, ge=1_000)
+    mcp_max_tool_calls: int = Field(default=50, ge=1, le=500)
+    mcp_max_output_chars: int = Field(default=20_000, ge=1_000)
+    mcp_token_max_days: int = Field(default=90, ge=1, le=365)
 
     _jwt_secret_generated: bool = PrivateAttr(default=False)
 

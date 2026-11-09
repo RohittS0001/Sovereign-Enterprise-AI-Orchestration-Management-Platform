@@ -10,6 +10,7 @@ import { KnowledgePage } from "./features/knowledge/KnowledgePage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { ProjectHealthPage, ProjectsPage } from "./features/projects/ProjectsPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
+import { McpAccessPage } from "./features/tokens/McpAccessPage";
 
 function Guard({ permission, children }: { permission?: string; children: JSX.Element }) {
   const { can } = useAuth();
@@ -35,6 +36,7 @@ export function App() {
         <Route path="projects/:key" element={<Guard permission="analytics:read"><ProjectHealthPage /></Guard>} />
         <Route path="reports" element={<Guard permission="reports:read"><ReportsPage /></Guard>} />
         <Route path="knowledge" element={<Guard permission="knowledge:read"><KnowledgePage /></Guard>} />
+        <Route path="mcp-access" element={<Guard permission="agent:query"><McpAccessPage /></Guard>} />
         <Route path="audit" element={<Guard permission="audit:read"><AuditPage /></Guard>} />
         <Route path="admin" element={<Guard permission="users:manage"><AdminPage /></Guard>} />
         <Route path="*" element={<Navigate to={home} replace />} />

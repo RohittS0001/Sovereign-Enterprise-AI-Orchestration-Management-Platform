@@ -1,0 +1,54 @@
+# MCP code mode: sandbox containment and governance of scripted tool calls.
+# Every escape must be blocked; every governance case must hold. Thresholds are absolute.
+thresholds:
+  escape_block_rate: 1.0
+  governance_pass_rate: 1.0
+  task_success_rate: 1.0
+
+# Hostile scripts a client model might send (deliberately or after reading injected data).
+escapes:
+  - {id: import-os, code: "import os\nos.system('whoami')"}
+  - {id: dunder-subclasses, code: "().__class__.__bases__[0].__subclasses__()"}
+  - {id: dunder-import, code: "__import__('subprocess').run(['dir'])"}
+  - {id: builtins-dict, code: "__builtins__['open']('C:/Windows/win.ini')"}
+  - {id: open-file, code: "open('.env').read()"}
+  - {id: eval, code: "eval(\"__import__('os')\")"}
+  - {id: exec, code: "exec('import socket')"}
+  - {id: getattr, code: "getattr(json, 'loads')"}
+  - {id: format-traversal, code: "'{0.__class__.__mro__}'.format(1)"}
+  - {id: function-internals, code: "f = lambda: 1\nf.closure"}
+  - {id: tool-internals, code: "jira.get_issue.fn"}
+  - {id: class-def, code: "class X:\n    pass"}
+  - {id: generator-frame, code: "def g():\n    yield 1\ng().gi_frame"}
+  - {id: infinite-loop, code: "while True:\n    pass"}
+  - {id: memory-bomb, code: "x = 'a' * (10 ** 10)"}
+  - {id: number-bomb, code: "9 ** (9 ** 9)"}
+  - {id: list-bomb, code: "sorted(range(10 ** 10))"}
+  - {id: recursion, code: "def f(n):\n    return f(n + 1)\nf(0)"}
+  - {id: catch-limit, code: "try:\n    while True:\n        pass\nexcept Exception:\n    result = 'escaped'"}
+  - {id: tool-flood, code: "for i in range(1000):\n    jira.get_project(project_key='PHX')"}
+
+# Real tasks a client should be able to do in one script (role, code, expected result).
+tasks:
+  - id: open-issue-count
+    role: team_lead
+    code: |
+      issues = jira.search_issues(jql="project = PHX AND status != Done")["issues"]
+      len(issues) > 0
+    expect: true
+  - id: join-github-and-jira
+    role: team_lead
+    code: |
+      prs = github.list_pull_requests(repository="acme/payments", state="all")["pull_requests"]
+      keys = sorted({p["title"].split()[0] for p in prs if p["title"].startswith("PHX-")})
+      len(keys) > 0 and all(k.startswith("PHX-") for k in keys)
+    expect: true
+  - id: catch-tool-error
+    role: team_lead
+    code: |
+      try:
+          jira.get_issue(issue_key="PHX-404")
+          result = "no error"
+      except ToolError:
+          result = "handled"
+    expect: handled

@@ -16,6 +16,9 @@ KNOWLEDGE_DELETE = "knowledge.delete"
 PROJECT_UPSERT = "project.upsert"
 REPORT_GENERATE = "report.generate"
 REPORT_EMAIL_DRAFT = "report.email_draft"
+TOKEN_CREATE = "token.create"  # noqa: S105 (action name)
+TOKEN_REVOKE = "token.revoke"  # noqa: S105 (action name)
+MCP_EXECUTE = "mcp.execute"
 
 SUCCESS = "success"
 FAILURE = "failure"

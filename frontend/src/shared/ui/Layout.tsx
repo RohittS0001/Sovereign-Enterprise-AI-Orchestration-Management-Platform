@@ -7,6 +7,7 @@ const NAV = [
   { to: "/projects", label: "Projects", permission: "projects:read" },
   { to: "/reports", label: "Reports", permission: "reports:read" },
   { to: "/knowledge", label: "Knowledge", permission: "knowledge:read" },
+  { to: "/mcp-access", label: "MCP access", permission: "agent:query" },
   { to: "/audit", label: "Audit log", permission: "audit:read" },
   { to: "/admin", label: "Admin", permission: "users:manage" },
 ];

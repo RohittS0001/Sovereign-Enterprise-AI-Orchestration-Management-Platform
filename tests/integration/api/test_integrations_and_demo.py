@@ -42,7 +42,9 @@ async def test_demo_mode_enables_every_integration(
     status = {i["name"]: i for i in body}
     active = [i for i in body if i["mode"] != "disabled"]
     assert {"jira", "github", "keka", "gmail"} <= set(status)
-    assert all(i["mode"] == "demo" and i["healthy"] is True and not i["missing_env"] for i in active)
+    assert all(
+        i["mode"] == "demo" and i["healthy"] is True and not i["missing_env"] for i in active
+    )
     assert "github.list_workflow_runs" in status["github"]["tools"]
     assert "keka.get_leave_requests" in status["keka"]["tools"]
     assert "gmail.create_draft" in status["gmail"]["tools"]

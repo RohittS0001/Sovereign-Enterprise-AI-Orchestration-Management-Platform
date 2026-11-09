@@ -62,7 +62,7 @@ class TextFormatter(logging.Formatter):
         )
 
 
-def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
+def configure_logging(level: str = "INFO", fmt: str = "json", stream: str = "stdout") -> None:
     """Install (or replace) the root log handler. Safe to call more than once."""
     root = logging.getLogger()
 
@@ -70,7 +70,8 @@ def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
         if handler.get_name() == _HANDLER_NAME:
             root.removeHandler(handler)
 
-    handler = logging.StreamHandler(sys.stdout)
+    # stdio transports (MCP) reserve stdout for protocol messages, so they log to stderr.
+    handler = logging.StreamHandler(sys.stderr if stream == "stderr" else sys.stdout)
     handler.set_name(_HANDLER_NAME)
     handler.addFilter(RequestIdFilter())
     handler.setFormatter(JsonFormatter() if fmt == "json" else TextFormatter())

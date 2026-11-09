@@ -10,6 +10,7 @@ from backend.app.integrations.keka.service import KekaService
 
 TOKEN = httpx.Response(200, json={"access_token": "tok", "expires_in": 3600})
 
+
 def service(*responses: httpx.Response) -> tuple[KekaService, list[httpx.Request]]:
     queue, seen = [TOKEN, *responses], []
 
@@ -23,9 +24,12 @@ def service(*responses: httpx.Response) -> tuple[KekaService, list[httpx.Request
     )  # fmt: skip
     return KekaService(client=client), seen
 
+
 async def test_search_employees_pages_and_filters() -> None:
     svc, seen = service(
-        httpx.Response(200, json={"data": [{"id": "e-1", "displayName": "Priya"}], "totalRecords": 7})
+        httpx.Response(
+            200, json={"data": [{"id": "e-1", "displayName": "Priya"}], "totalRecords": 7}
+        )
     )
 
     result = await svc.search_employees("pri", employment_status="All", limit=5)
@@ -34,6 +38,7 @@ async def test_search_employees_pages_and_filters() -> None:
     params = seen[-1].url.params
     assert params["searchKey"] == "pri" and params["pageSize"] == "5"
     assert "employmentStatus" not in params  # "All" means no filter
+
 
 async def test_leave_balances_and_attendance_accept_plain_lists() -> None:
     svc, seen = service(
@@ -48,10 +53,12 @@ async def test_leave_balances_and_attendance_accept_plain_lists() -> None:
     assert attendance["total"] == 1
     assert seen[-1].url.params["from"] == "2026-11-02"
 
+
 async def test_get_employee_unwraps_data_envelope() -> None:
     svc, _ = service(httpx.Response(200, json={"data": {"id": "e-9", "displayName": "Ravi"}}))
 
     assert (await svc.get_employee("e-9"))["id"] == "e-9"
+
 
 @pytest.mark.parametrize("bad", ["../hris", "e 1", "x" * 80])
 async def test_employee_ids_are_validated_before_any_request(bad) -> None:
@@ -61,12 +68,14 @@ async def test_employee_ids_are_validated_before_any_request(bad) -> None:
         await svc.get_employee(bad)
     assert seen == []
 
+
 async def test_ranges_are_validated() -> None:
     svc, seen = service()
 
     with pytest.raises(ValueError):
         await svc.get_leave_requests(date(2026, 3, 1), date(2026, 1, 1))
     assert seen == []
+
 
 async def test_lazy_client_and_close() -> None:
     built = []

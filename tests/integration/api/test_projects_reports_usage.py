@@ -272,7 +272,9 @@ async def test_scheduler_skips_a_failing_project_and_keeps_running(
     assert await due.run_due() == []  # logged and skipped, not raised
 
 
-async def test_scheduler_task_starts_and_stops_cleanly(demo_settings, database, monkeypatch) -> None:
+async def test_scheduler_task_starts_and_stops_cleanly(
+    demo_settings, database, monkeypatch
+) -> None:
     from backend.app.domains.reporting import scheduler as scheduler_module
 
     calls = []

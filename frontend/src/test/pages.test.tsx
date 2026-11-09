@@ -119,6 +119,32 @@ describe("Knowledge page", () => {
   });
 });
 
+describe("MCP access page", () => {
+  it("creates a token, shows it once and lists it", async () => {
+    const token = {
+      id: "t1", name: "Claude Desktop", prefix: "sov_pat_abc123", created_at: "2026-11-09T10:00:00Z",
+      expires_at: "2026-12-09T10:00:00Z", last_used_at: null,
+    };
+    let created = false;
+    const fetchMock = signedInAs(LEAD, {
+      "GET /tokens": () => json(created ? [token] : []),
+      "POST /tokens": () => {
+        created = true;
+        return json({ ...token, token: "sov_pat_abc123SECRET" }, 201);
+      },
+    });
+    renderApp("/mcp-access");
+
+    expect(await screen.findByText("No active tokens.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Create token" }));
+
+    expect(await screen.findByRole("status")).toHaveTextContent("sov_pat_abc123SECRET");
+    expect(await screen.findByText("sov_pat_abc123…")).toBeInTheDocument();
+    const post = fetchMock.mock.calls.find(([url, init]) => String(url).endsWith("/tokens") && init?.method === "POST")!;
+    expect(JSON.parse(String(post[1]!.body))).toEqual({ name: "Claude Desktop", expires_in_days: 30 });
+  });
+});
+
 describe("Admin page", () => {
   it("shows which integrations are connected and which env vars the rest need", async () => {
     const integrations: IntegrationStatus[] = [
