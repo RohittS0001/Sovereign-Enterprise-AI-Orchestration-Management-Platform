@@ -1,0 +1,18 @@
+# Keep secrets, local state and build output out of images.
+.git
+.venv
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+.env
+.env.*
+!.env.example
+credentials.json
+token.json
+data/*
+!data/.gitkeep
+evaluation/reports
+frontend/node_modules
+frontend/dist
+.claude
+*.db

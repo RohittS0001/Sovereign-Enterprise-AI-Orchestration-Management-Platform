@@ -40,8 +40,3 @@ google-api-python-client==2.201.0
 google-auth==2.61.0
 google-auth-httplib2==0.4.4
 google-auth-oauthlib==1.5.0
-
-# Development and testing
-pytest==9.1.1
-pytest-asyncio==1.4.0
-ruff==0.16.8

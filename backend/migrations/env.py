@@ -11,6 +11,7 @@ from backend.app.core.config import get_settings
 from backend.app.db import models  # noqa: F401  (register models on the metadata)
 from backend.app.db.base import Base
 from backend.app.db.session import normalize_database_url
+from backend.app.db.types import EmbeddingVector
 
 config = context.config
 if config.config_file_name is not None:
@@ -27,12 +28,20 @@ def _database_url() -> str:
     return normalize_database_url(url)
 
 
+def _compare_type(context, inspected_column, metadata_column, inspected_type, metadata_type):
+    # EmbeddingVector renders as pgvector `vector` on PostgreSQL but is JSON-backed in
+    # Python; its reflected type never matches literally, so don't report it as drift.
+    if isinstance(metadata_column.type, EmbeddingVector):
+        return False
+    return None  # default comparison for everything else
+
+
 def _configure(connection: Connection | None = None, url: str | None = None) -> None:
     context.configure(
         connection=connection,
         url=url,
         target_metadata=target_metadata,
-        compare_type=True,
+        compare_type=_compare_type,
         # SQLite cannot ALTER most things in place; batch mode recreates tables instead.
         render_as_batch=True,
         literal_binds=connection is None,

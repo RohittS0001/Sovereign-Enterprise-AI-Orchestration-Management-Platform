@@ -1,0 +1,79 @@
+# PostgreSQL (with the pgvector extension) is external: a managed service or your own cluster.
+# Secrets come from a Kubernetes Secret you create (never commit real values):
+#
+#   kubectl create secret generic sovereign-secrets \
+#     --from-literal=DATABASE_URL='postgresql://user:pass@postgres:5432/sovereign' \
+#     --from-literal=JWT_SECRET_KEY="$(openssl rand -base64 48)" \
+#     --from-literal=JIRA_API_TOKEN=... --from-literal=GITHUB_TOKEN=...
+#
+existingSecret: sovereign-secrets
+
+image:
+  api:
+    repository: ghcr.io/your-org/sovereign-api
+    tag: ""            # defaults to the chart appVersion
+  web:
+    repository: ghcr.io/your-org/sovereign-web
+    tag: ""
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+# Non-secret settings, passed to the API as environment variables (see .env.example).
+config:
+  ENVIRONMENT: production
+  LOG_FORMAT: json
+  DEMO_MODE: "false"
+  LLM_PROVIDER: ollama
+  LLM_BASE_URL: http://ollama:11434
+  LLM1_MODEL_NAME: ""
+  EMBEDDING_MODEL_NAME: ""
+  CORS_ORIGINS: '["https://sovereign.example.com"]'
+  REPORT_SCHEDULE_ENABLED: "true"
+  OTEL_EXPORTER_OTLP_ENDPOINT: ""
+  OTEL_SERVICE_NAME: sovereign-api
+
+api:
+  replicas: 2
+  workersPerPod: 2
+  resources:
+    requests: {cpu: 250m, memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+
+web:
+  replicas: 2
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+
+migrations:
+  enabled: true   # runs `alembic upgrade head` before each install/upgrade
+
+ingress:
+  enabled: false
+  className: nginx
+  host: sovereign.example.com
+  tls:
+    enabled: false
+    secretName: sovereign-tls
+  annotations:
+    # Streamed agent runs (SSE) need unbuffered, long-lived responses.
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "600"
+    nginx.ingress.kubernetes.io/proxy-body-size: 25m
+
+metrics:
+  serviceMonitor:
+    enabled: false   # requires the Prometheus Operator CRDs
+    interval: 30s
+
+podSecurityContext:
+  runAsNonRoot: true
+  seccompProfile: {type: RuntimeDefault}
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  capabilities: {drop: [ALL]}

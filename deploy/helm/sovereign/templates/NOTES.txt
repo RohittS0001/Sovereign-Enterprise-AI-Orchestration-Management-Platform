@@ -1,0 +1,15 @@
+Sovereign {{ .Chart.AppVersion }} deployed as release "{{ .Release.Name }}".
+
+{{- if .Values.ingress.enabled }}
+UI: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+{{- else }}
+Port-forward the UI:
+  kubectl port-forward svc/{{ include "sovereign.fullname" . }}-web 8080:80
+  open http://localhost:8080
+{{- end }}
+
+Create the first administrator:
+  kubectl exec deploy/{{ include "sovereign.fullname" . }}-api -- \
+    python -m scripts.create_admin --email you@company.com --name "Your Name"
+
+Secrets are read from the "{{ .Values.existingSecret }}" Secret (DATABASE_URL, JWT_SECRET_KEY, ...).

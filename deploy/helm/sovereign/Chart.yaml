@@ -1,0 +1,7 @@
+apiVersion: v2
+name: sovereign
+description: Sovereign enterprise AI orchestration & management platform (API + web)
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords: [ai, agents, project-management, on-prem]

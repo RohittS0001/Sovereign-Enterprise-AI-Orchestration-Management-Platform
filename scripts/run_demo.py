@@ -1,6 +1,7 @@
 """Run the platform locally in demo mode — no Jira/GitHub/Keka/Gmail credentials needed.
 
     python -m scripts.run_demo            # API on http://127.0.0.1:8000
+    python -m scripts.run_demo --seed-only  # migrate + seed, then exit (Docker)
     cd frontend && npm run dev            # UI on http://localhost:5173
 
 Creates (once) a SQLite database in data/demo.db, one user per role, the demo
@@ -62,6 +63,7 @@ async def seed() -> None:
 
 
 def main() -> None:
+    seed_only = "--seed-only" in sys.argv  # used by the Docker entrypoint
     (ROOT / "data").mkdir(exist_ok=True)
     subprocess.run([sys.executable, "-m", "alembic", "upgrade", "head"], cwd=ROOT, check=True)
     asyncio.run(seed())
@@ -69,6 +71,8 @@ def main() -> None:
     for email, _, role in DEMO_USERS:
         print(f"  {role:<16} {email}")
     print()
+    if seed_only:
+        return
 
     import uvicorn
 

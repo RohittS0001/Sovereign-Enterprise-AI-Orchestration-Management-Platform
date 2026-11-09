@@ -1,12 +1,38 @@
-# Local development services. Start with:  docker compose up -d db
-# Then set DATABASE_URL=postgresql://sovereign:sovereign@localhost:5432/sovereign
-# and run:  python -m alembic upgrade head
+# Sovereign platform — full local stack.
 #
-# The API, Ollama and frontend services are added in the deployment phase.
+#   docker compose up -d --build                       # demo: db + api + web  → http://localhost:8080
+#   LLM1_MODEL_NAME=qwen3:8b docker compose --profile ai up -d --build      # + local LLM (Ollama)
+#   docker compose --profile monitoring up -d          # + Prometheus, Grafana, Jaeger
+#
+# Demo logins (SEED_DEMO=true): admin@example.com / pm@ / lead@ / member@ / auditor@example.com,
+# password DEMO_PASSWORD (default Demo!Passw0rd123). Set DEMO_MODE=false and real credentials in
+# your environment to connect Jira/GitHub/Keka/Gmail.
+#
+# Only variables referenced below are passed to containers; your .env is never copied wholesale.
+
+x-api-env: &api-env
+  ENVIRONMENT: ${ENVIRONMENT:-development}
+  LOG_FORMAT: json
+  DATABASE_URL: postgresql://${POSTGRES_USER:-sovereign}:${POSTGRES_PASSWORD:-sovereign}@db:5432/${POSTGRES_DB:-sovereign}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-compose-local-only-secret-change-me-0123456789}
+  CORS_ORIGINS: '["http://localhost:8080"]'
+  DEMO_MODE: ${DEMO_MODE:-true}
+  SEED_DEMO: ${SEED_DEMO:-true}
+  DEMO_PASSWORD: ${DEMO_PASSWORD:-Demo!Passw0rd123}
+  LLM_PROVIDER: ${LLM_PROVIDER:-ollama}
+  LLM_BASE_URL: ${LLM_BASE_URL:-http://ollama:11434}
+  LLM1_MODEL_NAME: ${LLM1_MODEL_NAME:-}
+  LLM2_MODEL_NAME: ${LLM2_MODEL_NAME:-}
+  EMBEDDING_MODEL_NAME: ${EMBEDDING_MODEL_NAME:-}
+  REPORT_SCHEDULE_ENABLED: ${REPORT_SCHEDULE_ENABLED:-false}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+  OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+  OTEL_SERVICE_NAME: sovereign-api
+  WEB_CONCURRENCY: ${WEB_CONCURRENCY:-2}
 
 services:
   db:
-    # PostgreSQL 17 with the pgvector extension (used for document embeddings).
+    # PostgreSQL 17 with pgvector (embeddings) — full-text search is built in.
     image: pgvector/pgvector:0.8.0-pg17
     restart: unless-stopped
     environment:
@@ -23,5 +49,108 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build:
+      context: .
+      dockerfile: deploy/docker/api.Dockerfile
+    image: sovereign-api:local
+    restart: unless-stopped
+    environment: *api-env
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8000:8000"   # API docs at http://localhost:8000/docs (dev only)
+
+  web:
+    build:
+      context: .
+      dockerfile: deploy/docker/web.Dockerfile
+    image: sovereign-web:local
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: api:8000
+    depends_on:
+      - api
+    ports:
+      - "127.0.0.1:8080:8080"
+
+  # --- profile "ai": local models -------------------------------------------------------
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:0.5.7
+    restart: unless-stopped
+    volumes:
+      - ollama:/root/.ollama
+    ports:
+      - "127.0.0.1:11434:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # NVIDIA GPU: uncomment (requires the NVIDIA Container Toolkit).
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{driver: nvidia, count: all, capabilities: [gpu]}]
+
+  ollama-pull:
+    # One-shot: downloads the configured models into the shared volume, then exits.
+    profiles: ["ai"]
+    image: ollama/ollama:0.5.7
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        ollama pull "${LLM1_MODEL_NAME:-qwen3:8b}" &&
+        if [ -n "${EMBEDDING_MODEL_NAME:-}" ]; then ollama pull "${EMBEDDING_MODEL_NAME}"; fi
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+  # --- profile "monitoring": metrics, dashboards, traces -------------------------------------
+  prometheus:
+    profiles: ["monitoring"]
+    image: prom/prometheus:v3.1.0
+    restart: unless-stopped
+    volumes:
+      - ./deploy/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+    ports:
+      - "127.0.0.1:9090:9090"
+
+  grafana:
+    profiles: ["monitoring"]
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./deploy/monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "127.0.0.1:3000:3000"
+
+  jaeger:
+    # Receives OpenTelemetry traces. Set OTEL_EXPORTER_OTLP_ENDPOINT=http://jaeger:4318 for the API.
+    profiles: ["monitoring"]
+    image: jaegertracing/all-in-one:1.65.0
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "127.0.0.1:16686:16686"   # UI
+      - "127.0.0.1:4318:4318"     # OTLP/HTTP
+
 volumes:
   pgdata:
+  ollama:
+  prometheus:
+  grafana:
