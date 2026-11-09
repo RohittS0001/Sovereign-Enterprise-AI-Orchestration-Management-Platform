@@ -194,8 +194,14 @@ export interface UserRow {
 
 export interface IntegrationStatus {
   name: string;
+  title: string;
+  category: string;
   mode: "live" | "demo" | "disabled";
   tools: string[];
+  /** Env vars still needed to enable it (empty once configured). */
+  missing_env: string[];
+  setup: string;
+  docs_url: string;
   healthy: boolean | null;
   detail: string | null;
 }

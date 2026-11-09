@@ -113,6 +113,12 @@ function Users() {
   );
 }
 
+function groupByCategory(items: IntegrationStatus[]): [string, IntegrationStatus[]][] {
+  const groups = new Map<string, IntegrationStatus[]>();
+  for (const item of items) groups.set(item.category, [...(groups.get(item.category) ?? []), item]);
+  return [...groups.entries()];
+}
+
 function Integrations() {
   const [check, setCheck] = useState(false);
   const status = useQuery({
@@ -130,20 +136,50 @@ function Integrations() {
     >
       {status.isLoading && <Spinner />}
       <ErrorNote error={status.error} />
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-        {status.data?.map((i) => (
-          <li key={i.name} className="row" style={{ justifyContent: "space-between", padding: "6px 0" }}>
-            <span>
-              <strong style={{ textTransform: "capitalize" }}>{i.name}</strong>{" "}
-              <span className="small muted">{i.tools.length} tools</span>
-            </span>
-            <span className="row">
-              {i.healthy !== null && <Badge value={i.healthy ? "healthy" : "failed"} label={i.healthy ? "ok" : i.detail ?? "failed"} />}
-              <Badge value={i.mode} />
-            </span>
-          </li>
-        ))}
-      </ul>
+      {status.data && (
+        <p className="small muted">
+          {status.data.filter((i) => i.mode !== "disabled").length} of {status.data.length} connected. Fill in the
+          listed variables in <code>.env</code> and restart to connect more (see <code>docs/integrations.md</code>).
+        </p>
+      )}
+      {groupByCategory(status.data ?? []).map(([category, items]) => (
+        <section key={category} aria-label={category}>
+          <h3 className="small muted" style={{ textTransform: "uppercase", margin: "12px 0 4px" }}>
+            {category}
+          </h3>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {items.map((i) => (
+              <li key={i.name} style={{ padding: "6px 0" }}>
+                <div className="row" style={{ justifyContent: "space-between" }}>
+                  <span>
+                    <strong>{i.title}</strong> <span className="small muted">{i.tools.length} tools</span>
+                  </span>
+                  <span className="row">
+                    {i.healthy !== null && (
+                      <Badge value={i.healthy ? "healthy" : "failed"} label={i.healthy ? "ok" : i.detail ?? "failed"} />
+                    )}
+                    <Badge value={i.mode} />
+                  </span>
+                </div>
+                {i.missing_env.length > 0 && (
+                  <div className="small muted">
+                    Needs {i.missing_env.map((v) => <code key={v}>{v} </code>)}
+                    {i.docs_url && (
+                      <>
+                        {" · "}
+                        <a href={i.docs_url} target="_blank" rel="noreferrer">
+                          API docs
+                        </a>
+                      </>
+                    )}
+                    {i.setup && <div>{i.setup}</div>}
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))}
     </Card>
   );
 }
