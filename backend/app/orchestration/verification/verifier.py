@@ -13,8 +13,7 @@ def verify_results(state: AgentState) -> AgentState:
         return state
 
     state.verified = all(
-        observation.get("status") != "failed"
-        for observation in state.observations
+        observation.get("status") != "failed" for observation in state.observations
     )
 
     return state

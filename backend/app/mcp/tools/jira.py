@@ -1,4 +1,3 @@
-
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
 
@@ -102,7 +101,7 @@ class JiraTools:
             SearchIssuesInput,
             lambda inputs: self.service.search_issues(
                 inputs.jql,
-                start_at=inputs.start_at,
+                next_page_token=inputs.next_page_token,
                 max_results=inputs.max_results,
                 fields=inputs.fields,
             ),
@@ -116,7 +115,7 @@ class JiraTools:
             GetProjectIssuesInput,
             lambda inputs: self.service.get_project_issues(
                 inputs.project_key,
-                start_at=inputs.start_at,
+                next_page_token=inputs.next_page_token,
                 max_results=inputs.max_results,
             ),
         )
@@ -191,9 +190,7 @@ class JiraTools:
             "create epic",
             payload,
             CreateEpicInput,
-            lambda inputs: self.service.create_epic(
-                CreateEpicRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.create_epic(CreateEpicRequest(**inputs.model_dump())),
         )
 
     async def create_story(self, payload: dict[str, Any]) -> ToolResult:
@@ -202,9 +199,7 @@ class JiraTools:
             "create story",
             payload,
             CreateStoryInput,
-            lambda inputs: self.service.create_story(
-                CreateStoryRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.create_story(CreateStoryRequest(**inputs.model_dump())),
         )
 
     async def create_task(self, payload: dict[str, Any]) -> ToolResult:
@@ -213,9 +208,7 @@ class JiraTools:
             "create task",
             payload,
             CreateTaskInput,
-            lambda inputs: self.service.create_task(
-                CreateTaskRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.create_task(CreateTaskRequest(**inputs.model_dump())),
         )
 
     # --------------------------------------------------
@@ -228,9 +221,7 @@ class JiraTools:
             "assign issue",
             payload,
             AssignIssueInput,
-            lambda inputs: self.service.assign_issue(
-                AssignIssueRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.assign_issue(AssignIssueRequest(**inputs.model_dump())),
         )
 
     async def update_issue(self, payload: dict[str, Any]) -> ToolResult:
@@ -239,9 +230,7 @@ class JiraTools:
             "update issue",
             payload,
             UpdateIssueInput,
-            lambda inputs: self.service.update_issue(
-                UpdateIssueRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.update_issue(UpdateIssueRequest(**inputs.model_dump())),
         )
 
     async def transition_issue(self, payload: dict[str, Any]) -> ToolResult:
@@ -261,9 +250,7 @@ class JiraTools:
             "add comment",
             payload,
             AddCommentInput,
-            lambda inputs: self.service.add_comment(
-                AddCommentRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.add_comment(AddCommentRequest(**inputs.model_dump())),
         )
 
     async def link_issues(self, payload: dict[str, Any]) -> ToolResult:
@@ -272,7 +259,5 @@ class JiraTools:
             "link issues",
             payload,
             LinkIssuesInput,
-            lambda inputs: self.service.link_issues(
-                LinkIssuesRequest(**inputs.model_dump())
-            ),
+            lambda inputs: self.service.link_issues(LinkIssuesRequest(**inputs.model_dump())),
         )

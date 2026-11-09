@@ -1,6 +1,9 @@
+# Exact pins for reproducible installs. Keep in sync with pyproject.toml.
+
 # Backend
 fastapi==0.142.2
 uvicorn[standard]==0.54.0
+pydantic==2.13.5
 pydantic-settings==2.15.0
 python-dotenv==1.2.4
 httpx==0.28.1
@@ -13,14 +16,13 @@ sqlalchemy==2.1.1
 alembic==1.20.0
 psycopg[binary]==3.3.6
 
+# Gmail
+google-api-python-client==2.201.0
+google-auth==2.61.0
+google-auth-httplib2==0.4.4
+google-auth-oauthlib==1.5.0
+
 # Development and testing
 pytest==9.1.1
 pytest-asyncio==1.4.0
 ruff==0.16.8
-
-# Gmail 
-
-google-api-python-client
-google-auth
-google-auth-httplib2
-google-auth-oauthlib

@@ -1,4 +1,3 @@
-
 from unittest.mock import AsyncMock
 
 import pytest
@@ -105,6 +104,7 @@ def jira_tools(jira_service):
 # Read tools
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_get_project(jira_tools, jira_service):
     result = await jira_tools.get_project({"project_key": "DEMO"})
@@ -125,19 +125,21 @@ async def test_get_issue(jira_tools, jira_service):
 
 @pytest.mark.asyncio
 async def test_search_issues(jira_tools, jira_service):
-    result = await jira_tools.search_issues({
-        "jql": "project = DEMO",
-        "start_at": 0,
-        "max_results": 20,
-        "fields": ["summary"],
-    })
+    result = await jira_tools.search_issues(
+        {
+            "jql": "project = DEMO",
+            "next_page_token": "page-2",
+            "max_results": 20,
+            "fields": ["summary"],
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert len(result.data["issues"]) == 1
 
     jira_service.search_issues.assert_awaited_once_with(
         "project = DEMO",
-        start_at=0,
+        next_page_token="page-2",
         max_results=20,
         fields=["summary"],
     )
@@ -145,23 +147,27 @@ async def test_search_issues(jira_tools, jira_service):
 
 @pytest.mark.asyncio
 async def test_get_project_issues(jira_tools, jira_service):
-    result = await jira_tools.get_project_issues({
-        "project_key": "DEMO",
-    })
+    result = await jira_tools.get_project_issues(
+        {
+            "project_key": "DEMO",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     jira_service.get_project_issues.assert_awaited_once_with(
         "DEMO",
-        start_at=0,
+        next_page_token=None,
         max_results=50,
     )
 
 
 @pytest.mark.asyncio
 async def test_get_issue_comments(jira_tools, jira_service):
-    result = await jira_tools.get_issue_comments({
-        "issue_key": "DEMO-1",
-    })
+    result = await jira_tools.get_issue_comments(
+        {
+            "issue_key": "DEMO-1",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data == {"comments": []}
@@ -175,9 +181,11 @@ async def test_get_issue_comments(jira_tools, jira_service):
 
 @pytest.mark.asyncio
 async def test_get_issue_history(jira_tools, jira_service):
-    result = await jira_tools.get_issue_history({
-        "issue_key": "DEMO-1",
-    })
+    result = await jira_tools.get_issue_history(
+        {
+            "issue_key": "DEMO-1",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data == {"histories": []}
@@ -191,15 +199,15 @@ async def test_get_issue_history(jira_tools, jira_service):
 
 @pytest.mark.asyncio
 async def test_get_issue_dependencies(jira_tools, jira_service):
-    result = await jira_tools.get_issue_dependencies({
-        "issue_key": "DEMO-1",
-    })
+    result = await jira_tools.get_issue_dependencies(
+        {
+            "issue_key": "DEMO-1",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
 
-    jira_service.get_issue_dependencies.assert_awaited_once_with(
-        "DEMO-1"
-    )
+    jira_service.get_issue_dependencies.assert_awaited_once_with("DEMO-1")
 
 
 @pytest.mark.asyncio
@@ -228,13 +236,16 @@ async def test_get_sprint_issues(jira_tools, jira_service):
 # Create tools
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_create_epic(jira_tools, jira_service):
-    result = await jira_tools.create_epic({
-        "project_key": "DEMO",
-        "summary": "Platform Epic",
-        "description": "Build the platform",
-    })
+    result = await jira_tools.create_epic(
+        {
+            "project_key": "DEMO",
+            "summary": "Platform Epic",
+            "description": "Build the platform",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["key"] == "DEMO-10"
@@ -250,11 +261,13 @@ async def test_create_epic(jira_tools, jira_service):
 
 @pytest.mark.asyncio
 async def test_create_story(jira_tools, jira_service):
-    result = await jira_tools.create_story({
-        "project_key": "DEMO",
-        "summary": "Implement authentication",
-        "parent_key": "DEMO-10",
-    })
+    result = await jira_tools.create_story(
+        {
+            "project_key": "DEMO",
+            "summary": "Implement authentication",
+            "parent_key": "DEMO-10",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["key"] == "DEMO-11"
@@ -271,10 +284,12 @@ async def test_create_story(jira_tools, jira_service):
 
 @pytest.mark.asyncio
 async def test_create_task(jira_tools, jira_service):
-    result = await jira_tools.create_task({
-        "project_key": "DEMO",
-        "summary": "Write unit tests",
-    })
+    result = await jira_tools.create_task(
+        {
+            "project_key": "DEMO",
+            "summary": "Write unit tests",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["key"] == "DEMO-12"
@@ -293,12 +308,15 @@ async def test_create_task(jira_tools, jira_service):
 # Assign issue
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_assign_issue(jira_tools, jira_service):
-    result = await jira_tools.assign_issue({
-        "issue_key": "DEMO-1",
-        "account_id": "user-account-123",
-    })
+    result = await jira_tools.assign_issue(
+        {
+            "issue_key": "DEMO-1",
+            "account_id": "user-account-123",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["issue_key"] == "DEMO-1"
@@ -316,10 +334,12 @@ async def test_assign_issue_rejects_invalid_input(
     jira_tools,
     jira_service,
 ):
-    result = await jira_tools.assign_issue({
-        "issue_key": "DEMO-1",
-        "account_id": "",
-    })
+    result = await jira_tools.assign_issue(
+        {
+            "issue_key": "DEMO-1",
+            "account_id": "",
+        }
+    )
 
     assert result.status == ToolStatus.ERROR
     assert "Invalid Jira input" in result.error
@@ -330,15 +350,18 @@ async def test_assign_issue_rejects_invalid_input(
 # Update issue
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_update_issue(jira_tools, jira_service):
-    result = await jira_tools.update_issue({
-        "issue_key": "DEMO-1",
-        "summary": "Updated summary",
-        "description": "Updated description",
-        "priority_id": "2",
-        "assignee_account_id": "user-account-123",
-    })
+    result = await jira_tools.update_issue(
+        {
+            "issue_key": "DEMO-1",
+            "summary": "Updated summary",
+            "description": "Updated description",
+            "priority_id": "2",
+            "assignee_account_id": "user-account-123",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["issue_key"] == "DEMO-1"
@@ -359,10 +382,12 @@ async def test_update_issue_rejects_invalid_input(
     jira_tools,
     jira_service,
 ):
-    result = await jira_tools.update_issue({
-        "issue_key": "",
-        "summary": "Updated summary",
-    })
+    result = await jira_tools.update_issue(
+        {
+            "issue_key": "",
+            "summary": "Updated summary",
+        }
+    )
 
     assert result.status == ToolStatus.ERROR
     assert "Invalid Jira input" in result.error
@@ -373,12 +398,15 @@ async def test_update_issue_rejects_invalid_input(
 # Transition issue
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_transition_issue(jira_tools, jira_service):
-    result = await jira_tools.transition_issue({
-        "issue_key": "DEMO-1",
-        "transition_id": "31",
-    })
+    result = await jira_tools.transition_issue(
+        {
+            "issue_key": "DEMO-1",
+            "transition_id": "31",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["issue_key"] == "DEMO-1"
@@ -396,10 +424,12 @@ async def test_transition_issue_rejects_invalid_input(
     jira_tools,
     jira_service,
 ):
-    result = await jira_tools.transition_issue({
-        "issue_key": "DEMO-1",
-        "transition_id": "",
-    })
+    result = await jira_tools.transition_issue(
+        {
+            "issue_key": "DEMO-1",
+            "transition_id": "",
+        }
+    )
 
     assert result.status == ToolStatus.ERROR
     assert "Invalid Jira input" in result.error
@@ -410,12 +440,15 @@ async def test_transition_issue_rejects_invalid_input(
 # Add comment
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_add_comment(jira_tools, jira_service):
-    result = await jira_tools.add_comment({
-        "issue_key": "DEMO-1",
-        "comment": "Ready for review.",
-    })
+    result = await jira_tools.add_comment(
+        {
+            "issue_key": "DEMO-1",
+            "comment": "Ready for review.",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["issue_key"] == "DEMO-1"
@@ -433,10 +466,12 @@ async def test_add_comment_rejects_invalid_input(
     jira_tools,
     jira_service,
 ):
-    result = await jira_tools.add_comment({
-        "issue_key": "DEMO-1",
-        "comment": "",
-    })
+    result = await jira_tools.add_comment(
+        {
+            "issue_key": "DEMO-1",
+            "comment": "",
+        }
+    )
 
     assert result.status == ToolStatus.ERROR
     assert "Invalid Jira input" in result.error
@@ -447,13 +482,16 @@ async def test_add_comment_rejects_invalid_input(
 # Link issues
 # --------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_link_issues(jira_tools, jira_service):
-    result = await jira_tools.link_issues({
-        "issue_key": "DEMO-1",
-        "linked_issue_key": "DEMO-2",
-        "link_type": "Blocks",
-    })
+    result = await jira_tools.link_issues(
+        {
+            "issue_key": "DEMO-1",
+            "linked_issue_key": "DEMO-2",
+            "link_type": "Blocks",
+        }
+    )
 
     assert result.status == ToolStatus.SUCCESS
     assert result.data["issue_key"] == "DEMO-1"
@@ -472,11 +510,13 @@ async def test_link_issues_rejects_invalid_input(
     jira_tools,
     jira_service,
 ):
-    result = await jira_tools.link_issues({
-        "issue_key": "DEMO-1",
-        "linked_issue_key": "",
-        "link_type": "Blocks",
-    })
+    result = await jira_tools.link_issues(
+        {
+            "issue_key": "DEMO-1",
+            "linked_issue_key": "",
+            "link_type": "Blocks",
+        }
+    )
 
     assert result.status == ToolStatus.ERROR
     assert "Invalid Jira input" in result.error
@@ -486,6 +526,7 @@ async def test_link_issues_rejects_invalid_input(
 # --------------------------------------------------
 # General validation and error handling
 # --------------------------------------------------
+
 
 @pytest.mark.asyncio
 async def test_invalid_project_input_does_not_call_service(
@@ -504,10 +545,12 @@ async def test_create_epic_rejects_invalid_input(
     jira_tools,
     jira_service,
 ):
-    result = await jira_tools.create_epic({
-        "project_key": "DEMO",
-        "summary": "",
-    })
+    result = await jira_tools.create_epic(
+        {
+            "project_key": "DEMO",
+            "summary": "",
+        }
+    )
 
     assert result.status == ToolStatus.ERROR
     assert "Invalid Jira input" in result.error
@@ -519,9 +562,7 @@ async def test_service_error_returns_tool_error(
     jira_tools,
     jira_service,
 ):
-    jira_service.get_issue.side_effect = RuntimeError(
-        "Jira unavailable"
-    )
+    jira_service.get_issue.side_effect = RuntimeError("Jira unavailable")
 
     result = await jira_tools.get_issue({"issue_key": "DEMO-1"})
 

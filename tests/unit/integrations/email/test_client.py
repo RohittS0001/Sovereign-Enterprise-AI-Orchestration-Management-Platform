@@ -23,16 +23,12 @@ def test_get_profile(gmail_client, mock_gmail_service):
         "historyId": "12345",
     }
 
-    mock_gmail_service.users().getProfile().execute.return_value = (
-        expected_profile
-    )
+    mock_gmail_service.users().getProfile().execute.return_value = expected_profile
 
     result = gmail_client.get_profile()
 
     assert result == expected_profile
-    mock_gmail_service.users().getProfile.assert_any_call(
-    userId="me"
-    )
+    mock_gmail_service.users().getProfile.assert_any_call(userId="me")
 
 
 def test_search_messages(gmail_client, mock_gmail_service):
@@ -44,19 +40,18 @@ def test_search_messages(gmail_client, mock_gmail_service):
         "resultSizeEstimate": 2,
     }
 
-    mock_gmail_service.users().messages().list().execute.return_value = (
-        expected_messages
-    )
+    mock_gmail_service.users().messages().list().execute.return_value = expected_messages
 
     result = gmail_client.search_messages(
         query="is:unread",
         max_results=10,
     )
 
+    assert result == expected_messages
     mock_gmail_service.users().messages().list.assert_any_call(
-    userId="me",
-    q="is:unread",
-    maxResults=10,
+        userId="me",
+        q="is:unread",
+        maxResults=10,
     )
 
 
@@ -73,17 +68,15 @@ def test_get_message(gmail_client, mock_gmail_service):
         "payload": {"headers": []},
     }
 
-    mock_gmail_service.users().messages().get().execute.return_value = (
-        expected_message
-    )
+    mock_gmail_service.users().messages().get().execute.return_value = expected_message
 
     result = gmail_client.get_message("message-1")
 
     assert result == expected_message
     mock_gmail_service.users().messages().get.assert_any_call(
-    userId="me",
-    id="message-1",
-    format="full",
+        userId="me",
+        id="message-1",
+        format="full",
     )
 
 
@@ -95,9 +88,7 @@ def test_get_message_rejects_empty_id(gmail_client):
 def test_decode_body():
     import base64
 
-    encoded_body = base64.urlsafe_b64encode(
-        b"Hello from Gmail"
-    ).decode("utf-8").rstrip("=")
+    encoded_body = base64.urlsafe_b64encode(b"Hello from Gmail").decode("utf-8").rstrip("=")
 
     assert GmailClient.decode_body(encoded_body) == "Hello from Gmail"
 

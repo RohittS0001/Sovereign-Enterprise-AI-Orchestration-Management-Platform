@@ -1,4 +1,3 @@
-
 from typing import Any
 
 from backend.app.integrations.email.client import GmailClient
@@ -8,7 +7,13 @@ class EmailService:
     """Business logic for Gmail operations."""
 
     def __init__(self, client: GmailClient | None = None) -> None:
-        self.client = client or GmailClient()
+        self._client = client
+
+    @property
+    def client(self) -> GmailClient:
+        if self._client is None:
+            self._client = GmailClient()
+        return self._client
 
     def get_profile(self) -> dict[str, Any]:
         """Return the authenticated Gmail account profile."""

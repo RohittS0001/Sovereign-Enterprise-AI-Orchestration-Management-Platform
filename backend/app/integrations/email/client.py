@@ -1,29 +1,36 @@
-
 import base64
 from typing import Any
+
 from googleapiclient.discovery import build
 
-from backend.app.integrations.email.auth import get_gmail_credentials
+from backend.app.integrations.email.auth import load_gmail_credentials
 
 
 class GmailClient:
-    """Low-level client for the Gmail API."""
+    """Low-level client for the Gmail API.
+
+    The Google API client is synchronous; async callers should run these methods in a
+    worker thread (see ``EmailTools``) so they do not block the event loop.
+    """
 
     def __init__(self, service: Any = None) -> None:
-        self._service = service or build(
-            "gmail",
-            "v1",
-            credentials=get_gmail_credentials(),
-            cache_discovery=False,
-        )
+        # Built on first use so constructing the client never triggers credential loading.
+        self._service_instance = service
+
+    @property
+    def _service(self) -> Any:
+        if self._service_instance is None:
+            self._service_instance = build(
+                "gmail",
+                "v1",
+                credentials=load_gmail_credentials(),
+                cache_discovery=False,
+            )
+        return self._service_instance
 
     def get_profile(self) -> dict[str, Any]:
         """Return the authenticated Gmail profile."""
-        return (
-            self._service.users()
-            .getProfile(userId="me")
-            .execute()
-        )
+        return self._service.users().getProfile(userId="me").execute()
 
     def search_messages(
         self,
@@ -44,17 +51,9 @@ class GmailClient:
         if page_token:
             params["pageToken"] = page_token
 
-        return (
-            self._service.users()
-            .messages()
-            .list(**params)
-            .execute()
-        )
+        return self._service.users().messages().list(**params).execute()
 
-    def get_message(
-        self,
-        message_id: str,
-    ) -> dict[str, Any]:
+    def get_message(self, message_id: str) -> dict[str, Any]:
         """Retrieve a Gmail message, including its headers and body."""
         if not message_id.strip():
             raise ValueError("message_id must not be empty")
@@ -62,11 +61,7 @@ class GmailClient:
         return (
             self._service.users()
             .messages()
-            .get(
-                userId="me",
-                id=message_id,
-                format="full",
-            )
+            .get(userId="me", id=message_id, format="full")
             .execute()
         )
 
@@ -76,8 +71,6 @@ class GmailClient:
         if not data:
             return ""
 
-        decoded = base64.urlsafe_b64decode(
-            data + "=" * (-len(data) % 4)
-        )
+        decoded = base64.urlsafe_b64decode(data + "=" * (-len(data) % 4))
 
         return decoded.decode("utf-8", errors="replace")

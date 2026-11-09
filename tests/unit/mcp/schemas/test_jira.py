@@ -1,4 +1,3 @@
-
 import pytest
 from pydantic import ValidationError
 
@@ -22,10 +21,10 @@ from backend.app.mcp.schemas.jira import (
     UpdateIssueInput,
 )
 
-
 # --------------------------------------------------
 # Project input schemas
 # --------------------------------------------------
+
 
 def test_get_project_input_accepts_project_key():
     data = GetProjectInput(project_key="DEMO")
@@ -42,6 +41,7 @@ def test_get_project_input_rejects_empty_key():
 # Issue input schemas
 # --------------------------------------------------
 
+
 def test_get_issue_input_accepts_issue_key():
     data = GetIssueInput(issue_key="DEMO-1")
 
@@ -57,21 +57,21 @@ def test_get_issue_input_rejects_empty_key():
 # Search and pagination schemas
 # --------------------------------------------------
 
+
 def test_search_issues_input_defaults():
     data = SearchIssuesInput(jql="project = DEMO")
 
     assert data.jql == "project = DEMO"
-    assert data.start_at == 0
+    assert data.next_page_token is None
     assert data.max_results == 50
     assert data.fields is None
 
 
-@pytest.mark.parametrize("start_at", [-1, -10])
-def test_search_issues_rejects_negative_start_at(start_at):
+def test_search_issues_rejects_empty_page_token():
     with pytest.raises(ValidationError):
         SearchIssuesInput(
             jql="project = DEMO",
-            start_at=start_at,
+            next_page_token="",
         )
 
 
@@ -93,7 +93,7 @@ def test_get_project_issues_input():
     data = GetProjectIssuesInput(project_key="DEMO")
 
     assert data.project_key == "DEMO"
-    assert data.start_at == 0
+    assert data.next_page_token is None
     assert data.max_results == 50
 
 
@@ -123,6 +123,7 @@ def test_get_issue_dependencies_input():
 # Sprint input schemas
 # --------------------------------------------------
 
+
 def test_get_sprint_input_accepts_positive_id():
     data = GetSprintInput(sprint_id=42)
 
@@ -146,6 +147,7 @@ def test_get_sprint_issues_input_defaults():
 # --------------------------------------------------
 # Create epic, story, and task schemas
 # --------------------------------------------------
+
 
 def test_create_epic_input():
     data = CreateEpicInput(
@@ -207,6 +209,7 @@ def test_create_inputs_reject_empty_summary(schema):
 # Assign issue input schema
 # --------------------------------------------------
 
+
 def test_assign_issue_input():
     data = AssignIssueInput(
         issue_key="DEMO-1",
@@ -234,6 +237,7 @@ def test_assign_issue_input_rejects_empty_values():
 # --------------------------------------------------
 # Update issue input schema
 # --------------------------------------------------
+
 
 def test_update_issue_input_accepts_optional_fields():
     data = UpdateIssueInput(issue_key="DEMO-1")
@@ -278,6 +282,7 @@ def test_update_issue_input_rejects_empty_summary():
 # Transition issue input schema
 # --------------------------------------------------
 
+
 def test_transition_issue_input():
     data = TransitionIssueInput(
         issue_key="DEMO-1",
@@ -306,6 +311,7 @@ def test_transition_issue_input_rejects_empty_values():
 # Add comment input schema
 # --------------------------------------------------
 
+
 def test_add_comment_input():
     data = AddCommentInput(
         issue_key="DEMO-1",
@@ -333,6 +339,7 @@ def test_add_comment_input_rejects_empty_values():
 # --------------------------------------------------
 # Link issues input schema
 # --------------------------------------------------
+
 
 def test_link_issues_input():
     data = LinkIssuesInput(
@@ -367,3 +374,28 @@ def test_link_issues_input_rejects_empty_values():
             linked_issue_key="DEMO-2",
             link_type="",
         )
+
+
+# --------------------------------------------------
+# Key validation (path traversal / JQL injection)
+# --------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "project_key",
+    ["DEMO OR project = SECRET", "../DEMO", "DE MO", "1DEMO", 'DEMO"'],
+)
+def test_project_key_rejects_unsafe_values(project_key):
+    with pytest.raises(ValidationError):
+        GetProjectInput(project_key=project_key)
+
+
+@pytest.mark.parametrize("issue_key", ["DEMO", "DEMO-", "../DEMO-1", "DEMO-1/comment", "DEMO-x"])
+def test_issue_key_rejects_unsafe_values(issue_key):
+    with pytest.raises(ValidationError):
+        GetIssueInput(issue_key=issue_key)
+
+
+def test_keys_are_trimmed():
+    assert GetProjectInput(project_key="  DEMO ").project_key == "DEMO"
+    assert GetIssueInput(issue_key=" DEMO-12 ").issue_key == "DEMO-12"

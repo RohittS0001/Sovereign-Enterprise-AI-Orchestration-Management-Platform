@@ -2,15 +2,18 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from backend.app.integrations.jira.schemas import (
+    AddCommentRequest,
+    AssignIssueRequest,
+    CreateEpicRequest,
+    CreateStoryRequest,
+    CreateTaskRequest,
+    LinkIssuesRequest,
+    TransitionIssueRequest,
+    UpdateIssueRequest,
+)
 from backend.app.integrations.jira.service import JiraService
-from backend.app.integrations.jira.schemas import CreateEpicRequest
-from backend.app.integrations.jira.schemas import CreateStoryRequest
-from backend.app.integrations.jira.schemas import CreateTaskRequest
-from backend.app.integrations.jira.schemas import AssignIssueRequest
-from backend.app.integrations.jira.schemas import UpdateIssueRequest
-from backend.app.integrations.jira.schemas import TransitionIssueRequest
-from backend.app.integrations.jira.schemas import AddCommentRequest
-from backend.app.integrations.jira.schemas import LinkIssuesRequest
+
 
 @pytest.fixture
 def jira_client() -> AsyncMock:
@@ -38,9 +41,7 @@ async def test_get_project(
     result = await jira_service.get_project("TEST")
 
     assert result == expected
-    jira_client.get.assert_awaited_once_with(
-        "/rest/api/3/project/TEST"
-    )
+    jira_client.get.assert_awaited_once_with("/rest/api/3/project/TEST")
 
 
 @pytest.mark.asyncio
@@ -58,9 +59,7 @@ async def test_get_issue(
     result = await jira_service.get_issue("TEST-1")
 
     assert result == expected
-    jira_client.get.assert_awaited_once_with(
-        "/rest/api/3/issue/TEST-1"
-    )
+    jira_client.get.assert_awaited_once_with("/rest/api/3/issue/TEST-1")
 
 
 @pytest.mark.asyncio
@@ -77,7 +76,6 @@ async def test_search_issues(
 
     result = await jira_service.search_issues(
         "project = TEST",
-        start_at=0,
         max_results=25,
     )
 
@@ -86,8 +84,32 @@ async def test_search_issues(
         "/rest/api/3/search/jql",
         params={
             "jql": "project = TEST",
-            "startAt": 0,
             "maxResults": 25,
+        },
+    )
+
+
+@pytest.mark.asyncio
+async def test_search_issues_passes_page_token_and_fields(
+    jira_client: AsyncMock,
+    jira_service: JiraService,
+) -> None:
+    jira_client.get.return_value = {"issues": [], "isLast": True}
+
+    await jira_service.search_issues(
+        "project = TEST",
+        next_page_token="token-2",
+        max_results=10,
+        fields=["summary", "status"],
+    )
+
+    jira_client.get.assert_awaited_once_with(
+        "/rest/api/3/search/jql",
+        params={
+            "jql": "project = TEST",
+            "maxResults": 10,
+            "nextPageToken": "token-2",
+            "fields": "summary,status",
         },
     )
 
@@ -106,11 +128,46 @@ async def test_get_project_issues(
     jira_client.get.assert_awaited_once_with(
         "/rest/api/3/search/jql",
         params={
-            "jql": "project = TEST ORDER BY created DESC",
-            "startAt": 0,
+            "jql": 'project = "TEST" ORDER BY created DESC',
             "maxResults": 50,
         },
     )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "project_key",
+    ["TEST OR project = SECRET", 'TEST" OR "1"="1', "../admin", ""],
+)
+async def test_get_project_issues_rejects_jql_injection(
+    jira_client: AsyncMock,
+    jira_service: JiraService,
+    project_key: str,
+) -> None:
+    with pytest.raises(ValueError, match="Invalid Jira project key"):
+        await jira_service.get_project_issues(project_key)
+
+    jira_client.get.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("issue_key", ["../../myself", "TEST-1/../2", "TEST", "TEST-"])
+async def test_issue_paths_reject_invalid_keys(
+    jira_client: AsyncMock,
+    jira_service: JiraService,
+    issue_key: str,
+) -> None:
+    with pytest.raises(ValueError, match="Invalid Jira issue key"):
+        await jira_service.get_issue(issue_key)
+
+    jira_client.get.assert_not_awaited()
+
+
+def test_service_does_not_build_client_until_used() -> None:
+    # Constructing the service must not require Jira configuration.
+    service = JiraService()
+
+    assert service._client is None
 
 
 @pytest.mark.asyncio
@@ -196,9 +253,7 @@ async def test_get_sprint(
     result = await jira_service.get_sprint(101)
 
     assert result == expected
-    jira_client.get.assert_awaited_once_with(
-        "/rest/agile/1.0/sprint/101"
-    )
+    jira_client.get.assert_awaited_once_with("/rest/agile/1.0/sprint/101")
 
 
 @pytest.mark.asyncio
@@ -227,6 +282,8 @@ async def test_get_sprint_issues(
             "maxResults": 25,
         },
     )
+
+
 @pytest.mark.asyncio
 async def test_create_epic() -> None:
     client = AsyncMock()
