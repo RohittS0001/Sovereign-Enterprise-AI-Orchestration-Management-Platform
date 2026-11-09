@@ -6,7 +6,6 @@ Run migrations and create an admin first, then:
 
 import argparse
 import asyncio
-from importlib import resources
 
 from sqlalchemy import select
 
@@ -17,14 +16,7 @@ from backend.app.db.models import User, Visibility
 from backend.app.db.session import Database
 from backend.app.domains.knowledge.embeddings import build_embedder
 from backend.app.domains.knowledge.service import KnowledgeService
-
-DOCUMENTS = [
-    ("incident-escalation-policy.md", "Incident Escalation Policy", Visibility.ORGANIZATION, []),
-    ("release-process.md", "Release Process", Visibility.ORGANIZATION, []),
-    # Confidential: only project managers (and admins) can retrieve it.
-    ("gateway-vendor-contract.md", "Gateway Vendor Contract Summary", Visibility.ROLES,
-     [Role.PROJECT_MANAGER.value]),
-]  # fmt: skip
+from backend.app.integrations.demo.seed import DEMO_DOCUMENTS, read_document
 
 
 async def seed(admin_email: str) -> list[str]:
@@ -38,15 +30,13 @@ async def seed(admin_email: str) -> list[str]:
             if admin is None or admin.role != Role.ADMIN:
                 raise SystemExit(f"No admin user {admin_email}; run scripts.create_admin first")
             principal = Principal.human(admin.id, admin.email, admin.role)
-            folder = resources.files("backend.app.integrations.demo").joinpath("knowledge")
-
-            for filename, title, visibility, roles in DOCUMENTS:
-                text = folder.joinpath(filename).read_text("utf-8")
+            for filename, title, visibility, roles in DEMO_DOCUMENTS:
+                text = read_document(filename)
                 try:
                     await KnowledgeService(session, settings, embedder).ingest(
                         principal, title=title, text=text, source_type="demo",
                         filename=filename, mime_type="text/markdown",
-                        visibility=visibility, allowed_roles=roles, tags=["demo"],
+                        visibility=Visibility(visibility), allowed_roles=roles, tags=["demo"],
                     )  # fmt: skip
                     outcomes.append(f"added: {title}")
                 except ConflictError:

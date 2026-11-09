@@ -140,6 +140,12 @@ class Settings(BaseSettings):
     # Usage limits (0 = unlimited)
     agent_daily_token_quota: int = Field(default=0, ge=0)
 
+    # Observability
+    metrics_enabled: bool = True
+    metrics_token: SecretStr = SecretStr("")  # if set, /metrics requires "Bearer <token>"
+    otel_exporter_otlp_endpoint: str = ""  # e.g. http://localhost:4318 (Jaeger, Tempo, collector)
+    otel_service_name: str = "sovereign-api"
+
     _jwt_secret_generated: bool = PrivateAttr(default=False)
 
     model_config = SettingsConfigDict(

@@ -38,6 +38,9 @@ models/*
 hf_cache/
 transformers_cache/
 
+# Evaluation output
+evaluation/reports/
+
 # Logs
 logs/
 *.log

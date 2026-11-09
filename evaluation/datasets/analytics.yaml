@@ -1,0 +1,19 @@
+# Expected analytics for the demo PHX project, evaluated as of a fixed date.
+as_of: 2026-11-09
+project: PHX
+thresholds:
+  accuracy: 1.0
+
+expected:
+  forecast_status: off_track
+  committed_points: 31
+  done_points: 7
+  working_days_left: 5
+  overloaded: [Arjun M]
+  at_risk: {Arjun M: [PHX-5]}
+  suggestions: [[PHX-5, Dev R]]
+  contradictions: [[merged_but_not_done, PHX-4], [done_but_pr_open, PHX-6]]
+  blocked: [PHX-3, PHX-7]
+  risk_level: high
+  risk_score_between: [70, 95]
+  failing_main_builds: 2

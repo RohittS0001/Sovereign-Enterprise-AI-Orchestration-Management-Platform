@@ -11,8 +11,8 @@ knowledge base and project analytics, with human approval for writes, RBAC and a
 
 Work proceeds in phases, one local commit each (never push unless asked). Done: 1–7 (foundation,
 auth/RBAC, agent + approvals + audit + guardrails, GitHub/Keka/Gmail drafts + demo mode, RAG, analytics
-+ reports + quotas, React frontend) and the domain restructure. Next: 8 evaluation (DeepEval/Ragas,
-red-team, CI gates — new top-level `evaluation/`) + observability, 9 Docker Compose/CI/Helm/README.
++ reports + quotas, React frontend), the domain restructure, and 8 (evaluation + observability).
+Next: 9 Docker Compose (incl. Prometheus/Grafana/Jaeger), GitHub Actions CI, Helm, README.
 `docs/ROADMAP.md` is the backlog source of truth (integrations, moonshots, lifecycle features) — tick
 items there as they land.
 
@@ -26,6 +26,8 @@ Windows machine; the Bash tool is Git Bash. Use the venv interpreter explicitly.
 .venv/Scripts/python.exe -m pytest "tests/integration/api/test_auth.py::test_refresh_rotates_tokens" -q
 .venv/Scripts/python.exe -m pytest --run-live -m live    # real services (skipped by default)
 .venv/Scripts/python.exe -m scripts.dev fmt       # ruff --fix + format
+.venv/Scripts/python.exe -m scripts.dev eval      # offline eval suites → evaluation/reports/
+.venv/Scripts/python.exe -m evaluation run --suite agent --judge   # needs LLM1_MODEL_NAME
 .venv/Scripts/python.exe -m scripts.dev demo      # demo API: data/demo.db, users per role, PHX, docs
 npm --prefix frontend run dev                     # UI on :5173, proxies /api to :8000
 npm --prefix frontend test                        # Vitest + Testing Library
@@ -115,6 +117,23 @@ sources become warnings. Pure functions: `forecast.py`, `workload.py`, `contradi
 `reporting/generator.py` (LLM 2 narrative over untrusted-wrapped metrics, template fallback) and
 `reporting/scheduler.py` (lifespan task, unique-constraint dedupe). `domains/usage/service.py` computes
 usage and enforces `AGENT_DAILY_TOKEN_QUOTA`.
+
+**Evaluation** (top-level `evaluation/`, see its README). `environment.py` builds an isolated seeded
+instance (in-memory DB, demo integrations, a user per role, demo docs, PHX from
+`integrations/demo/seed.py` — the single source of demo seed data). Suites in `evaluation/suites/`
+read `evaluation/datasets/*.yaml` (data + thresholds): retrieval (incl. leak rate), guardrails,
+analytics (golden values at a fixed date), redteam (scripted hostile planner through the real
+`AgentService`/gateway), agent (real model; optional LLM-2 judge fed the exact responder prompt via a
+recording wrapper). `tests/evaluation/test_quality_gates.py` enforces the offline suites in CI and
+proves they fail when approvals, access control or redaction are broken — keep that property when
+adding suites. When a behaviour change shifts a golden value, update the dataset deliberately.
+
+**Observability** (`core/observability.py`, `api/metrics.py`). Prometheus counters/histograms for
+HTTP (labelled by route *template*; unknown paths → `unmatched`), agent runs, tool calls, LLM
+latency/tokens, rate limits and approvals, exposed at `/metrics` (`METRICS_TOKEN` optional). Tracing
+via OpenTelemetry: spans for each request, `agent.run`, `tool.invoke` and `llm.request`; exported only
+when `OTEL_EXPORTER_OTLP_ENDPOINT` is set (otherwise no-op). Logs include `trace_id` when tracing.
+Use `core.observability.span(...)` for new spans instead of creating tracers.
 
 **LLMs** (`llm/`). `OllamaClient`, `OpenAICompatibleClient`, `FakeLLM`; `AgentModels(operations,
 reporting)` from `llm/factory.py`. No `LLM1_MODEL_NAME` → agent endpoints return 503.

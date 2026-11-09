@@ -15,6 +15,7 @@ from backend.app.core.errors import (
     NotFoundError,
 )
 from backend.app.core.logging import get_logger
+from backend.app.core.observability import APPROVALS
 from backend.app.core.security.permissions import Permission, Principal
 from backend.app.db.base import as_utc, utcnow
 from backend.app.db.models import AgentRun, ApprovalRequest, ApprovalStatus, RunStatus
@@ -181,6 +182,7 @@ class ApprovalService:
         if approval.run_id is not None:
             await self._settle_run(approval.run_id)
         await self.session.commit()
+        APPROVALS.labels(approval.status.value).inc()
         logger.info(
             "Approval decided",
             extra={"approval_id": str(approval.id), "status": approval.status.value},

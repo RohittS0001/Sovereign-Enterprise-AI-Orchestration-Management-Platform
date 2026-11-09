@@ -26,6 +26,11 @@ class RequestIdFilter(logging.Filter):
 
     def filter(self, record: logging.LogRecord) -> bool:
         record.request_id = get_request_id()
+        from backend.app.core.observability import current_trace_id
+
+        trace_id = current_trace_id()
+        if trace_id:
+            record.trace_id = trace_id
         return True
 
 

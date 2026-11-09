@@ -1,0 +1,77 @@
+# Knowledge-base retrieval over the demo documents.
+# relevant: what a good result looks like (title + text in the section path).
+# forbidden: documents this role must never receive (access-control leak test).
+k: 3
+thresholds:
+  hit_at_1: 0.7
+  recall_at_k: 0.85
+  mrr: 0.75
+  leak_rate: 0.0
+
+queries:
+  - id: vendor-no-fix-date
+    role: member
+    query: What should we do if the vendor gives no fix date?
+    relevant: [{title: Incident Escalation Policy, section: Vendor incidents}]
+  - id: vendor-escalation-who
+    role: team_lead
+    query: who escalates to the vendor account manager
+    relevant: [{title: Incident Escalation Policy, section: Vendor incidents}]
+  - id: sev1-definition
+    role: member
+    query: When is an incident SEV1 and who gets paged?
+    relevant: [{title: Incident Escalation Policy, section: Severity levels}]
+  - id: degraded-payments-severity
+    role: member
+    query: severity for elevated timeouts above 2 percent
+    relevant: [{title: Incident Escalation Policy, section: Severity levels}]
+  - id: customer-updates
+    role: member
+    query: Who sends customer-facing status updates during an incident?
+    relevant: [{title: Incident Escalation Policy, section: Communication}]
+  - id: definition-of-done
+    role: member
+    query: what is the definition of done for a story
+    relevant: [{title: Release Process, section: Definition of done}]
+  - id: release-freeze
+    role: team_lead
+    query: Can we release right before a big merchant sale?
+    relevant: [{title: Release Process, section: Release freeze}]
+  - id: failing-main-builds
+    role: member
+    query: what happens after two failing builds on main
+    relevant: [{title: Release Process, section: CI requirements}]
+  - id: sprint-commitment
+    role: project_manager
+    query: how much of our velocity should a sprint commit to
+    relevant: [{title: Release Process, section: Sprint commitments}]
+  - id: unplanned-leave
+    role: project_manager
+    query: unplanned leave above 20 percent of team capacity
+    relevant: [{title: Release Process, section: Sprint commitments}]
+  - id: sla-penalty-pm
+    role: project_manager
+    query: service credit for an SLA breach
+    relevant: [{title: Gateway Vendor Contract Summary, section: Penalties}]
+  - id: vendor-availability-pm
+    role: project_manager
+    query: what availability does the gateway vendor guarantee
+    relevant: [{title: Gateway Vendor Contract Summary, section: Service levels}]
+  - id: exit-clause-pm
+    role: project_manager
+    query: can we terminate the vendor contract after repeated breaches
+    relevant: [{title: Gateway Vendor Contract Summary, section: Exit clause}]
+
+  # Access control: restricted contract must never reach these roles.
+  - id: leak-member-sla
+    role: member
+    query: service credit for an SLA breach penalties
+    forbidden: [Gateway Vendor Contract Summary]
+  - id: leak-lead-exit
+    role: team_lead
+    query: terminate vendor contract exit clause notice
+    forbidden: [Gateway Vendor Contract Summary]
+  - id: leak-auditor-availability
+    role: auditor
+    query: vendor guarantees 99.95% monthly availability
+    forbidden: [Gateway Vendor Contract Summary]

@@ -5,6 +5,7 @@ write actions are queued for human approval -> the tool runs. Each outcome, incl
 denials, is written to the audit log.
 """
 
+import time
 import uuid
 from typing import Any
 
@@ -14,6 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.core.config import Settings
 from backend.app.core.context import principal_var
 from backend.app.core.logging import get_logger
+from backend.app.core.observability import TOOL_CALLS, TOOL_SECONDS, span
 from backend.app.core.security.permissions import Principal
 from backend.app.domains.governance.approvals.service import ApprovalService
 from backend.app.domains.governance.audit import actions
@@ -64,7 +66,22 @@ class ToolGateway:
         run_id: uuid.UUID | None = None,
         risk_flags: list[str] | None = None,
     ) -> ToolResult:
-        risk_flags = risk_flags or []
+        with span(
+            "tool.invoke", tool=tool_name, actor=principal.actor_type, run_id=run_id
+        ) as current:
+            result = await self._invoke(principal, tool_name, arguments, run_id, risk_flags or [])
+            current.set_attribute("tool.status", result.status.value)
+            return result
+
+    async def _invoke(
+        self,
+        principal: Principal,
+        tool_name: str,
+        arguments: dict[str, Any],
+        run_id: uuid.UUID | None,
+        risk_flags: list[str],
+    ) -> ToolResult:
+        started = time.perf_counter()
         spec = self.registry.get(tool_name)
 
         if spec is None:
@@ -117,6 +134,8 @@ class ToolGateway:
         # durable even if a later step of the run fails.
         await self.session.commit()
 
+        TOOL_CALLS.labels(tool_name if spec else "unknown", result.status.value).inc()
+        TOOL_SECONDS.labels(tool_name if spec else "unknown").observe(time.perf_counter() - started)
         logger.info(
             "Tool call",
             extra={"tool": tool_name, "status": result.status.value, "run_id": str(run_id)},

@@ -1,5 +1,6 @@
 """Run the agent for a user's question and persist the run."""
 
+import time
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
@@ -11,6 +12,7 @@ from backend.app.core.config import Settings
 from backend.app.core.context import get_request_id
 from backend.app.core.errors import AppException, NotFoundError
 from backend.app.core.logging import get_logger
+from backend.app.core.observability import AGENT_RUN_SECONDS, AGENT_RUNS, span
 from backend.app.core.security.permissions import Principal
 from backend.app.db.base import utcnow
 from backend.app.db.models import AgentRun, RunStatus
@@ -76,6 +78,19 @@ class AgentService:
         async def emit(event: dict[str, Any]) -> None:
             if on_event is not None:
                 await on_event(event)
+
+        started = time.perf_counter()
+        with span("agent.run", user_id=user.user_id) as current:
+            run = await self._run(user, query, emit)
+            current.set_attribute("agent.run_id", str(run.id))
+            current.set_attribute("agent.status", run.status.value)
+            current.set_attribute("agent.steps", len(run.steps))
+            current.set_attribute("llm.tokens", run.prompt_tokens + run.completion_tokens)
+        AGENT_RUNS.labels(run.status.value).inc()
+        AGENT_RUN_SECONDS.observe(time.perf_counter() - started)
+        return run
+
+    async def _run(self, user: Principal, query: str, emit: EventSink) -> AgentRun:
 
         agent = user.as_agent()
         run = AgentRun(

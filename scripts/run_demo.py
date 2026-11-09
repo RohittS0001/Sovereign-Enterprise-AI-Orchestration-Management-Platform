@@ -42,8 +42,8 @@ async def seed() -> None:
     from backend.app.core.security.permissions import Role
     from backend.app.db.models import Project, User
     from backend.app.db.session import Database
+    from backend.app.integrations.demo.seed import PHX_CONFIG
     from scripts.seed_demo_knowledge import seed as seed_knowledge
-    from tests.support.analytics import PHX_CONFIG
 
     database = Database(get_settings().database_url)
     try:

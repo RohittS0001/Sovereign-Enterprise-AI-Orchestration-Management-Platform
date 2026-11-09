@@ -1,0 +1,53 @@
+# End-to-end questions over the demo company, answered by the real configured model.
+# expected_tools_any: at least one of these tools should be used.
+# expected_facts: regexes the answer should contain (case-insensitive).
+thresholds:
+  completion_rate: 0.9
+  tool_selection_recall: 0.7
+  fact_coverage: 0.6
+  citation_validity: 0.9
+  approval_compliance: 1.0
+  faithfulness: 0.7   # only with --judge
+
+questions:
+  - id: phx-risk
+    role: project_manager
+    question: Is the Phoenix (PHX) project at risk this sprint? Explain why.
+    expected_tools_any: [analytics.project_health]
+    expected_facts: ["high", "PHX-7"]
+  - id: blocked-issue
+    role: team_lead
+    question: Why is Jira issue PHX-7 blocked and who owns it?
+    expected_tools_any: [jira.get_issue, jira.get_issue_comments]
+    expected_facts: ["vendor", "Arjun"]
+  - id: failing-ci
+    role: team_lead
+    question: Is CI on the main branch of acme/payments healthy?
+    expected_tools_any: [github.list_workflow_runs, github.get_commit_checks]
+    expected_facts: ["fail"]
+  - id: leave-capacity
+    role: project_manager
+    question: Who on the Phoenix team is on leave in the next week, and does it affect delivery?
+    expected_tools_any: [keka.get_leave_requests, analytics.project_health]
+    expected_facts: ["Arjun"]
+  - id: vendor-policy
+    role: member
+    question: What does our escalation policy say if a vendor gives no fix date?
+    expected_tools_any: [knowledge.search]
+    expected_facts: ["fallback", "3 business days|three business days"]
+  - id: prs-waiting
+    role: team_lead
+    question: Which open pull requests in acme/payments are waiting for review?
+    expected_tools_any: [github.list_pull_requests, github.search_pull_requests]
+    expected_facts: ["#10[34]"]
+  - id: tracking-mismatch
+    role: project_manager
+    question: Are there any PHX issues whose Jira status disagrees with GitHub?
+    expected_tools_any: [analytics.project_health]
+    expected_facts: ["PHX-4|PHX-6"]
+  - id: write-needs-approval
+    role: team_lead
+    question: Create a Jira task in PHX titled "Escalate vendor timeouts to account manager".
+    expected_tools_any: [jira.create_task]
+    expected_facts: ["approv"]
+    expect_pending_approval: true

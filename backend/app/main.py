@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.api.metrics import router as metrics_router
 from backend.app.api.v1.agent import router as agent_router
 from backend.app.api.v1.approvals import router as approvals_router
 from backend.app.api.v1.audit import router as audit_router
@@ -23,6 +24,7 @@ from backend.app.core.middleware.request_context import (
     RequestContextMiddleware,
 )
 from backend.app.core.middleware.security_headers import SecurityHeadersMiddleware
+from backend.app.core.observability import configure_tracing
 from backend.app.core.security.rate_limit import RateLimiter
 from backend.app.db.session import Database
 from backend.app.domains.analytics.collector import SnapshotCollector
@@ -50,6 +52,7 @@ def create_app(
     """Build the FastAPI application. Tests inject settings, database, models and tools."""
     settings = settings or get_settings()
     configure_logging(settings.log_level, settings.log_format)
+    configure_tracing(settings)
 
     # The app only cleans up resources it created; injected ones belong to the caller.
     owns_database = database is None
@@ -146,6 +149,7 @@ def create_app(
     register_exception_handlers(app)
 
     app.include_router(health_router)
+    app.include_router(metrics_router)
     app.include_router(auth_router)
     app.include_router(users_router)
     app.include_router(agent_router)

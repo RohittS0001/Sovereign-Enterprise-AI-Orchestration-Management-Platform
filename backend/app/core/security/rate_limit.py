@@ -11,6 +11,7 @@ from collections import defaultdict, deque
 from collections.abc import Callable
 
 from backend.app.core.errors import RateLimitError
+from backend.app.core.observability import RATE_LIMITED
 
 
 class RateLimiter:
@@ -29,6 +30,7 @@ class RateLimiter:
 
             if len(hits) >= limit:
                 retry_after = max(1, math.ceil(hits[0] + window_seconds - now))
+                RATE_LIMITED.inc()
                 raise RateLimitError(retry_after)
 
             hits.append(now)

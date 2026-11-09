@@ -5,6 +5,7 @@ python -m scripts.dev test [pytest args]
 python -m scripts.dev lint             # ruff + formatting check + frontend type check
 python -m scripts.dev fmt              # auto-fix lint and format
 python -m scripts.dev web-test         # frontend tests
+python -m scripts.dev eval [args]      # evaluation suites (see evaluation/README.md)
 python -m scripts.dev migrate          # alembic upgrade head
 python -m scripts.dev demo             # local demo API (see scripts/run_demo.py)
 """
@@ -44,6 +45,7 @@ COMMANDS = {
         run(PY, "-m", "ruff", "format", "."),
     ),
     "web-test": lambda args: npm("test"),
+    "eval": lambda args: run(PY, "-m", "evaluation", "run", *args),
     "migrate": lambda args: run(PY, "-m", "alembic", "upgrade", "head"),
     "demo": lambda args: run(PY, "-m", "scripts.run_demo"),
     "check": lambda args: (lint(), run(PY, "-m", "pytest", "-q"), npm("test"), npm("run", "build")),

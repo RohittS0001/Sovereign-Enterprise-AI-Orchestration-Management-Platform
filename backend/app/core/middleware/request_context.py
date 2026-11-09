@@ -10,6 +10,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from backend.app.core.context import request_id_var
 from backend.app.core.error_handlers import error_response
 from backend.app.core.logging import get_logger
+from backend.app.core.observability import HTTP_LATENCY, HTTP_REQUESTS, tracer
 
 REQUEST_ID_HEADER = "X-Request-ID"
 
@@ -46,6 +47,9 @@ class RequestContextMiddleware:
                 MutableHeaders(scope=message)[REQUEST_ID_HEADER] = request_id
             await send(message)
 
+        span_cm = tracer.start_as_current_span(f"{scope['method']} {scope['path']}")
+        current_span = span_cm.__enter__()
+        current_span.set_attribute("http.request_id", request_id)
         try:
             await self.app(scope, receive, send_with_request_id)
         except Exception:
@@ -57,6 +61,14 @@ class RequestContextMiddleware:
             response = error_response(500, "internal_error", "An unexpected error occurred")
             await response(scope, receive, send_with_request_id)
         finally:
+            route = getattr(scope.get("route"), "path", None) or "unmatched"
+            elapsed = time.perf_counter() - started
+            HTTP_REQUESTS.labels(scope["method"], route, str(status_code)).inc()
+            HTTP_LATENCY.labels(scope["method"], route).observe(elapsed)
+            current_span.update_name(f"{scope['method']} {route}")
+            current_span.set_attribute("http.route", route)
+            current_span.set_attribute("http.status_code", status_code)
+            span_cm.__exit__(None, None, None)
             logger.info(
                 "%s %s -> %s",
                 scope["method"],

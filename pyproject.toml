@@ -23,6 +23,11 @@ dependencies = [
     "pgvector>=0.5,<1",
     "pypdf>=7.0,<8",
     "python-docx>=1.2,<2",
+    "pyyaml>=6.0,<7",
+    "prometheus-client>=0.26,<1",
+    "opentelemetry-api>=1.45,<2",
+    "opentelemetry-sdk>=1.45,<2",
+    "opentelemetry-exporter-otlp-proto-http>=1.45,<2",
     "google-api-python-client>=2.201,<3",
     "google-auth>=2.61,<3",
     "google-auth-httplib2>=0.4,<1",
@@ -48,14 +53,15 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-# Long literals in test fixtures read better unwrapped.
+# Long literals in test fixtures and evaluation metric tables read better unwrapped.
+"evaluation/suites/**" = ["E501"]
 "tests/**" = ["S101", "S105", "S106", "S107", "E731", "E501"]
 "scripts/**" = ["T201", "S603", "S607"]  # dev tooling runs fixed commands
 # Regex patterns read better unwrapped.
 "backend/app/domains/governance/guardrails/injection.py" = ["E501"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["backend", "scripts", "tests"]
+known-first-party = ["backend", "evaluation", "scripts", "tests"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

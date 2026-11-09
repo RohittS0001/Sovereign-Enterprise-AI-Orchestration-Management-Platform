@@ -1,0 +1,67 @@
+"""Correctness of project analytics on the demo dataset (deterministic golden values)."""
+
+from datetime import date
+
+from sqlalchemy import select
+
+from backend.app.db.models import Project
+from backend.app.domains.analytics.contradictions import find_contradictions
+from backend.app.domains.analytics.forecast import forecast_sprint
+from backend.app.domains.analytics.risk import assess_risk
+from backend.app.domains.analytics.workload import compute_workload
+from evaluation.core import CaseResult, Metric, SuiteResult, Timer, load_dataset, ratio
+from evaluation.environment import environment
+
+
+async def run() -> SuiteResult:
+    data = load_dataset("analytics")
+    exp = data["expected"]
+    result = SuiteResult("analytics")
+
+    with Timer() as timer:
+        async with environment() as env:
+            async with env.database.session() as session:
+                project = await session.scalar(
+                    select(Project).where(Project.key == data["project"])
+                )
+            as_of = (
+                data["as_of"]
+                if isinstance(data["as_of"], date)
+                else date.fromisoformat(data["as_of"])
+            )
+            snap = await env.collector.collect(project, today=as_of)
+
+        forecast = forecast_sprint(snap)
+        workload = compute_workload(snap)
+        contradictions = find_contradictions(snap)
+        risk = assess_risk(snap, forecast, workload, contradictions)
+        members = {m.name: m for m in workload.members}
+        pipeline = next(f for f in risk.factors if f.name == "Delivery pipeline")
+
+        checks = {
+            "forecast_status": (forecast.status, exp["forecast_status"]),
+            "committed_points": (forecast.committed_points, exp["committed_points"]),
+            "done_points": (forecast.done_points, exp["done_points"]),
+            "working_days_left": (forecast.working_days_left, exp["working_days_left"]),
+            "overloaded": (sorted(n for n, m in members.items() if m.status == "overloaded"), sorted(exp["overloaded"])),
+            "at_risk": ({n: m.at_risk_issues for n, m in members.items() if m.at_risk_issues}, exp["at_risk"]),
+            "suggestions": ([[s.issue, s.to_member] for s in workload.suggestions], exp["suggestions"]),
+            "contradictions": (sorted([c.kind, c.issue] for c in contradictions), sorted(exp["contradictions"])),
+            "blocked": (sorted(i.key for i in snap.sprint_issues if i.is_open and i.is_blocked), sorted(exp["blocked"])),
+            "risk_level": (risk.level, exp["risk_level"]),
+            "risk_score_in_range": (exp["risk_score_between"][0] <= risk.score <= exp["risk_score_between"][1], True),
+            "failing_main_builds": (
+                any(f"{exp['failing_main_builds']} consecutive failing builds" in e for e in pipeline.evidence), True
+            ),
+        }  # fmt: skip
+        for name, (actual, expected) in checks.items():
+            result.cases.append(
+                CaseResult(name, actual == expected, {"actual": actual, "expected": expected})
+            )
+
+    passed = sum(c.passed for c in result.cases)
+    result.metrics = [
+        Metric("accuracy", ratio(passed, len(result.cases)), data["thresholds"]["accuracy"])
+    ]
+    result.seconds = timer.seconds
+    return result

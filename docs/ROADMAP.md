@@ -17,8 +17,8 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 ## Next
 
 - [x] Restructure into domain modules (easy to navigate, test and evaluate)
-- [ ] Phase 8 — Evaluation (golden sets, tool-call accuracy, RAG faithfulness, red-team, CI gates)
-      and observability (OpenTelemetry traces, metrics, dashboards)
+- [x] Phase 8 — Evaluation (golden sets, tool-call accuracy, RAG faithfulness, red-team, CI gates)
+      and observability (OpenTelemetry traces, Prometheus metrics); dashboards ship with Phase 9
 - [ ] Phase 9 — Docker Compose, GitHub Actions CI, Helm chart, README & docs
 
 ## Backlog A — Integrations
