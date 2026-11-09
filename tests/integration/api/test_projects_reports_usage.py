@@ -276,9 +276,12 @@ async def test_scheduler_task_starts_and_stops_cleanly(demo_settings, database, 
     from backend.app.domains.reporting import scheduler as scheduler_module
 
     calls = []
+    second_iteration = asyncio.Event()
 
     async def fake_run_due(self):
         calls.append(1)
+        if len(calls) == 2:
+            second_iteration.set()
         raise RuntimeError("one bad iteration must not kill the loop")
 
     monkeypatch.setattr(scheduler_module.ReportScheduler, "run_due", fake_run_due)
@@ -287,8 +290,7 @@ async def test_scheduler_task_starts_and_stops_cleanly(demo_settings, database, 
     scheduler = ReportScheduler(database, collector, demo_settings, None)
 
     scheduler.start()
-    while len(calls) < 2:
-        await asyncio.sleep(0)
+    await asyncio.wait_for(second_iteration.wait(), timeout=5)
     await scheduler.stop()
 
     assert len(calls) >= 2
