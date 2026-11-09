@@ -13,6 +13,7 @@ from backend.app.mcp.schemas import github as github_schemas
 from backend.app.mcp.schemas import jira as jira_schemas
 from backend.app.mcp.schemas import keka as keka_schemas
 from backend.app.mcp.schemas.common import ToolOperation
+from backend.app.mcp.tools.analytics import AnalyticsTools, ListProjectsInput, ProjectHealthInput
 from backend.app.mcp.tools.email import EmailTools
 from backend.app.mcp.tools.github import GitHubTools
 from backend.app.mcp.tools.jira import JiraTools
@@ -172,6 +173,7 @@ def build_tool_registry(
     github_tools: GitHubTools | None = None,
     keka_tools: KekaTools | None = None,
     knowledge_tools: KnowledgeTools | None = None,
+    analytics_tools: AnalyticsTools | None = None,
 ) -> ToolRegistry:
     """Register tools for every active integration (explicit tool objects win)."""
     hub = hub or build_integration_hub(settings)
@@ -211,6 +213,28 @@ def build_tool_registry(
             input_model=SearchKnowledgeInput,
             operation=READ,
             permission=Permission.KNOWLEDGE_READ,
+        )
+    if analytics_tools is not None:
+        registry.register(
+            "analytics.list_projects",
+            analytics_tools.list_projects,
+            description="List projects configured for analytics (Jira key, name, repos).",
+            input_model=ListProjectsInput,
+            operation=READ,
+            permission=Permission.ANALYTICS_READ,
+        )
+        registry.register(
+            "analytics.project_health",
+            analytics_tools.project_health,
+            description=(
+                "Computed project health: risk score (0-100) with evidence per factor, sprint "
+                "completion forecast, workload vs capacity including leave, reassignment "
+                "suggestions, and Jira/GitHub contradictions. Prefer this for 'is X at risk', "
+                "'are we on track', 'who is overloaded' questions."
+            ),
+            input_model=ProjectHealthInput,
+            operation=READ,
+            permission=Permission.ANALYTICS_READ,
         )
 
     return registry

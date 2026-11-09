@@ -99,6 +99,8 @@ class Settings(BaseSettings):
     jira_email: str = ""
     jira_api_token: SecretStr = SecretStr("")
     jira_timeout_seconds: float = Field(default=30.0, gt=0)
+    # Jira Cloud stores story points in a custom field; check yours in the issue JSON.
+    jira_story_points_field: str = "customfield_10016"
 
     # Gmail
     gmail_client_id: str = ""
@@ -127,6 +129,16 @@ class Settings(BaseSettings):
 
     # Demo mode: every integration is served from a built-in synthetic dataset.
     demo_mode: bool = False
+
+    # Analytics & reports
+    analytics_cache_seconds: int = Field(default=60, ge=0)
+    analytics_default_capacity_points: float = Field(default=10.0, gt=0)
+    report_schedule_enabled: bool = False
+    report_schedule_weekday: int = Field(default=0, ge=0, le=6)  # 0 = Monday
+    report_schedule_hour_utc: int = Field(default=3, ge=0, le=23)  # 03:00 UTC = 08:30 IST
+
+    # Usage limits (0 = unlimited)
+    agent_daily_token_quota: int = Field(default=0, ge=0)
 
     _jwt_secret_generated: bool = PrivateAttr(default=False)
 

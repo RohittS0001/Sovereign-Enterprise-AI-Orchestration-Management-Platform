@@ -10,9 +10,9 @@ with human approval for writes, RBAC, and a tamper-evident audit log.
 
 Work proceeds in phases, one local commit each (never push unless asked):
 done — 1 foundation, 2 database/auth/RBAC, 3 LangGraph agent + approvals + audit + guardrails,
-4 GitHub + Keka integrations, Gmail drafting, demo mode, 5 knowledge base / RAG.
-Planned — 6 org features (project risk score, workload/capacity, forecasts, scheduled reports,
-Jira-vs-GitHub contradiction checks, usage tracking), 7 React+TS (Vite) frontend incl. streamed agent
+4 GitHub + Keka integrations, Gmail drafting, demo mode, 5 knowledge base / RAG, 6 project analytics
+(risk, forecast, workload, contradictions), weekly reports + scheduler, usage/quotas.
+Planned — 7 React+TS (Vite) frontend incl. streamed agent
 steps, 8 evaluation (DeepEval/Ragas, red-team, CI gates) + observability, 9 Docker Compose, GitHub
 Actions, docs. Empty `__init__.py` packages (`retrieval/`, `analytics/`, `reasoning/`, `knowledge/`,
 `workflows/`, `evaluation/`) are placeholders for those phases.
@@ -111,6 +111,20 @@ rank permitted chunks in Python. `EmbeddingVector` (`db/types.py`) = pgvector on
 chunks store `embedding_model` and only same-model vectors are compared. `knowledge.search` reads the
 acting user from `core/context.py:principal_var`, which `ToolGateway` sets around every tool call —
 tools needing per-user access must use it (and refuse when it is unset).
+
+**Project analytics** (`analytics/`, `/api/v1/projects/{key}/health`, agent tools `analytics.*`). A `Project`
+row links a Jira key to repos, the active sprint id and members (Jira account id ↔ Keka employee id,
+capacity points). `analytics/collector.py:SnapshotCollector` fetches once per project (TTL cache, keyed by
+project; pass `today=` for deterministic tests — bypasses the cache) and normalizes into
+`analytics/snapshot.py` facts (live Jira status categories + `JIRA_STORY_POINTS_FIELD`, or demo shapes);
+each failing source becomes a `warning`, never an error. Pure functions compute `trends/forecast.py`
+(weekday burn rate), `workload/workload.py` (leave-aware capacity, greedy reassignment of unstarted
+unblocked work), `reasoning/contradiction/checks.py` (Jira vs PR state via issue keys in PR title/branch)
+and `risks/score.py` (weighted factors with evidence → 0-100). Reports (`workflows/reporting/`): LLM 2
+narrative over the metrics (wrapped as untrusted) with a deterministic template fallback;
+`ReportScheduler` runs in the app lifespan when `REPORT_SCHEDULE_ENABLED`, deduped by a unique
+constraint. Emailing a report = a Gmail draft via `ToolGateway` with the human principal. Usage/quota:
+`services/usage_service.py` (from `AgentRun` rows; `AGENT_DAILY_TOKEN_QUOTA` enforced before a run).
 
 **Approvals** (`services/approval_service.py`, `/api/v1/approvals`). Approving executes the stored call
 through the registry and records the result; the run is marked completed once no approval is pending

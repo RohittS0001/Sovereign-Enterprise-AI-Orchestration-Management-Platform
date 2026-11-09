@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from backend.app.analytics.collector import SnapshotCollector
 from backend.app.api.agent import router as agent_router
 from backend.app.api.approvals import router as approvals_router
 from backend.app.api.audit import router as audit_router
@@ -11,6 +12,9 @@ from backend.app.api.auth import router as auth_router
 from backend.app.api.health import router as health_router
 from backend.app.api.integrations import router as integrations_router
 from backend.app.api.knowledge import router as knowledge_router
+from backend.app.api.projects import router as projects_router
+from backend.app.api.reports import router as reports_router
+from backend.app.api.usage import router as usage_router
 from backend.app.api.users import router as users_router
 from backend.app.core.config.settings import Settings, get_settings
 from backend.app.core.exceptions.handlers import register_exception_handlers
@@ -27,9 +31,11 @@ from backend.app.llm.base import AgentModels
 from backend.app.llm.factory import build_agent_models
 from backend.app.mcp.catalog import build_tool_registry
 from backend.app.mcp.registry.tool_registry import ToolRegistry
+from backend.app.mcp.tools.analytics import AnalyticsTools
 from backend.app.mcp.tools.knowledge import KnowledgeTools
 from backend.app.retrieval.embeddings.embedders import build_embedder
 from backend.app.retrieval.reranking.reranker import HttpReranker
+from backend.app.workflows.reporting.scheduler import ReportScheduler
 
 logger = get_logger(__name__)
 
@@ -55,11 +61,20 @@ def create_app(
     integrations = build_integration_hub(settings)
     embedder = build_embedder(settings)
     reranker = HttpReranker(settings.reranker_url) if settings.reranker_url else None
+    collector = SnapshotCollector(integrations, settings)
     if tool_registry is None:
         knowledge_tools = (
             KnowledgeTools(database, settings, embedder, reranker) if database is not None else None
         )
-        tool_registry = build_tool_registry(settings, integrations, knowledge_tools=knowledge_tools)
+        analytics_tools = AnalyticsTools(database, collector) if database is not None else None
+        tool_registry = build_tool_registry(
+            settings, integrations, knowledge_tools=knowledge_tools, analytics_tools=analytics_tools
+        )
+    scheduler = (
+        ReportScheduler(database, collector, settings, agent_models)
+        if settings.report_schedule_enabled and database is not None
+        else None
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -82,7 +97,11 @@ def create_app(
         if settings.demo_mode:
             logger.warning("DEMO_MODE is on: integrations serve synthetic data, not real systems")
         logger.info("Agent tools available", extra={"tools": tool_registry.list_tools()})
+        if scheduler is not None:
+            scheduler.start()
         yield
+        if scheduler is not None:
+            await scheduler.stop()
         if owns_models and agent_models is not None:
             await agent_models.close()
         await integrations.close()
@@ -109,6 +128,8 @@ def create_app(
     app.state.integrations = integrations
     app.state.embedder = embedder
     app.state.reranker = reranker
+    app.state.analytics_collector = collector
+    app.state.report_scheduler = scheduler
 
     app.add_middleware(
         CORSMiddleware,
@@ -132,6 +153,9 @@ def create_app(
     app.include_router(audit_router)
     app.include_router(integrations_router)
     app.include_router(knowledge_router)
+    app.include_router(projects_router)
+    app.include_router(reports_router)
+    app.include_router(usage_router)
 
     return app
 

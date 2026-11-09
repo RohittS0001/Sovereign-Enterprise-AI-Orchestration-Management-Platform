@@ -22,6 +22,7 @@ from backend.app.schemas.agent import (
     AgentToolInfo,
 )
 from backend.app.services.agent_service import AgentService, get_run, list_runs, run_to_response
+from backend.app.services.usage_service import enforce_daily_quota
 
 router = APIRouter(
     prefix="/api/v1/agent",
@@ -51,6 +52,7 @@ async def agent_query(
         limit=settings.agent_rate_limit_per_minute,
         window_seconds=60,
     )
+    await enforce_daily_quota(session, principal.user_id, settings.agent_daily_token_quota)
     run = await AgentService(session, settings, models, registry).run(principal, query)
     return run_to_response(run)
 
