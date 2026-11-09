@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 import jwt
 from pydantic import BaseModel, ValidationError
 
-from backend.app.core.config.settings import Settings
-from backend.app.core.exceptions.exceptions import AuthenticationError
+from backend.app.core.config import Settings
+from backend.app.core.errors import AuthenticationError
 from backend.app.core.security.permissions import Role
 from backend.app.db.base import utcnow
 

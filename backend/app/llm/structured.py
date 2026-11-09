@@ -5,7 +5,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, ValidationError
 
-from backend.app.core.logging.logger import get_logger
+from backend.app.core.logging import get_logger
 from backend.app.llm.base import ChatMessage, LLMClient, LLMError
 
 logger = get_logger(__name__)

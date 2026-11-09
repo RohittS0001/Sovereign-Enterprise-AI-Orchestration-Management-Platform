@@ -7,7 +7,7 @@ Usage:
     python -m scripts.gmail_auth
 """
 
-from backend.app.integrations.email.auth import authorize_interactively
+from backend.app.integrations.gmail.auth import authorize_interactively
 
 
 def main() -> None:

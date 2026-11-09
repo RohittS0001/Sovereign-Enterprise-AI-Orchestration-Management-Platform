@@ -2,8 +2,8 @@ from typing import Any
 
 import httpx
 
-from backend.app.core.config.settings import settings
-from backend.app.core.exceptions.exceptions import ConfigurationError
+from backend.app.core.config import settings
+from backend.app.core.errors import ConfigurationError
 from backend.app.integrations.common.http import HttpIntegrationClient
 
 

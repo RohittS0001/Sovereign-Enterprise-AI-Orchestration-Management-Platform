@@ -3,13 +3,13 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select, update
 
-from backend.app.analytics.collector import SnapshotCollector
 from backend.app.core.security.permissions import Role
 from backend.app.db.models import AgentRun, Report
+from backend.app.domains.analytics.collector import SnapshotCollector
+from backend.app.domains.reporting.scheduler import ReportScheduler
 from backend.app.integrations.hub import build_integration_hub
 from backend.app.llm.base import LLMError
 from backend.app.main import create_app
-from backend.app.workflows.reporting.scheduler import ReportScheduler
 from tests.conftest import serve
 from tests.support.agent import DONE, models, plan
 from tests.support.analytics import PHX_CONFIG

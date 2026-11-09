@@ -15,8 +15,8 @@ from typing import Any, Self
 
 import httpx
 
-from backend.app.core.exceptions.exceptions import IntegrationError
-from backend.app.core.logging.logger import get_logger
+from backend.app.core.errors import IntegrationError
+from backend.app.core.logging import get_logger
 
 logger = get_logger(__name__)
 

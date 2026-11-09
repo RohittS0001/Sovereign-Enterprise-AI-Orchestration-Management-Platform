@@ -8,7 +8,7 @@ import httpx
 import pytest
 from fastapi import FastAPI
 
-from backend.app.core.config.settings import Settings
+from backend.app.core.config import Settings
 from backend.app.core.security.passwords import hash_password
 from backend.app.core.security.permissions import Role
 from backend.app.core.security.tokens import create_access_token

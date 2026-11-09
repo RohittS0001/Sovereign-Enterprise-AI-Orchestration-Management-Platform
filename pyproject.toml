@@ -50,9 +50,9 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # Long literals in test fixtures read better unwrapped.
 "tests/**" = ["S101", "S105", "S106", "S107", "E731", "E501"]
-"scripts/**" = ["T201"]
+"scripts/**" = ["T201", "S603", "S607"]  # dev tooling runs fixed commands
 # Regex patterns read better unwrapped.
-"backend/app/guardrails/injection.py" = ["E501"]
+"backend/app/domains/governance/guardrails/injection.py" = ["E501"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["backend", "scripts", "tests"]

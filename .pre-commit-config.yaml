@@ -1,0 +1,26 @@
+# Install once:  pip install pre-commit && pre-commit install
+# Uses the project's own tool versions (no network fetch of hook repos).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (auto-fix)
+        entry: python -m ruff check --fix
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: ruff format
+        entry: python -m ruff format
+        language: system
+        types: [python]
+      - id: no-secrets-files
+        name: block secret files
+        entry: secret files must never be committed (.env, credentials.json, token.json)
+        language: fail
+        files: (^|/)(\.env|credentials\.json|token\.json)$
+      - id: frontend-typecheck
+        name: frontend type check
+        entry: npm --prefix frontend run typecheck
+        language: system
+        files: ^frontend/
+        pass_filenames: false

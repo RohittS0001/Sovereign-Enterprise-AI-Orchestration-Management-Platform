@@ -4,8 +4,8 @@ import asyncio
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from backend.app.core.config.settings import Settings
-from backend.app.core.logging.logger import get_logger
+from backend.app.core.config import Settings
+from backend.app.core.logging import get_logger
 from backend.app.integrations.demo.services import build_demo_services
 
 logger = get_logger(__name__)
@@ -78,10 +78,10 @@ def build_integration_hub(settings: Settings) -> IntegrationHub:
             email=demo["email"],
         )
 
-    from backend.app.integrations.email.client import GmailClient
-    from backend.app.integrations.email.service import EmailService
     from backend.app.integrations.github.client import GitHubClient
     from backend.app.integrations.github.service import GitHubService
+    from backend.app.integrations.gmail.client import GmailClient
+    from backend.app.integrations.gmail.service import EmailService
     from backend.app.integrations.jira.client import JiraClient
     from backend.app.integrations.jira.service import JiraService
     from backend.app.integrations.keka.client import KekaClient

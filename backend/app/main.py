@@ -4,21 +4,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.analytics.collector import SnapshotCollector
-from backend.app.api.agent import router as agent_router
-from backend.app.api.approvals import router as approvals_router
-from backend.app.api.audit import router as audit_router
-from backend.app.api.auth import router as auth_router
-from backend.app.api.health import router as health_router
-from backend.app.api.integrations import router as integrations_router
-from backend.app.api.knowledge import router as knowledge_router
-from backend.app.api.projects import router as projects_router
-from backend.app.api.reports import router as reports_router
-from backend.app.api.usage import router as usage_router
-from backend.app.api.users import router as users_router
-from backend.app.core.config.settings import Settings, get_settings
-from backend.app.core.exceptions.handlers import register_exception_handlers
-from backend.app.core.logging.logger import configure_logging, get_logger
+from backend.app.api.v1.agent import router as agent_router
+from backend.app.api.v1.approvals import router as approvals_router
+from backend.app.api.v1.audit import router as audit_router
+from backend.app.api.v1.auth import router as auth_router
+from backend.app.api.v1.health import router as health_router
+from backend.app.api.v1.integrations import router as integrations_router
+from backend.app.api.v1.knowledge import router as knowledge_router
+from backend.app.api.v1.projects import router as projects_router
+from backend.app.api.v1.reports import router as reports_router
+from backend.app.api.v1.usage import router as usage_router
+from backend.app.api.v1.users import router as users_router
+from backend.app.core.config import Settings, get_settings
+from backend.app.core.error_handlers import register_exception_handlers
+from backend.app.core.logging import configure_logging, get_logger
 from backend.app.core.middleware.request_context import (
     REQUEST_ID_HEADER,
     RequestContextMiddleware,
@@ -26,16 +25,17 @@ from backend.app.core.middleware.request_context import (
 from backend.app.core.middleware.security_headers import SecurityHeadersMiddleware
 from backend.app.core.security.rate_limit import RateLimiter
 from backend.app.db.session import Database
+from backend.app.domains.analytics.collector import SnapshotCollector
+from backend.app.domains.knowledge.embeddings import build_embedder
+from backend.app.domains.knowledge.reranker import HttpReranker
+from backend.app.domains.reporting.scheduler import ReportScheduler
 from backend.app.integrations.hub import build_integration_hub
 from backend.app.llm.base import AgentModels
 from backend.app.llm.factory import build_agent_models
-from backend.app.mcp.catalog import build_tool_registry
-from backend.app.mcp.registry.tool_registry import ToolRegistry
-from backend.app.mcp.tools.analytics import AnalyticsTools
-from backend.app.mcp.tools.knowledge import KnowledgeTools
-from backend.app.retrieval.embeddings.embedders import build_embedder
-from backend.app.retrieval.reranking.reranker import HttpReranker
-from backend.app.workflows.reporting.scheduler import ReportScheduler
+from backend.app.tools.analytics import AnalyticsTools
+from backend.app.tools.catalog import build_tool_registry
+from backend.app.tools.knowledge import KnowledgeTools
+from backend.app.tools.registry import ToolRegistry
 
 logger = get_logger(__name__)
 

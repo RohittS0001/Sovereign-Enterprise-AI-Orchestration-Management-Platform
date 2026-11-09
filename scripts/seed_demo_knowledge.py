@@ -10,13 +10,13 @@ from importlib import resources
 
 from sqlalchemy import select
 
-from backend.app.core.config.settings import get_settings
-from backend.app.core.exceptions.exceptions import ConflictError
+from backend.app.core.config import get_settings
+from backend.app.core.errors import ConflictError
 from backend.app.core.security.permissions import Principal, Role
 from backend.app.db.models import User, Visibility
 from backend.app.db.session import Database
-from backend.app.retrieval.embeddings.embedders import build_embedder
-from backend.app.retrieval.service import KnowledgeService
+from backend.app.domains.knowledge.embeddings import build_embedder
+from backend.app.domains.knowledge.service import KnowledgeService
 
 DOCUMENTS = [
     ("incident-escalation-policy.md", "Incident Escalation Policy", Visibility.ORGANIZATION, []),

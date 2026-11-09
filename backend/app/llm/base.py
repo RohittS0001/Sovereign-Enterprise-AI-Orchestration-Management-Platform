@@ -5,7 +5,7 @@ from typing import Any, Literal, Protocol
 
 from pydantic import BaseModel
 
-from backend.app.core.exceptions.exceptions import AppException
+from backend.app.core.errors import AppException
 
 Role = Literal["system", "user", "assistant"]
 

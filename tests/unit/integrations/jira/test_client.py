@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import SecretStr
 
-from backend.app.core.exceptions.exceptions import ConfigurationError, IntegrationError
+from backend.app.core.errors import ConfigurationError, IntegrationError
 from backend.app.integrations.jira.client import JiraClient
 
 BASE_URL = "https://acme.atlassian.net"

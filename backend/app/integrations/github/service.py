@@ -9,7 +9,7 @@ from collections import Counter
 from collections.abc import Callable
 from typing import Any
 
-from backend.app.core.config.settings import settings
+from backend.app.core.config import settings
 from backend.app.integrations.github.client import GitHubClient
 
 _REPO = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})/[A-Za-z0-9._-]{1,100}$")

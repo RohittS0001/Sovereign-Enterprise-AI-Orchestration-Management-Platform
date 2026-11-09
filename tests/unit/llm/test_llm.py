@@ -4,7 +4,7 @@ import httpx
 import pytest
 from pydantic import BaseModel
 
-from backend.app.core.config.settings import Settings
+from backend.app.core.config import Settings
 from backend.app.llm.base import ChatMessage, LLMError
 from backend.app.llm.factory import build_agent_models
 from backend.app.llm.fake import FakeLLM

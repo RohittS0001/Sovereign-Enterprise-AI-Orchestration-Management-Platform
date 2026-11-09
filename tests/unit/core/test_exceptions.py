@@ -1,6 +1,6 @@
 import pytest
 
-from backend.app.core.exceptions.exceptions import (
+from backend.app.core.errors import (
     AppException,
     AuthenticationError,
     AuthorizationError,

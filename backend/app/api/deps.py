@@ -7,8 +7,8 @@ from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.config.settings import Settings
-from backend.app.core.exceptions.exceptions import (
+from backend.app.core.config import Settings
+from backend.app.core.errors import (
     AuthenticationError,
     AuthorizationError,
     ServiceUnavailableError,
@@ -18,9 +18,9 @@ from backend.app.core.security.rate_limit import RateLimiter
 from backend.app.core.security.tokens import decode_access_token
 from backend.app.db.models import User
 from backend.app.db.session import Database
+from backend.app.domains.identity.auth_service import ClientInfo
 from backend.app.llm.base import AgentModels
-from backend.app.mcp.registry.tool_registry import ToolRegistry
-from backend.app.services.auth_service import ClientInfo
+from backend.app.tools.registry import ToolRegistry
 
 _bearer = HTTPBearer(auto_error=False, description="Access token from /api/v1/auth/login")
 

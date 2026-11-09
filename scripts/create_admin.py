@@ -16,12 +16,12 @@ import sys
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from backend.app.core.config.settings import get_settings
+from backend.app.core.config import get_settings
 from backend.app.core.security.passwords import hash_password
 from backend.app.core.security.permissions import Role
 from backend.app.db.models import User
 from backend.app.db.session import Database
-from backend.app.schemas.auth import UserCreate
+from backend.app.domains.identity.schemas import UserCreate
 
 
 async def create_admin(email: str, name: str, password: str) -> str:

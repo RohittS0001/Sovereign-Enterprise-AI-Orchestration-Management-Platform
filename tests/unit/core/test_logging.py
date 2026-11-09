@@ -2,7 +2,7 @@ import json
 import logging
 
 from backend.app.core.context import request_id_var
-from backend.app.core.logging.logger import JsonFormatter, RequestIdFilter, configure_logging
+from backend.app.core.logging import JsonFormatter, RequestIdFilter, configure_logging
 
 
 def _record(message: str = "hello", **extra) -> logging.LogRecord:

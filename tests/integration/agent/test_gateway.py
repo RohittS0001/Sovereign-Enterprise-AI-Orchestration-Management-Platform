@@ -7,8 +7,8 @@ from sqlalchemy import select
 
 from backend.app.core.security.permissions import Principal, Role
 from backend.app.db.models import ApprovalRequest, ApprovalStatus, AuditEvent
-from backend.app.mcp.schemas.common import ToolStatus
-from backend.app.orchestration.tool_gateway import ToolGateway
+from backend.app.tools.base import ToolStatus
+from backend.app.tools.gateway import ToolGateway
 from tests.support.agent import build_registry, fake_jira_service
 
 

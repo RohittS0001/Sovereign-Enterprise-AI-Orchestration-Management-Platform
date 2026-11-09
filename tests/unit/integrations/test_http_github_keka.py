@@ -6,15 +6,15 @@ from datetime import date
 import httpx
 import pytest
 
-from backend.app.core.exceptions.exceptions import ConfigurationError, IntegrationError
+from backend.app.core.errors import ConfigurationError, IntegrationError
 from backend.app.integrations.common.http import HttpIntegrationClient
 from backend.app.integrations.github.client import GitHubClient
 from backend.app.integrations.github.service import GitHubService, validate_repository
 from backend.app.integrations.keka.client import KekaClient
 from backend.app.integrations.keka.service import KekaService
-from backend.app.mcp.schemas.common import ToolStatus
-from backend.app.mcp.tools.github import GitHubTools
-from backend.app.mcp.tools.keka import KekaTools
+from backend.app.tools.base import ToolStatus
+from backend.app.tools.github.tools import GitHubTools
+from backend.app.tools.keka.tools import KekaTools
 
 
 class Recorder:

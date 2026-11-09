@@ -1,15 +1,15 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import { useAuth } from "./auth/AuthContext";
-import { Layout } from "./components/Layout";
-import { Spinner } from "./components/ui";
-import { AdminPage } from "./pages/Admin";
-import { ApprovalsPage } from "./pages/Approvals";
-import { AssistantPage } from "./pages/Assistant";
-import { AuditPage } from "./pages/Audit";
-import { KnowledgePage } from "./pages/Knowledge";
-import { LoginPage } from "./pages/Login";
-import { ProjectHealthPage, ProjectsPage } from "./pages/Projects";
-import { ReportsPage } from "./pages/Reports";
+import { useAuth } from "./shared/auth/AuthContext";
+import { Layout } from "./shared/ui/Layout";
+import { Spinner } from "./shared/ui/components";
+import { AdminPage } from "./features/admin/AdminPage";
+import { ApprovalsPage } from "./features/approvals/ApprovalsPage";
+import { AssistantPage } from "./features/assistant/AssistantPage";
+import { AuditPage } from "./features/audit/AuditPage";
+import { KnowledgePage } from "./features/knowledge/KnowledgePage";
+import { LoginPage } from "./features/auth/LoginPage";
+import { ProjectHealthPage, ProjectsPage } from "./features/projects/ProjectsPage";
+import { ReportsPage } from "./features/reports/ReportsPage";
 
 function Guard({ permission, children }: { permission?: string; children: JSX.Element }) {
   const { can } = useAuth();

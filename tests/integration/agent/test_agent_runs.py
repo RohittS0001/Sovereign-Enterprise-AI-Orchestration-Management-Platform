@@ -5,8 +5,8 @@ from sqlalchemy import select
 
 from backend.app.core.security.permissions import Principal, Role
 from backend.app.db.models import ApprovalRequest, AuditEvent, RunStatus
+from backend.app.domains.agent.service import AgentService
 from backend.app.llm.base import LLMError
-from backend.app.services.agent_service import AgentService
 from tests.support.agent import (
     DONE,
     INJECTION_EMAIL,

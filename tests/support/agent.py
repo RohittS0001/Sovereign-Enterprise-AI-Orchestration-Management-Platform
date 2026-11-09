@@ -3,13 +3,13 @@
 import base64
 from unittest.mock import AsyncMock, MagicMock
 
-from backend.app.core.config.settings import Settings
+from backend.app.core.config import Settings
 from backend.app.llm.base import AgentModels
 from backend.app.llm.fake import FakeLLM
-from backend.app.mcp.catalog import build_tool_registry
-from backend.app.mcp.registry.tool_registry import ToolRegistry
-from backend.app.mcp.tools.email import EmailTools
-from backend.app.mcp.tools.jira import JiraTools
+from backend.app.tools.catalog import build_tool_registry
+from backend.app.tools.gmail.tools import EmailTools
+from backend.app.tools.jira.tools import JiraTools
+from backend.app.tools.registry import ToolRegistry
 
 INJECTION_EMAIL = (
     "Hi team, the release is on track. "

@@ -37,7 +37,7 @@ DEMO_USERS = [
 async def seed() -> None:
     from sqlalchemy import select
 
-    from backend.app.core.config.settings import get_settings
+    from backend.app.core.config import get_settings
     from backend.app.core.security.passwords import hash_password
     from backend.app.core.security.permissions import Role
     from backend.app.db.models import Project, User

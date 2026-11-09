@@ -2,15 +2,15 @@ from datetime import date
 
 import pytest
 
-from backend.app.analytics.collector import SnapshotCollector
-from backend.app.analytics.risks.score import assess_risk
-from backend.app.analytics.snapshot import ProjectSnapshot, normalize_issue, normalize_pull
-from backend.app.analytics.trends.forecast import forecast_sprint, working_days
-from backend.app.analytics.workload.workload import compute_workload
-from backend.app.core.config.settings import Settings
+from backend.app.core.config import Settings
+from backend.app.domains.analytics.collector import SnapshotCollector
+from backend.app.domains.analytics.contradictions import find_contradictions
+from backend.app.domains.analytics.forecast import forecast_sprint, working_days
+from backend.app.domains.analytics.risk import assess_risk
+from backend.app.domains.analytics.snapshot import ProjectSnapshot, normalize_issue, normalize_pull
+from backend.app.domains.analytics.workload import compute_workload
+from backend.app.domains.reporting.generator import render_template, week_bounds
 from backend.app.integrations.hub import IntegrationHub, build_integration_hub
-from backend.app.reasoning.contradiction.checks import find_contradictions
-from backend.app.workflows.reporting.generator import render_template, week_bounds
 from tests.support.analytics import phx_project
 
 MONDAY = date(2026, 11, 9)
@@ -190,7 +190,7 @@ async def test_collector_survives_a_failing_integration(snapshot) -> None:
 
 
 def test_week_bounds_and_template(snapshot) -> None:
-    from backend.app.analytics.metrics.results import ProjectHealth
+    from backend.app.domains.analytics.results import ProjectHealth
 
     forecast, workload = forecast_sprint(snapshot), compute_workload(snapshot)
     contradictions = find_contradictions(snapshot)

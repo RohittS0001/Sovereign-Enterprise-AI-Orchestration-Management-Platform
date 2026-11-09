@@ -8,8 +8,8 @@ from starlette.datastructures import MutableHeaders
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from backend.app.core.context import request_id_var
-from backend.app.core.exceptions.handlers import error_response
-from backend.app.core.logging.logger import get_logger
+from backend.app.core.error_handlers import error_response
+from backend.app.core.logging import get_logger
 
 REQUEST_ID_HEADER = "X-Request-ID"
 

@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from backend.app.core.config.settings import Settings
+from backend.app.core.config import Settings
 
 
 def make(**overrides) -> Settings:

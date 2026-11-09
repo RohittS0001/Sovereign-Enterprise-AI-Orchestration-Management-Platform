@@ -6,7 +6,7 @@ at a real site.
 
 import pytest
 
-from backend.app.core.config.settings import settings
+from backend.app.core.config import settings
 from backend.app.integrations.jira.client import JiraClient
 
 pytestmark = [

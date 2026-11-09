@@ -10,7 +10,7 @@ import time
 from collections import defaultdict, deque
 from collections.abc import Callable
 
-from backend.app.core.exceptions.exceptions import RateLimitError
+from backend.app.core.errors import RateLimitError
 
 
 class RateLimiter:

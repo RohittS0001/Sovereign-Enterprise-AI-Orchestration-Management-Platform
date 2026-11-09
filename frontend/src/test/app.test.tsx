@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { App } from "../App";
-import { api, ApiError, storeTokens } from "../api/client";
-import { parseSseChunk } from "../api/stream";
-import type { CurrentUser } from "../api/types";
-import { AuthProvider } from "../auth/AuthContext";
+import { api, ApiError, storeTokens } from "../shared/api/client";
+import { parseSseChunk } from "../shared/api/stream";
+import type { CurrentUser } from "../shared/api/types";
+import { AuthProvider } from "../shared/auth/AuthContext";
 
 const LEAD: CurrentUser = {
   id: "u1",

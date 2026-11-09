@@ -8,8 +8,8 @@ from sqlalchemy import select
 from backend.app.core.security.permissions import Principal, Role
 from backend.app.db.models import AuditEvent
 from backend.app.main import create_app
-from backend.app.mcp.schemas.common import ToolStatus
-from backend.app.orchestration.tool_gateway import ToolGateway
+from backend.app.tools.base import ToolStatus
+from backend.app.tools.gateway import ToolGateway
 from tests.conftest import serve
 from tests.support.agent import DONE, models, plan
 
@@ -282,7 +282,7 @@ async def test_agent_answers_from_documents(test_settings, database, people) -> 
 
 
 async def test_seed_script_loads_demo_documents(tmp_path, monkeypatch, make_user) -> None:
-    from backend.app.core.config.settings import Settings
+    from backend.app.core.config import Settings
     from backend.app.db.session import Database
     from scripts import seed_demo_knowledge as script
 

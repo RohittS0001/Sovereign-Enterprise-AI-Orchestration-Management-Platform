@@ -4,8 +4,8 @@ from datetime import timedelta
 import jwt
 import pytest
 
-from backend.app.core.config.settings import Settings
-from backend.app.core.exceptions.exceptions import AuthenticationError, RateLimitError
+from backend.app.core.config import Settings
+from backend.app.core.errors import AuthenticationError, RateLimitError
 from backend.app.core.security.passwords import hash_password, needs_rehash, verify_password
 from backend.app.core.security.permissions import (
     AGENT_SCOPES,

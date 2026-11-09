@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.pool import StaticPool
 
-from backend.app.core.logging.logger import get_logger
+from backend.app.core.logging import get_logger
 
 logger = get_logger(__name__)
 

@@ -4,7 +4,7 @@ from typing import Any
 
 import httpx
 
-from backend.app.core.logging.logger import get_logger
+from backend.app.core.logging import get_logger
 from backend.app.llm.base import ChatMessage, LLMError, LLMResponse
 
 logger = get_logger(__name__)

@@ -1,12 +1,15 @@
-"""Import every model here so ``Base.metadata`` is complete for Alembic and tests."""
+"""Registry of every ORM model, so ``Base.metadata`` is complete for Alembic and tests.
 
-from backend.app.db.models.agent_run import AgentRun, RunStatus
-from backend.app.db.models.approval import ApprovalRequest, ApprovalStatus
-from backend.app.db.models.audit import AuditChainHead, AuditEvent
-from backend.app.db.models.document import Document, DocumentChunk, Visibility
-from backend.app.db.models.project import Project, Report
-from backend.app.db.models.refresh_token import RefreshToken
-from backend.app.db.models.user import User
+Models live in their domains; import them from here or from the domain module.
+"""
+
+from backend.app.domains.agent.models import AgentRun, RunStatus
+from backend.app.domains.analytics.models import Project
+from backend.app.domains.governance.approvals.models import ApprovalRequest, ApprovalStatus
+from backend.app.domains.governance.audit.models import AuditChainHead, AuditEvent
+from backend.app.domains.identity.models import RefreshToken, User
+from backend.app.domains.knowledge.models import Document, DocumentChunk, Visibility
+from backend.app.domains.reporting.models import Report
 
 __all__ = [
     "AgentRun",

@@ -10,8 +10,8 @@ import time
 
 import httpx
 
-from backend.app.core.config.settings import settings
-from backend.app.core.exceptions.exceptions import ConfigurationError, IntegrationError
+from backend.app.core.config import settings
+from backend.app.core.errors import ConfigurationError, IntegrationError
 from backend.app.integrations.common.http import HttpIntegrationClient, error_message
 
 _REFRESH_MARGIN_SECONDS = 120

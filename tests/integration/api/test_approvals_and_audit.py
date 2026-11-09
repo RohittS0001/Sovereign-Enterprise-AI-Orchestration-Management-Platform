@@ -92,7 +92,7 @@ async def test_rejecting_does_not_run_the_action(
 
 
 async def test_failed_execution_is_recorded(app_factory, make_user, auth_headers, jira) -> None:
-    from backend.app.core.exceptions.exceptions import IntegrationError
+    from backend.app.core.errors import IntegrationError
 
     jira.create_task.side_effect = IntegrationError(
         "Jira returned 400", integration="jira", upstream_status=400

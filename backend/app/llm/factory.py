@@ -1,4 +1,4 @@
-from backend.app.core.config.settings import Settings
+from backend.app.core.config import Settings
 from backend.app.llm.base import AgentModels, LLMClient
 from backend.app.llm.http_clients import OllamaClient, OpenAICompatibleClient
 

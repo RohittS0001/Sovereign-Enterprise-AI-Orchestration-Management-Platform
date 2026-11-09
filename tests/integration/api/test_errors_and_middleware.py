@@ -1,6 +1,6 @@
 from fastapi import APIRouter, FastAPI
 
-from backend.app.core.exceptions.exceptions import IntegrationError, NotFoundError
+from backend.app.core.errors import IntegrationError, NotFoundError
 from backend.app.main import create_app
 from tests.conftest import serve
 
@@ -112,7 +112,7 @@ async def test_hsts_enabled_in_production(test_settings) -> None:
 
 
 async def test_rate_limit_error_sets_retry_after(test_settings) -> None:
-    from backend.app.core.exceptions.exceptions import RateLimitError
+    from backend.app.core.errors import RateLimitError
 
     app = create_app(test_settings)
     router = APIRouter()
