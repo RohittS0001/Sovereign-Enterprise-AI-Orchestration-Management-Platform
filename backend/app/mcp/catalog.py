@@ -17,6 +17,7 @@ from backend.app.mcp.tools.email import EmailTools
 from backend.app.mcp.tools.github import GitHubTools
 from backend.app.mcp.tools.jira import JiraTools
 from backend.app.mcp.tools.keka import KekaTools
+from backend.app.mcp.tools.knowledge import KnowledgeTools, SearchKnowledgeInput
 
 READ, WRITE = ToolOperation.READ, ToolOperation.WRITE
 
@@ -170,6 +171,7 @@ def build_tool_registry(
     email_tools: EmailTools | None = None,
     github_tools: GitHubTools | None = None,
     keka_tools: KekaTools | None = None,
+    knowledge_tools: KnowledgeTools | None = None,
 ) -> ToolRegistry:
     """Register tools for every active integration (explicit tool objects win)."""
     hub = hub or build_integration_hub(settings)
@@ -198,5 +200,17 @@ def build_tool_registry(
         register_keka_tools(registry, keka_tools)
     if email_tools is not None:
         register_email_tools(registry, email_tools)
+    if knowledge_tools is not None:
+        registry.register(
+            "knowledge.search",
+            knowledge_tools.search,
+            description=(
+                "Search the organization's internal documents (policies, runbooks, specs, "
+                "meeting notes) the user is allowed to read. Returns cited passages."
+            ),
+            input_model=SearchKnowledgeInput,
+            operation=READ,
+            permission=Permission.KNOWLEDGE_READ,
+        )
 
     return registry

@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.audit import actions
 from backend.app.audit.service import AuditService
 from backend.app.core.config.settings import Settings
+from backend.app.core.context import principal_var
 from backend.app.core.logging.logger import get_logger
 from backend.app.core.security.permissions import Principal
 from backend.app.mcp.registry.tool_registry import ToolRegistry, ToolSpec
@@ -92,7 +93,11 @@ class ToolGateway:
                         data={"message": "Queued for human approval", "summary": approval.summary},
                     )
                 else:
-                    result = await self.registry.invoke(spec.name, arguments)
+                    token = principal_var.set(principal)
+                    try:
+                        result = await self.registry.invoke(spec.name, arguments)
+                    finally:
+                        principal_var.reset(token)
 
         await self.audit.record(
             actions.TOOL_INVOKE,

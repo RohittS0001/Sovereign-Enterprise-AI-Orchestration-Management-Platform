@@ -10,9 +10,8 @@ with human approval for writes, RBAC, and a tamper-evident audit log.
 
 Work proceeds in phases, one local commit each (never push unless asked):
 done — 1 foundation, 2 database/auth/RBAC, 3 LangGraph agent + approvals + audit + guardrails,
-4 GitHub + Keka integrations, Gmail drafting, demo mode.
-Planned — 5 RAG (pgvector, hybrid search, citations,
-permission-aware), 6 org features (project risk score, workload/capacity, forecasts, scheduled reports,
+4 GitHub + Keka integrations, Gmail drafting, demo mode, 5 knowledge base / RAG.
+Planned — 6 org features (project risk score, workload/capacity, forecasts, scheduled reports,
 Jira-vs-GitHub contradiction checks, usage tracking), 7 React+TS (Vite) frontend incl. streamed agent
 steps, 8 evaluation (DeepEval/Ragas, red-team, CI gates) + observability, 9 Docker Compose, GitHub
 Actions, docs. Empty `__init__.py` packages (`retrieval/`, `analytics/`, `reasoning/`, `knowledge/`,
@@ -34,6 +33,7 @@ Windows machine; the Bash tool is Git Bash. Use the venv interpreter explicitly.
 .venv/Scripts/python.exe -m alembic revision --autogenerate --rev-id 0003 -m "describe change"
 .venv/Scripts/python.exe -m scripts.create_admin --email you@example.com --name "Name"  # ADMIN_PASSWORD env or prompt
 .venv/Scripts/python.exe -m scripts.gmail_auth   # one-time interactive Gmail consent -> token.json
+.venv/Scripts/python.exe -m scripts.seed_demo_knowledge --admin-email you@example.com  # demo docs
 ```
 
 - Run Alembic as `python -m alembic` (invoking `alembic.exe` directly is denied). Target a scratch DB
@@ -97,6 +97,20 @@ demo services) and the tool registry from it. `DEMO_MODE=true` serves all integr
 dataset (writes are in-memory only). `GET /api/v1/integrations?check=true` (admin) reports mode, tools
 and live health. Enterprise scoping: `GITHUB_ALLOWED_REPOS` (also rewrites search scope qualifiers),
 `GMAIL_ALLOWED_RECIPIENT_DOMAINS`; Gmail can only create drafts, never send.
+
+**Knowledge base / RAG** (`retrieval/service.py:KnowledgeService`, `/api/v1/knowledge`, agent tool
+`knowledge.search`). Ingest: `knowledge/documents/parsers.py` (pdf/docx/md/txt/html → text with
+Markdown headings) → `retrieval/chunking/chunker.py` (heading-path aware, overlap) → embedder
+(`retrieval/embeddings/embedders.py`: Ollama/OpenAI-compatible, or offline `HashingEmbedder` by default)
+→ `Document`/`DocumentChunk` rows (dedup by SHA-256). Search: dense + BM25/full-text candidates →
+reciprocal rank fusion → per-document cap → optional TEI reranker. **Access control is a SQL filter
+(`access_filter`) applied before ranking** — visibility organization / roles / private; roles are stored
+as `",role,"` in `allowed_roles` for a portable LIKE. PostgreSQL path uses pgvector `<=>` and
+`to_tsvector`/`ts_rank_cd` (GIN index in migration 0003; not yet run against a live Postgres); other DBs
+rank permitted chunks in Python. `EmbeddingVector` (`db/types.py`) = pgvector on PG, JSON elsewhere;
+chunks store `embedding_model` and only same-model vectors are compared. `knowledge.search` reads the
+acting user from `core/context.py:principal_var`, which `ToolGateway` sets around every tool call —
+tools needing per-user access must use it (and refuse when it is unset).
 
 **Approvals** (`services/approval_service.py`, `/api/v1/approvals`). Approving executes the stored call
 through the registry and records the result; the run is marked completed once no approval is pending

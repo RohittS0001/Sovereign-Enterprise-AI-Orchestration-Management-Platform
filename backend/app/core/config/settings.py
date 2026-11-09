@@ -54,7 +54,23 @@ class Settings(BaseSettings):
     llm1_model_name: str = ""
     llm2_model_path: str = ""
     llm2_model_name: str = ""
+
+    # Embeddings for document search. "auto" = the LLM server when EMBEDDING_MODEL_NAME is
+    # set (e.g. nomic-embed-text, bge-m3), otherwise the offline hashing embedder.
+    embedding_provider: Literal["auto", "ollama", "openai_compatible", "hashing", "none"] = "auto"
     embedding_model_name: str = ""
+    embedding_base_url: str = ""  # empty = LLM_BASE_URL
+    embedding_dimensions: int = Field(default=384, ge=16, le=4096)  # hashing embedder only
+
+    # Retrieval (RAG)
+    rag_chunk_size: int = Field(default=1200, ge=200, le=8000)  # characters
+    rag_chunk_overlap: int = Field(default=150, ge=0, le=2000)
+    rag_top_k: int = Field(default=6, ge=1, le=50)
+    rag_candidate_k: int = Field(default=40, ge=5, le=500)
+    rag_max_chunks_per_document: int = Field(default=3, ge=1, le=50)
+    rag_max_upload_mb: int = Field(default=10, ge=1, le=200)
+    # Optional local reranker speaking the text-embeddings-inference /rerank API.
+    reranker_url: str = ""
 
     # Agent loop limits
     agent_max_iterations: int = Field(default=4, ge=1, le=20)

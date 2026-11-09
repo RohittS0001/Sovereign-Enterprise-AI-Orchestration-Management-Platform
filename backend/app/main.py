@@ -10,6 +10,7 @@ from backend.app.api.audit import router as audit_router
 from backend.app.api.auth import router as auth_router
 from backend.app.api.health import router as health_router
 from backend.app.api.integrations import router as integrations_router
+from backend.app.api.knowledge import router as knowledge_router
 from backend.app.api.users import router as users_router
 from backend.app.core.config.settings import Settings, get_settings
 from backend.app.core.exceptions.handlers import register_exception_handlers
@@ -26,6 +27,9 @@ from backend.app.llm.base import AgentModels
 from backend.app.llm.factory import build_agent_models
 from backend.app.mcp.catalog import build_tool_registry
 from backend.app.mcp.registry.tool_registry import ToolRegistry
+from backend.app.mcp.tools.knowledge import KnowledgeTools
+from backend.app.retrieval.embeddings.embedders import build_embedder
+from backend.app.retrieval.reranking.reranker import HttpReranker
 
 logger = get_logger(__name__)
 
@@ -49,8 +53,13 @@ def create_app(
     if agent_models is None:
         agent_models = build_agent_models(settings)
     integrations = build_integration_hub(settings)
+    embedder = build_embedder(settings)
+    reranker = HttpReranker(settings.reranker_url) if settings.reranker_url else None
     if tool_registry is None:
-        tool_registry = build_tool_registry(settings, integrations)
+        knowledge_tools = (
+            KnowledgeTools(database, settings, embedder, reranker) if database is not None else None
+        )
+        tool_registry = build_tool_registry(settings, integrations, knowledge_tools=knowledge_tools)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -77,6 +86,10 @@ def create_app(
         if owns_models and agent_models is not None:
             await agent_models.close()
         await integrations.close()
+        if embedder is not None:
+            await embedder.close()
+        if reranker is not None:
+            await reranker.close()
         if owns_database and database is not None:
             await database.dispose()
         logger.info("Shutting down %s", settings.app_name)
@@ -94,6 +107,8 @@ def create_app(
     app.state.agent_models = agent_models
     app.state.tool_registry = tool_registry
     app.state.integrations = integrations
+    app.state.embedder = embedder
+    app.state.reranker = reranker
 
     app.add_middleware(
         CORSMiddleware,
@@ -116,6 +131,7 @@ def create_app(
     app.include_router(approvals_router)
     app.include_router(audit_router)
     app.include_router(integrations_router)
+    app.include_router(knowledge_router)
 
     return app
 

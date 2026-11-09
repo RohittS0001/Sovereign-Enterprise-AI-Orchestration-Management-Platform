@@ -11,6 +11,8 @@ TOOL_INVOKE = "tool.invoke"
 APPROVAL_REQUEST = "approval.request"
 APPROVAL_DECIDE = "approval.decide"
 APPROVAL_EXECUTE = "approval.execute"
+KNOWLEDGE_INGEST = "knowledge.ingest"
+KNOWLEDGE_DELETE = "knowledge.delete"
 
 SUCCESS = "success"
 FAILURE = "failure"
