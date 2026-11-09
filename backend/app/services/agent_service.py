@@ -1,8 +1,10 @@
 from backend.app.core.exceptions.exceptions import AppException
+from backend.app.core.security.permissions import Principal
 from backend.app.schemas.agent import AgentQueryRequest, AgentQueryResponse
 
 
-def process_agent_request(request: AgentQueryRequest) -> AgentQueryResponse:
+def process_agent_request(request: AgentQueryRequest, agent: Principal) -> AgentQueryResponse:
+    """Handle a user's question. ``agent`` is the agent principal acting for the user."""
     query = request.normalized_query()
     if not query:
         raise AppException("Query must not be blank", 422, code="validation_error")

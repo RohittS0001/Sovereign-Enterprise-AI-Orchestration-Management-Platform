@@ -13,6 +13,8 @@ class HealthResponse(BaseModel):
 class DependencyStatus(BaseModel):
     name: str
     configured: bool
+    # None when no live check is performed for this dependency.
+    healthy: bool | None = None
 
 
 class ReadinessResponse(BaseModel):

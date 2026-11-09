@@ -20,8 +20,10 @@ class AppException(Exception):
         *,
         code: str | None = None,
         details: Any = None,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self.message = message
+        self.headers = headers or {}
         if status_code is not None:
             self.status_code = status_code
         if code is not None:
@@ -90,3 +92,31 @@ class AuthorizationError(AppException):
 
     status_code = 403
     code = "authorization_error"
+
+
+class ConflictError(AppException):
+    """Raised when a request conflicts with existing state (e.g. duplicate email)."""
+
+    status_code = 409
+    code = "conflict"
+
+
+class RateLimitError(AppException):
+    """Raised when a caller exceeds a rate limit."""
+
+    status_code = 429
+    code = "rate_limited"
+
+    def __init__(self, retry_after_seconds: int) -> None:
+        super().__init__(
+            "Too many requests; try again later",
+            details={"retry_after_seconds": retry_after_seconds},
+            headers={"Retry-After": str(retry_after_seconds)},
+        )
+
+
+class ServiceUnavailableError(AppException):
+    """Raised when a required backing service is not configured or reachable."""
+
+    status_code = 503
+    code = "service_unavailable"

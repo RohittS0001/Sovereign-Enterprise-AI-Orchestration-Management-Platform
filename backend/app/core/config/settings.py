@@ -1,10 +1,11 @@
 """Typed application settings loaded from environment variables and ``.env``."""
 
+import secrets
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Literal, Self
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, PrivateAttr, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
@@ -29,6 +30,18 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = ""
+    database_echo: bool = False
+
+    # Security / auth
+    jwt_secret_key: SecretStr = SecretStr("")
+    jwt_algorithm: Literal["HS256", "HS384", "HS512"] = "HS256"
+    jwt_issuer: str = "sovereign-platform"
+    jwt_audience: str = "sovereign-api"
+    access_token_ttl_minutes: int = Field(default=15, ge=1, le=24 * 60)
+    refresh_token_ttl_days: int = Field(default=7, ge=1, le=90)
+    login_rate_limit_attempts: int = Field(default=10, ge=1)
+    login_rate_limit_window_seconds: int = Field(default=60, ge=1)
+    agent_rate_limit_per_minute: int = Field(default=30, ge=1)
 
     # Local LLMs
     llm1_model_path: str = ""
@@ -59,6 +72,8 @@ class Settings(BaseSettings):
     # GitHub
     github_token: SecretStr = SecretStr("")
 
+    _jwt_secret_generated: bool = PrivateAttr(default=False)
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -88,6 +103,24 @@ class Settings(BaseSettings):
     def _resolve_from_project_root(cls, value: Path) -> Path:
         # Relative paths in .env are relative to the project, not the working directory.
         return value if value.is_absolute() else PROJECT_ROOT / value
+
+    @model_validator(mode="after")
+    def _ensure_jwt_secret(self) -> Self:
+        secret = self.jwt_secret_key.get_secret_value()
+        if self.environment in {"staging", "production"}:
+            if len(secret) < 32:
+                raise ValueError(
+                    "JWT_SECRET_KEY must be set to at least 32 characters in staging/production"
+                )
+        elif not secret:
+            # Development/test convenience: an ephemeral key (tokens die on restart).
+            self.jwt_secret_key = SecretStr(secrets.token_urlsafe(48))
+            self._jwt_secret_generated = True
+        return self
+
+    @property
+    def jwt_secret_generated(self) -> bool:
+        return self._jwt_secret_generated
 
     @property
     def is_production(self) -> bool:

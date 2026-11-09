@@ -54,7 +54,9 @@ async def app_exception_handler(request: Request, exc: AppException) -> JSONResp
         exc.message,
         extra={"error_code": exc.code, "path": request.url.path},
     )
-    return error_response(exc.status_code, exc.code, exc.message, exc.details)
+    response = error_response(exc.status_code, exc.code, exc.message, exc.details)
+    response.headers.update(exc.headers)
+    return response
 
 
 async def validation_exception_handler(

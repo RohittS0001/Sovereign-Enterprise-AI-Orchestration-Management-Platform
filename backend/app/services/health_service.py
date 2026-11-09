@@ -1,4 +1,5 @@
 from backend.app.core.config.settings import Settings
+from backend.app.db.session import Database
 from backend.app.schemas.health import DependencyStatus, HealthResponse, ReadinessResponse
 
 
@@ -12,16 +13,17 @@ def get_health_status(settings: Settings) -> HealthResponse:
     )
 
 
-def get_readiness_status(settings: Settings) -> ReadinessResponse:
-    """Readiness: report which dependencies are configured.
+async def get_readiness_status(settings: Settings, database: Database | None) -> ReadinessResponse:
+    """Readiness: is each dependency configured, and is the database reachable?
 
-    Only configuration is checked here, so the probe stays fast and never calls
-    external services. Live connectivity checks come with the integration layer.
+    External integrations are only checked for configuration so the probe stays fast
+    and never calls third-party services.
     """
+    database_ok = database is not None and await database.ping()
     dependencies = [
+        DependencyStatus(name="database", configured=database is not None, healthy=database_ok),
         DependencyStatus(name="jira", configured=settings.jira_configured),
         DependencyStatus(name="gmail", configured=settings.gmail_configured),
-        DependencyStatus(name="database", configured=bool(settings.database_url)),
     ]
-    status = "ready" if all(d.configured for d in dependencies) else "degraded"
-    return ReadinessResponse(status=status, dependencies=dependencies)
+    ready = all(d.configured and d.healthy is not False for d in dependencies)
+    return ReadinessResponse(status="ready" if ready else "degraded", dependencies=dependencies)

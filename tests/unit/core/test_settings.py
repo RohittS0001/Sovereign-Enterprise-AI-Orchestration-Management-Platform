@@ -19,7 +19,12 @@ def test_defaults() -> None:
 
 
 def test_environment_and_levels_are_normalized() -> None:
-    settings = make(environment=" Production ", log_level="debug", log_format="TEXT")
+    settings = make(
+        environment=" Production ",
+        log_level="debug",
+        log_format="TEXT",
+        jwt_secret_key="p" * 32,
+    )
 
     assert settings.environment == "production"
     assert settings.is_production is True

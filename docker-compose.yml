@@ -1,0 +1,27 @@
+# Local development services. Start with:  docker compose up -d db
+# Then set DATABASE_URL=postgresql://sovereign:sovereign@localhost:5432/sovereign
+# and run:  python -m alembic upgrade head
+#
+# The API, Ollama and frontend services are added in the deployment phase.
+
+services:
+  db:
+    # PostgreSQL 17 with the pgvector extension (used for document embeddings).
+    image: pgvector/pgvector:0.8.0-pg17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-sovereign}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sovereign}
+      POSTGRES_DB: ${POSTGRES_DB:-sovereign}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sovereign} -d ${POSTGRES_DB:-sovereign}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:
