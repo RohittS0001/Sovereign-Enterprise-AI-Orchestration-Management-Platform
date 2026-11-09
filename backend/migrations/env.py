@@ -36,12 +36,21 @@ def _compare_type(context, inspected_column, metadata_column, inspected_type, me
     return None  # default comparison for everything else
 
 
+# Expression indexes created with raw SQL in migrations (models cannot declare them portably).
+_SQL_MANAGED_INDEXES = {"ix_document_chunks_fts"}
+
+
+def _include_object(obj, name, type_, reflected, compare_to):
+    return not (type_ == "index" and name in _SQL_MANAGED_INDEXES)
+
+
 def _configure(connection: Connection | None = None, url: str | None = None) -> None:
     context.configure(
         connection=connection,
         url=url,
         target_metadata=target_metadata,
         compare_type=_compare_type,
+        include_object=_include_object,
         # SQLite cannot ALTER most things in place; batch mode recreates tables instead.
         render_as_batch=True,
         literal_binds=connection is None,

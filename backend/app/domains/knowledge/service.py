@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import ColumnElement, Select, and_, delete, func, or_, select, true
+from sqlalchemy import ColumnElement, Select, and_, delete, func, literal_column, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.config import Settings
@@ -29,7 +29,7 @@ from backend.app.db.models import Document, DocumentChunk, Visibility
 from backend.app.domains.governance.audit import actions
 from backend.app.domains.governance.audit.service import AuditService
 from backend.app.domains.knowledge.chunking import chunk_text
-from backend.app.domains.knowledge.embeddings import Embedder, cosine
+from backend.app.domains.knowledge.embeddings import Embedder, cosine, tokenize
 from backend.app.domains.knowledge.ranking import bm25_scores, cap_per_group, reciprocal_rank_fusion
 from backend.app.domains.knowledge.reranker import HttpReranker
 
@@ -336,16 +336,24 @@ class KnowledgeService:
                 rows[r.id] = r._asdict()
                 dense.append(r.id)
 
-        tsvector = func.to_tsvector("simple", DocumentChunk.text)
-        tsquery = func.websearch_to_tsquery("simple", query)
-        sparse_statement = (
-            self._chunk_query(principal)
-            .where(tsvector.op("@@")(tsquery))
-            .order_by(func.ts_rank_cd(tsvector, tsquery).desc())
-            .limit(limit)
-        )
+        # OR the terms, like BM25 on other databases: websearch_to_tsquery ANDs every word and
+        # the 'simple' config keeps stopwords, so natural questions would match nothing.
+        # tokenize() yields only [a-z0-9]+, so no tsquery syntax can be injected.
         sparse = []
-        for r in (await self.session.execute(sparse_statement)).all():
-            rows.setdefault(r.id, r._asdict())
-            sparse.append(r.id)
+        terms = sorted(set(tokenize(query)))
+        if terms:
+            # A literal config (not a bind parameter) so the planner can use the GIN index
+            # ix_document_chunks_fts, created on to_tsvector('simple', text).
+            config = literal_column("'simple'::regconfig")
+            tsvector = func.to_tsvector(config, DocumentChunk.text)
+            tsquery = func.to_tsquery(config, " | ".join(terms))
+            sparse_statement = (
+                self._chunk_query(principal)
+                .where(tsvector.op("@@")(tsquery))
+                .order_by(func.ts_rank_cd(tsvector, tsquery).desc())
+                .limit(limit)
+            )
+            for r in (await self.session.execute(sparse_statement)).all():
+                rows.setdefault(r.id, r._asdict())
+                sparse.append(r.id)
         return rows, dense, sparse
