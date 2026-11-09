@@ -1,3 +1,4 @@
+import { DeliveryTwin } from "./DeliveryTwin";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api/client";
@@ -127,6 +128,8 @@ export function ProjectHealthPage() {
           </div>
         </Card>
       </div>
+
+      {can("analytics:read") && <DeliveryTwin projectKey={h.project} />}
 
       <Card title="Risk factors">
         <div className="stack">

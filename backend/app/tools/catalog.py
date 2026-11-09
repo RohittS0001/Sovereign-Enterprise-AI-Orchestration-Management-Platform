@@ -7,7 +7,13 @@ tool that cannot work.
 from backend.app.core.config import Settings
 from backend.app.core.security.permissions import Permission
 from backend.app.integrations.hub import IntegrationHub, build_integration_hub
-from backend.app.tools.analytics import AnalyticsTools, ListProjectsInput, ProjectHealthInput
+from backend.app.tools.analytics import (
+    AnalyticsTools,
+    ListProjectsInput,
+    NegotiationInput,
+    ProjectHealthInput,
+    SimulateDeliveryInput,
+)
 from backend.app.tools.base import ToolOperation
 from backend.app.tools.github import schemas as github_schemas
 from backend.app.tools.github.tools import GitHubTools
@@ -220,6 +226,31 @@ def build_tool_registry(
             analytics_tools.list_projects,
             description="List projects configured for analytics (Jira key, name, repos).",
             input_model=ListProjectsInput,
+            operation=READ,
+            permission=Permission.ANALYTICS_READ,
+        )
+        registry.register(
+            "analytics.simulate_delivery",
+            analytics_tools.simulate_delivery,
+            description=(
+                "Monte Carlo delivery forecast (digital twin): probability of finishing by a "
+                "date, P50/P80/P95 completion dates and the drivers (blockers, efficiency, CI "
+                "rework, leave). Optional what-ifs: add_people, cut_points, extra_leave_days, "
+                "resolve_blockers. Use for 'when will we ship', 'what if we add someone'."
+            ),
+            input_model=SimulateDeliveryInput,
+            operation=READ,
+            permission=Permission.ANALYTICS_READ,
+        )
+        registry.register(
+            "analytics.negotiation_options",
+            analytics_tools.negotiation_options,
+            description=(
+                "When a deadline is at risk: simulated options (clear blockers, phased release, "
+                "cut scope, add people, move the date) with the chance of hitting the date, a "
+                "recommendation and a drafted stakeholder note. Read-only; nothing is sent."
+            ),
+            input_model=NegotiationInput,
             operation=READ,
             permission=Permission.ANALYTICS_READ,
         )

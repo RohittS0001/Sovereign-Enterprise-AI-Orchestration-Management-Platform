@@ -145,6 +145,45 @@ describe("MCP access page", () => {
   });
 });
 
+describe("Delivery twin", () => {
+  it("runs a what-if simulation and shows the negotiation options", async () => {
+    const sim = (scenario: string, p: number, p80: string) => ({
+      scenario, target_date: "2026-11-20", probability_by_target: p, p50: "2026-11-19", p80, p95: "2026-11-25",
+      finish_rate: 1, remaining_points: 24, remaining_issues: 5, efficiency: 0.8, blocked_issues: [],
+      rework_chance: 0.1, histogram: [["2026-11-19", 500], ["2026-11-24", 500]], trials: 1000,
+      drivers: ["1 open issue(s) are blocked (PHX-3)"],
+    });
+    const health = {
+      project: "PHX", name: "Phoenix", as_of: "2026-11-09", warnings: [], issue_counts: {},
+      risk: { score: 40, level: "medium", factors: [] }, forecast: null, contradictions: [],
+      workload: { period_end: "2026-11-14", members: [], unassigned_open: [], suggestions: [] },
+    };
+    const fetchMock = signedInAs(LEAD, {
+      "GET /projects/PHX/health": () => json(health),
+      "POST /projects/PHX/simulate": () => json([sim("baseline", 0.5, "2026-11-24"), sim("what-if", 0.9, "2026-11-19")]),
+      "POST /projects/PHX/negotiate": () =>
+        json({
+          target_date: "2026-11-20", baseline: sim("baseline", 0.5, "2026-11-24"), recommended: "add_one",
+          options: [{ id: "add_one", title: "Add one person", tradeoff: "costs budget", meets_goal: true,
+                      result: sim("add_one", 0.85, "2026-11-20") }],
+          message_markdown: "We recommend adding one person.", generated_by_model: null,
+        }),
+    });
+    renderApp("/projects/PHX");
+
+    await userEvent.type(await screen.findByLabelText("Add people"), "1");
+    await userEvent.click(screen.getByRole("button", { name: "Run simulation" }));
+    expect(await screen.findByText("90%")).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: /Likely finish 2026-11-19/ })).toHaveLength(2);
+    const body = JSON.parse(String(fetchMock.mock.calls.find(([u]) => String(u).endsWith("/simulate"))![1]!.body));
+    expect(body.scenarios[0]).toMatchObject({ add_people: 1 });
+
+    await userEvent.click(screen.getByRole("button", { name: "Negotiation options" }));
+    expect(await screen.findByText("recommended")).toBeInTheDocument();
+    expect(screen.getByText("We recommend adding one person.")).toBeInTheDocument();
+  });
+});
+
 describe("Admin page", () => {
   it("shows which integrations are connected and which env vars the rest need", async () => {
     const integrations: IntegrationStatus[] = [

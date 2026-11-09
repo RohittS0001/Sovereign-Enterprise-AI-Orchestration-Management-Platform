@@ -149,3 +149,22 @@ th { color: var(--text-muted); font-weight: 600; font-size: 0.8rem; text-transfo
 .button.small { padding: 4px 10px; font-size: 0.8rem; font-weight: 500; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 .history button[aria-current="true"] { background: var(--info-bg); }
+
+/* Digital twin: completion-date distribution */
+.histogram {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 72px;
+  margin: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+.histogram span {
+  flex: 1;
+  min-width: 3px;
+  background: var(--muted-bg);
+  border-radius: 2px 2px 0 0;
+}
+.histogram span.hit {
+  background: var(--accent);
+}

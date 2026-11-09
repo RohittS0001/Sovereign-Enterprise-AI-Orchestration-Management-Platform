@@ -1,3 +1,5 @@
+import asyncio
+from datetime import date
 from typing import Any
 
 from pydantic import BaseModel, Field, ValidationError
@@ -7,7 +9,9 @@ from backend.app.core.errors import AppException
 from backend.app.db.models import Project
 from backend.app.db.session import Database
 from backend.app.domains.analytics.collector import SnapshotCollector
-from backend.app.domains.analytics.service import project_health
+from backend.app.domains.analytics.negotiation import negotiate
+from backend.app.domains.analytics.service import get_project, project_health
+from backend.app.domains.analytics.twin import Scenario, simulate
 from backend.app.integrations.jira.validators import ProjectKey
 from backend.app.tools.base import ToolResult, ToolStatus
 
@@ -18,6 +22,20 @@ class ProjectHealthInput(BaseModel):
 
 class ListProjectsInput(BaseModel):
     pass
+
+
+class SimulateDeliveryInput(BaseModel):
+    project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
+    target_date: date | None = Field(default=None, description="Default: the sprint end")
+    add_people: int = Field(default=0, ge=0, le=10, description="What-if: extra engineers")
+    cut_points: float = Field(default=0, ge=0, description="What-if: lowest-priority points cut")
+    extra_leave_days: int = Field(default=0, ge=0, le=60, description="What-if: lost days")
+    resolve_blockers: bool = Field(default=False, description="What-if: blockers clear today")
+
+
+class NegotiationInput(BaseModel):
+    project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
+    target_date: date | None = Field(default=None, description="Default: the sprint end")
 
 
 class AnalyticsTools:
@@ -46,4 +64,41 @@ class AnalyticsTools:
         # Drop zero-score factors and per-issue lists the model does not need.
         data = health.model_dump(mode="json")
         data["risk"]["factors"] = [f for f in data["risk"]["factors"] if f["score"] > 0]
+        return ToolResult(status=ToolStatus.SUCCESS, data=data)
+
+    async def _snapshot(self, key: str):
+        async with self.database.session() as session:
+            project = await get_project(session, key)
+        return await self.collector.collect(project)
+
+    async def simulate_delivery(self, payload: dict[str, Any]) -> ToolResult:
+        try:
+            i = SimulateDeliveryInput.model_validate(payload)
+            snapshot = await self._snapshot(i.project_key)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        except AppException as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=exc.message)
+        scenario = Scenario(
+            name="what_if" if (i.add_people or i.cut_points or i.extra_leave_days
+                               or i.resolve_blockers) else "baseline",
+            target_date=i.target_date, add_people=i.add_people, cut_points=i.cut_points,
+            extra_leave_days=i.extra_leave_days, resolve_blockers=i.resolve_blockers,
+        )  # fmt: skip
+        result = await asyncio.to_thread(simulate, snapshot, scenario)
+        data = result.model_dump(mode="json", exclude={"histogram"})
+        return ToolResult(status=ToolStatus.SUCCESS, data=data)
+
+    async def negotiation_options(self, payload: dict[str, Any]) -> ToolResult:
+        try:
+            i = NegotiationInput.model_validate(payload)
+            snapshot = await self._snapshot(i.project_key)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        except AppException as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=exc.message)
+        plan = await negotiate(snapshot, i.target_date)
+        data = plan.model_dump(mode="json")
+        for item in [data["baseline"], *(o["result"] for o in data["options"])]:
+            item.pop("histogram", None)
         return ToolResult(status=ToolStatus.SUCCESS, data=data)

@@ -296,3 +296,32 @@ async def test_scheduler_task_starts_and_stops_cleanly(
     await scheduler.stop()
 
     assert len(calls) >= 2
+
+
+# ------------------------------------------------------------------ digital twin & negotiation
+
+
+async def test_simulate_and_negotiate_endpoints(demo_settings, database, staff) -> None:
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        await configure_phx(client, h[Role.ADMIN])
+        body = {"scenarios": [{"name": "add2", "add_people": 2}], "trials": 300}
+        runs = await client.post(
+            "/api/v1/projects/PHX/simulate", json=body, headers=h[Role.TEAM_LEAD]
+        )
+        denied = await client.post("/api/v1/projects/PHX/simulate", json={}, headers=h[Role.MEMBER])
+        plan = await client.post(
+            "/api/v1/projects/PHX/negotiate", json={}, headers=h[Role.TEAM_LEAD]
+        )
+        tool = await client.post(
+            "/api/v1/projects/NOPE/simulate", json={}, headers=h[Role.TEAM_LEAD]
+        )
+
+    assert runs.status_code == 200, runs.text
+    baseline, add2 = runs.json()
+    assert baseline["scenario"] == "baseline" and add2["scenario"] == "add2"
+    assert add2["p80"] <= baseline["p80"] and baseline["histogram"]
+    assert denied.status_code == 403  # analytics:read
+    assert plan.status_code == 200 and plan.json()["options"]
+    assert "| Option |" in plan.json()["message_markdown"]
+    assert tool.status_code == 404
