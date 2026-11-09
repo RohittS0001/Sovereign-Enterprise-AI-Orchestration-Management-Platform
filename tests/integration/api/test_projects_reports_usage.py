@@ -1,3 +1,4 @@
+import asyncio
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -248,3 +249,46 @@ async def test_agent_uses_project_health_tool(demo_settings, database, staff) ->
     evidence = reporting.calls[0]["messages"][1].content
     assert "off_track" in evidence and "merged_but_not_done" in evidence
     assert "analytics.project_health" in ops.calls[0]["messages"][0].content
+
+
+async def test_scheduler_skips_a_failing_project_and_keeps_running(
+    demo_settings, database, staff, monkeypatch
+) -> None:
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        await configure_phx(client, h[Role.ADMIN])
+    from backend.app.domains.reporting import scheduler as scheduler_module
+
+    async def broken(*args, **kwargs):
+        raise RuntimeError("collector exploded")
+
+    monkeypatch.setattr(scheduler_module, "generate_scheduled", broken)
+    collector = SnapshotCollector(build_integration_hub(demo_settings), demo_settings)
+    due = ReportScheduler(
+        database, collector, demo_settings, None,
+        clock=lambda: datetime(2026, 11, 9, 9, tzinfo=UTC),
+    )  # fmt: skip
+
+    assert await due.run_due() == []  # logged and skipped, not raised
+
+
+async def test_scheduler_task_starts_and_stops_cleanly(demo_settings, database, monkeypatch) -> None:
+    from backend.app.domains.reporting import scheduler as scheduler_module
+
+    calls = []
+
+    async def fake_run_due(self):
+        calls.append(1)
+        raise RuntimeError("one bad iteration must not kill the loop")
+
+    monkeypatch.setattr(scheduler_module.ReportScheduler, "run_due", fake_run_due)
+    monkeypatch.setattr(scheduler_module, "CHECK_INTERVAL_SECONDS", 0)
+    collector = SnapshotCollector(build_integration_hub(demo_settings), demo_settings)
+    scheduler = ReportScheduler(database, collector, demo_settings, None)
+
+    scheduler.start()
+    while len(calls) < 2:
+        await asyncio.sleep(0)
+    await scheduler.stop()
+
+    assert len(calls) >= 2

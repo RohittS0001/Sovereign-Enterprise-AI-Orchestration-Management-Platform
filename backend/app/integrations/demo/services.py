@@ -42,6 +42,16 @@ def load_dataset(today: date | None = None) -> dict[str, Any]:
     return _resolve(json.loads(raw), today or date.today())
 
 
+def load_connector_dataset(today: date | None = None) -> dict[str, Any]:
+    """Synthetic data for the connectors beyond the core four (trackers, ops, HR, ...)."""
+    raw = (
+        resources.files("backend.app.integrations.demo")
+        .joinpath("connectors.json")
+        .read_text("utf-8")
+    )
+    return _resolve(json.loads(raw), today or date.today())
+
+
 # ------------------------------------------------------------------ Jira
 
 _CLAUSE = re.compile(

@@ -43,7 +43,7 @@ jobs:
           ruff check .
           ruff format --check .
       - name: Tests (incl. PostgreSQL-specific and evaluation gates)
-        run: pytest -q -ra
+        run: pytest -q -ra --cov --cov-report=term
       - name: Evaluation report
         if: always()
         run: python -m evaluation run --out evaluation/reports

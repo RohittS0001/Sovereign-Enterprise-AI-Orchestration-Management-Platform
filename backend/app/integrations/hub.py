@@ -1,12 +1,13 @@
 """One place that knows which integrations are active and how to check them."""
 
 import asyncio
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import date
 from typing import Any, Literal
 
 from backend.app.core.config import Settings
 from backend.app.core.logging import get_logger
-from backend.app.integrations.demo.services import build_demo_services
+from backend.app.integrations.demo.services import build_demo_services, load_connector_dataset
 
 logger = get_logger(__name__)
 
@@ -28,14 +29,25 @@ class IntegrationHub:
     github: Any = None
     keka: Any = None
     email: Any = None
+    # Connectors beyond the core four, by spec name (see integrations/connectors/).
+    connectors: dict[str, Any] = field(default_factory=dict)
 
-    def service(self, name: IntegrationName) -> Any:
-        return self.email if name == "gmail" else getattr(self, name)
+    def service(self, name: str) -> Any:
+        if name in INTEGRATIONS:
+            return self.email if name == "gmail" else getattr(self, name)
+        return self.connectors.get(name)
 
     def enabled(self) -> dict[str, bool]:
-        return {name: self.service(name) is not None for name in INTEGRATIONS}
+        core = {name: self.service(name) is not None for name in INTEGRATIONS}
+        return core | {name: True for name in self.connectors}
 
-    async def check(self, name: IntegrationName, limit_seconds: float = 10.0) -> HealthResult:
+    def by_category(self, category: str) -> dict[str, Any]:
+        """Active connector services of one category, e.g. every configured issue tracker."""
+        from backend.app.integrations.connectors.registry import spec
+
+        return {n: s for n, s in self.connectors.items() if spec(n).category == category}
+
+    async def check(self, name: str, limit_seconds: float = 10.0) -> HealthResult:
         service = self.service(name)
         if service is None:
             return HealthResult(name, False, "not configured")
@@ -57,7 +69,7 @@ class IntegrationHub:
             return HealthResult(name, False, str(message)[:300])
 
     async def close(self) -> None:
-        for service in (self.jira, self.github, self.keka):
+        for service in (self.jira, self.github, self.keka, *self.connectors.values()):
             close = getattr(service, "close", None)
             if close is not None:
                 await close()
@@ -68,14 +80,18 @@ def build_integration_hub(settings: Settings) -> IntegrationHub:
 
     Services build their HTTP clients lazily, so this never touches the network.
     """
+    from backend.app.integrations.connectors.registry import CONNECTOR_SPECS
+
     if settings.demo_mode:
         demo = build_demo_services()
+        data, today = load_connector_dataset(), date.today()
         return IntegrationHub(
             mode="demo",
             jira=demo["jira"],
             github=demo["github"],
             keka=demo["keka"],
             email=demo["email"],
+            connectors={s.name: s.demo(data, today) for s in CONNECTOR_SPECS if s.demo},
         )
 
     from backend.app.integrations.github.client import GitHubClient
@@ -120,4 +136,5 @@ def build_integration_hub(settings: Settings) -> IntegrationHub:
         keka=KekaService(client_factory=keka) if s.keka_configured else None,
         email=EmailService(client_factory=lambda: GmailClient(settings=s))
         if s.gmail_configured else None,
+        connectors={c.name: c.build(s) for c in CONNECTOR_SPECS if c.build and c.configured(s)},
     )  # fmt: skip

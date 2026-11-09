@@ -17,12 +17,17 @@ async def test_status_without_configuration(client, make_user, auth_headers) -> 
 
     body = (await client.get("/api/v1/integrations?check=true", headers=admin)).json()
 
-    assert [(i["name"], i["mode"], i["tools"]) for i in body] == [
+    core = [i for i in body if i["category"] == "core"]
+    assert [(i["name"], i["mode"], i["tools"]) for i in core] == [
         ("jira", "disabled", []),
         ("github", "disabled", []),
         ("keka", "disabled", []),
         ("gmail", "disabled", []),
     ]
+    assert all(i["mode"] == "disabled" for i in body)
+    jira = core[0]
+    assert jira["missing_env"] == ["JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_API_TOKEN"]
+    assert jira["setup"] and jira["docs_url"].startswith("https://")
 
 
 async def test_demo_mode_enables_every_integration(
@@ -35,7 +40,9 @@ async def test_demo_mode_enables_every_integration(
         body = (await client.get("/api/v1/integrations?check=true", headers=admin)).json()
 
     status = {i["name"]: i for i in body}
-    assert all(i["mode"] == "demo" and i["healthy"] is True for i in body)
+    active = [i for i in body if i["mode"] != "disabled"]
+    assert {"jira", "github", "keka", "gmail"} <= set(status)
+    assert all(i["mode"] == "demo" and i["healthy"] is True and not i["missing_env"] for i in active)
     assert "github.list_workflow_runs" in status["github"]["tools"]
     assert "keka.get_leave_requests" in status["keka"]["tools"]
     assert "gmail.create_draft" in status["gmail"]["tools"]

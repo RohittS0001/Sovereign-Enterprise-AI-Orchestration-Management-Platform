@@ -38,6 +38,7 @@ dependencies = [
 dev = [
     "pytest>=9.1,<10",
     "pytest-asyncio>=1.4,<2",
+    "pytest-cov>=7.1,<8",
     "ruff>=0.16,<1",
 ]
 
@@ -76,3 +77,13 @@ markers = [
 filterwarnings = [
     "error::pytest.PytestUnraisableExceptionWarning",
 ]
+
+[tool.coverage.run]
+source = ["backend/app", "evaluation"]
+# SQLAlchemy's async engine switches greenlets; without this, lines after awaits look untested.
+concurrency = ["thread", "greenlet"]
+omit = ["backend/migrations/*"]
+
+[tool.coverage.report]
+skip_covered = true
+show_missing = true
