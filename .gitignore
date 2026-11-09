@@ -49,6 +49,9 @@ build/
 .next/
 .vite/
 
+# Local Claude Code preview config (machine-specific paths)
+.claude/launch.json
+
 # IDE
 .vscode/*
 !.vscode/settings.json

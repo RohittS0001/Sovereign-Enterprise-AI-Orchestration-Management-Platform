@@ -67,3 +67,15 @@ async def test_create_admin_script_creates_then_promotes(tmp_path, monkeypatch) 
     assert users[0].email == "root@example.com"
     assert users[0].role == Role.ADMIN
     assert verify_password("N3w!Passw0rd!!", users[0].hashed_password)
+
+
+async def test_datetimes_come_back_timezone_aware(database, make_user) -> None:
+    from datetime import UTC
+
+    user = await make_user()
+
+    async with database.session() as session:
+        fetched = await session.get(User, user.id)
+
+    assert fetched.created_at.tzinfo is not None
+    assert fetched.created_at.utcoffset() == UTC.utcoffset(None)

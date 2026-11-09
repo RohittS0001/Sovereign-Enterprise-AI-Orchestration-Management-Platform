@@ -1,10 +1,15 @@
+import asyncio
+import json
 import uuid
-from typing import Annotated
+from collections.abc import AsyncIterator
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 
 from backend.app.api.deps import (
     AgentModelsDep,
+    DatabaseDep,
     PrincipalDep,
     RateLimiterDep,
     SessionDep,
@@ -55,6 +60,65 @@ async def agent_query(
     await enforce_daily_quota(session, principal.user_id, settings.agent_daily_token_quota)
     run = await AgentService(session, settings, models, registry).run(principal, query)
     return run_to_response(run)
+
+
+@router.post("/query/stream")
+async def agent_query_stream(
+    request: AgentQueryRequest,
+    principal: AgentUser,
+    session: SessionDep,
+    database: DatabaseDep,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    models: AgentModelsDep,
+    registry: ToolRegistryDep,
+) -> StreamingResponse:
+    """Same as /query, streamed as Server-Sent Events.
+
+    Events: ``run_started``, ``step`` (one per tool call), ``phase``, then ``done`` with
+    the full run (or ``error``). Use fetch() with a ReadableStream (EventSource cannot
+    send the Authorization header).
+    """
+    query = request.normalized_query()
+    if not query:
+        raise AppException("Query must not be blank", 422, code="validation_error")
+    await limiter.hit(
+        f"agent:user:{principal.user_id}",
+        limit=settings.agent_rate_limit_per_minute,
+        window_seconds=60,
+    )
+    await enforce_daily_quota(session, principal.user_id, settings.agent_daily_token_quota)
+
+    queue: asyncio.Queue[dict[str, Any] | None] = asyncio.Queue()
+
+    async def produce() -> None:
+        # Own session: request-scoped dependencies may close before streaming ends.
+        try:
+            async with database.session() as run_session:
+                run = await AgentService(run_session, settings, models, registry).run(
+                    principal, query, on_event=queue.put
+                )
+                await queue.put(
+                    {"type": "done", "run": run_to_response(run).model_dump(mode="json")}
+                )
+        except Exception:
+            await queue.put({"type": "error", "message": "The agent hit an internal error"})
+        finally:
+            await queue.put(None)
+
+    # The run continues (and is saved and audited) even if the client disconnects.
+    task = asyncio.create_task(produce())
+
+    async def events() -> AsyncIterator[str]:
+        while (event := await queue.get()) is not None:
+            yield f"event: {event['type']}\ndata: {json.dumps(event, default=str)}\n\n"
+        await task
+
+    return StreamingResponse(
+        events(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @router.get("/runs", response_model=AgentRunPage)

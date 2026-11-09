@@ -8,8 +8,10 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, MetaData, Uuid
+from sqlalchemy import JSON, MetaData, Uuid
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from backend.app.db.types import UTCDateTime
 
 # Deterministic constraint names keep Alembic migrations stable across databases.
 NAMING_CONVENTION = {
@@ -33,7 +35,7 @@ def as_utc(value: datetime) -> datetime:
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
     type_annotation_map = {
-        datetime: DateTime(timezone=True),
+        datetime: UTCDateTime(),
         dict[str, Any]: JSON,
         list[dict[str, Any]]: JSON,
         list[str]: JSON,

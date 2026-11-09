@@ -1,6 +1,8 @@
 """Run the agent for a user's question and persist the run."""
 
 import uuid
+from collections.abc import Awaitable, Callable
+from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +25,16 @@ from backend.app.orchestration.tool_gateway import ToolGateway
 from backend.app.schemas.agent import AgentRunResponse, AgentStep, TokenUsage
 
 logger = get_logger(__name__)
+
+EventSink = Callable[[dict[str, Any]], Awaitable[None]]
+
+
+def _step_event(observation: Observation) -> dict[str, Any]:
+    return {
+        "type": "step",
+        "step": observation.model_dump(include={"step_id", "tool", "purpose", "status", "error",
+                                                 "approval_id", "suspicious"}),
+    }  # fmt: skip
 
 
 def run_to_response(run: AgentRun) -> AgentRunResponse:
@@ -58,7 +70,13 @@ class AgentService:
         self.models = models
         self.registry = registry
 
-    async def run(self, user: Principal, query: str) -> AgentRun:
+    async def run(self, user: Principal, query: str, on_event: EventSink | None = None) -> AgentRun:
+        """Run the agent; ``on_event`` receives progress events (for streaming UIs)."""
+
+        async def emit(event: dict[str, Any]) -> None:
+            if on_event is not None:
+                await on_event(event)
+
         agent = user.as_agent()
         run = AgentRun(
             id=uuid.uuid4(),
@@ -71,6 +89,7 @@ class AgentService:
         )
         self.session.add(run)
         await self.session.commit()
+        await emit({"type": "run_started", "run_id": str(run.id)})
 
         deps = AgentDeps(
             models=self.models,
@@ -88,7 +107,12 @@ class AgentService:
                 config={"recursion_limit": recursion_limit(deps)},
                 stream_mode="values",
             ):
+                seen = len(state.get("observations", []))
                 state = snapshot
+                for observation in state.get("observations", [])[seen:]:
+                    await emit(_step_event(observation))
+                if "verification" in state and "answer" not in state:
+                    await emit({"type": "phase", "phase": "writing_answer"})
             run.answer = state.get("answer")
             run.citations = state.get("citations", [])
             pending = any(o.status == "pending_approval" for o in state.get("observations", []))

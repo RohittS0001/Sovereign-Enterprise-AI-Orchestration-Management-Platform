@@ -55,6 +55,7 @@ def get_client_info(request: Request) -> ClientInfo:
 
 
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
+DatabaseDep = Annotated[Database, Depends(get_database)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
 RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
 ClientInfoDep = Annotated[ClientInfo, Depends(get_client_info)]
