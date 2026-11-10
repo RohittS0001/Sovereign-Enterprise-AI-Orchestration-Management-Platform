@@ -15,14 +15,23 @@ from pathlib import Path
 
 from evaluation.core import SuiteResult, to_markdown, write_reports
 
-OFFLINE = ["retrieval", "guardrails", "analytics", "redteam", "codemode"]
+OFFLINE = ["retrieval", "rag", "guardrails", "analytics", "planning", "redteam", "codemode"]
 ALL = [*OFFLINE, "agent"]
 
 
 async def run_suites(
     names: list[str], *, judge: bool = False, real_embeddings: bool = False
 ) -> list[SuiteResult]:
-    from evaluation.suites import agent, analytics, codemode, guardrails, redteam, retrieval
+    from evaluation.suites import (
+        agent,
+        analytics,
+        codemode,
+        guardrails,
+        planning,
+        rag,
+        redteam,
+        retrieval,
+    )
 
     runners = {
         "retrieval": lambda: retrieval.run(real_embeddings=real_embeddings),
@@ -30,6 +39,8 @@ async def run_suites(
         "analytics": analytics.run,
         "redteam": redteam.run,
         "codemode": codemode.run,
+        "rag": rag.run,
+        "planning": planning.run,
         "agent": lambda: agent.run(judge=judge, real_embeddings=real_embeddings),
     }
     return [await runners[name]() for name in names]

@@ -1,0 +1,51 @@
+# Retrieval-augmented answering over the demo knowledge base.
+# facts: phrases a correct answer must contain; the retrieved context must hold all of them.
+# relevant_titles: documents a good retrieval draws from (for context precision).
+k: 4
+thresholds:
+  context_recall: 0.85        # share of required facts present in the top-k chunks
+  context_precision: 0.6      # share of top-k chunks from a relevant document
+  citation_validity: 1.0      # every [S#] in an answer points at a successful tool call
+  faithfulness: 0.9           # answer sentences found verbatim in the cited context
+  sync_leak_rate: 0.0         # restricted synced documents reaching a member
+
+questions:
+  - id: vendor-no-fix
+    role: member
+    query: What should we do if the vendor gives no fix date?
+    relevant_titles: [Incident Escalation Policy]
+    facts: [fix date]
+  - id: sev1-paging
+    role: member
+    query: When is an incident SEV1 and who gets paged?
+    relevant_titles: [Incident Escalation Policy]
+    facts: [SEV1]
+  - id: customer-status
+    role: member
+    query: Who sends customer-facing status updates during an incident?
+    relevant_titles: [Incident Escalation Policy]
+    facts: [status]
+  - id: release-freeze
+    role: member
+    query: Can we release to production right before a merchant sale event?
+    relevant_titles: [Release Process]
+    facts: [5 days before a major merchant sale]
+  - id: ci-gate
+    role: member
+    query: Which CI job must pass on main before any release?
+    relevant_titles: [Release Process]
+    facts: [integration-tests]
+  - id: velocity-commitment
+    role: team_lead
+    query: How much of our average velocity should a team commit to?
+    relevant_titles: [Release Process]
+    facts: [85% of their average velocity]
+  - id: contract-credits
+    role: project_manager
+    query: What service credits does the gateway vendor owe for an SLA breach?
+    relevant_titles: [Gateway Vendor Contract Summary]
+    facts: [credit]
+
+sync:
+  restricted_query: gateway pricing volume discount tiers
+  restricted_title: Gateway Pricing Negotiation Notes

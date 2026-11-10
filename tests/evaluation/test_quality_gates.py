@@ -177,3 +177,43 @@ async def test_codemode_detects_scripts_running_as_the_human(monkeypatch) -> Non
 
     assert not result.passed
     assert "governance-write-needs-approval" in {c.id for c in result.cases if not c.passed}
+
+
+async def test_rag_gate() -> None:
+    from evaluation.suites import rag
+
+    result = await rag.run()
+    assert_passed(result)
+
+
+async def test_rag_detects_restricted_documents_leaking_after_sync(monkeypatch) -> None:
+    from backend.app.db.models import Visibility
+    from backend.app.domains.knowledge import sync
+    from evaluation.suites import rag
+
+    # Regression: ignoring the source's restriction would publish confidential pages.
+    monkeypatch.setattr(
+        sync, "_visibility", lambda settings, restricted: (Visibility.ORGANIZATION, [])
+    )
+
+    result = await rag.run()
+
+    assert not result.passed and result.metric("sync_leak_rate").value > 0
+
+
+async def test_planning_gate() -> None:
+    from evaluation.suites import planning
+
+    assert_passed(await planning.run())
+
+
+async def test_planning_detects_an_optimistic_twin(monkeypatch) -> None:
+    from backend.app.domains.analytics import twin
+    from evaluation.suites import planning
+
+    # Regression: reporting the earliest simulated finish as "P80" would be wildly optimistic.
+    monkeypatch.setattr(twin, "_percentile", lambda values, q: min(values) if values else None)
+
+    result = await planning.run()
+
+    assert not result.passed and result.metric("p80_coverage").value < 0.65

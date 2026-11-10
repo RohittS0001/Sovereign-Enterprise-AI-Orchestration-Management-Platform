@@ -1,0 +1,17 @@
+# Planning intelligence: digital-twin calibration and slip-model discrimination.
+thresholds:
+  p80_coverage_min: 0.65     # share of realized finishes on or before the forecast P80
+  p80_coverage_max: 0.95     # (much higher means forecasts are padded, lower means optimistic)
+  brier_score: 0.2           # mean squared error of "chance to finish by the target"
+  slip_auc: 0.8              # how well the slip model ranks slipping sprints above healthy ones
+
+twin:
+  projects: 60
+  trials: 400
+  seed: 11
+
+slip_model:
+  sprints: 40
+  days_per_sprint: 5
+  seed: 5
+  holdout_share: 0.3
