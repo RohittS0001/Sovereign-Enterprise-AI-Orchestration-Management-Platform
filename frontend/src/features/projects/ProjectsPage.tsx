@@ -1,4 +1,5 @@
 import { BriefingCard } from "./BriefingCard";
+import { BacklogPlanner, DoraPanel, ReleasePanel, RoadmapPanel } from "./DeliveryPanels";
 import { DeliveryTwin } from "./DeliveryTwin";
 import { CommitmentsCard, FinanceCard } from "./FinanceCard";
 import { ProductionCard } from "./ProductionCard";
@@ -69,7 +70,7 @@ export function ProjectHealthPage() {
     queryKey: ["health", key],
     queryFn: () => api<ProjectHealth>(`/projects/${encodeURIComponent(key)}/health`),
   });
-  const [tab, setTab] = useState<"overview" | "forecast" | "team" | "business">("overview");
+  const [tab, setTab] = useState<"overview" | "forecast" | "roadmap" | "dora" | "releases" | "planner" | "team" | "business">("overview");
   const generate = useMutation({
     mutationFn: () => api<Report>("/reports/generate", { body: { project_key: key } }),
     onSuccess: (report) => navigate(`/reports?open=${report.id}`),
@@ -117,7 +118,7 @@ export function ProjectHealthPage() {
             {h.risk.factors.filter((x) => x.score > 0).sort((a, b) => b.score / b.max_score - a.score / a.max_score)[0]?.recommendation ?? "No action needed right now."}
           </p>
         </div>
-        <div className="stack" style={{ minWidth: 240, gap: 6 }}>
+        <div className="stack" style={{ flex: "1 1 240px", gap: 6 }}>
           {f ? (
             <>
               <div className="row between small">
@@ -145,7 +146,13 @@ export function ProjectHealthPage() {
 
       <Tabs label="Project sections" value={tab} onChange={setTab} tabs={[
         { id: "overview", label: "Overview" },
-        ...(can("analytics:read") ? [{ id: "forecast" as const, label: "Forecast & what-ifs" }] : []),
+        ...(can("analytics:read") ? [
+          { id: "forecast" as const, label: "Forecast & what-ifs" },
+          { id: "roadmap" as const, label: "Roadmap" },
+          { id: "dora" as const, label: "DORA metrics" },
+          { id: "releases" as const, label: "Releases & retro" },
+        ] : []),
+        ...(can("agent:query") && can("analytics:read") ? [{ id: "planner" as const, label: "Backlog planner" }] : []),
         { id: "team", label: "Team" },
         ...(h.production || h.finance || h.commitments ? [{ id: "business" as const, label: "Production & finance" }] : []),
       ]} />
@@ -196,6 +203,10 @@ export function ProjectHealthPage() {
         </>
       )}
       {tab === "forecast" && <DeliveryTwin projectKey={h.project} />}
+      {tab === "roadmap" && <RoadmapPanel projectKey={h.project} />}
+      {tab === "dora" && <DoraPanel projectKey={h.project} />}
+      {tab === "releases" && <ReleasePanel projectKey={h.project} />}
+      {tab === "planner" && <BacklogPlanner projectKey={h.project} />}
       {tab === "team" && (
         <Card title="Team capacity">
           <div className="table-wrap">

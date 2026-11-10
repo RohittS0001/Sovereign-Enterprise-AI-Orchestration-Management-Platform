@@ -13,7 +13,8 @@ Work proceeds in phases, one local commit each (never push unless asked). Done: 
 auth/RBAC, agent + approvals + audit + guardrails, GitHub/Keka/Gmail drafts + demo mode, RAG, analytics
 + reports + quotas, React frontend), the domain restructure, 8 (evaluation + observability), 9
 (Docker Compose, CI, Helm, README) and 10 (connection registry, MCP code mode, digital twin, all of
-Backlog A and B except LoRA fine-tuning, RAG/planning evals). Remaining work: Backlog C.
+Backlog A and B except LoRA fine-tuning, RAG/planning evals) and most of Backlog C (delivery lifecycle).
+Remaining work: the rest of Backlog C (intake portal, staffing, standup digest, lessons library, enterprise readiness).
 `docs/ROADMAP.md` is the backlog source of truth (integrations, moonshots, lifecycle features) — tick
 items there as they land.
 
@@ -185,6 +186,13 @@ members may carry `hr_employee_id`/`github_login`. `domains/knowledge/sync.py` (
 `domains/meetings/actions.py`, `domains/chat/` + `api/v1/chat.py` (Slack/Teams, signature-verified,
 background tasks on `app.state.chat_tasks`), `domains/graph/`, `domains/briefing/` (chief of staff +
 voice script), `domains/compliance/`, `domains/agent/team.py` (supervisor + tool-subset specialists).
+
+**Delivery lifecycle** (`domains/delivery/`, `api/v1/delivery.py`, tools `delivery.*`). Pure functions over
+the analytics snapshot: `roadmap.py` (list scheduling — one task per person at a time — then CPM slack and
+critical path; cycles broken and reported), `dora.py` (bands per DORA; non-prod deploys excluded; MTTR from
+`Incident.resolved` via `incident_history`), `release.py` (release notes, retrospective with optional LLM 2
+summary over untrusted-wrapped facts), `backlog.py` (requirements → epics/stories via LLM 2 or an offline
+parser, estimates from similar issues, submitted as `jira.create_*` through the gateway = approvals only).
 
 **Database** (`db/`). Async SQLAlchemy 2; PostgreSQL in prod, SQLite in tests. `db/types.py`:
 `UTCDateTime` (always tz-aware UTC — applied to every `datetime` via `Base.type_annotation_map`) and

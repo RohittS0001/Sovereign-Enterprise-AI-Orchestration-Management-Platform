@@ -36,6 +36,7 @@ export function McpAccessPage() {
     <>
       <div className="page-header">
         <div>
+          <div className="eyebrow">Platform</div>
           <h1>MCP access</h1>
           <p>
             Let Claude Desktop, an IDE or another agent use the platform's tools through the Model Context Protocol

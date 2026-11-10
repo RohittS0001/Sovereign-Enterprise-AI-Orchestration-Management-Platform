@@ -96,6 +96,7 @@ export function KnowledgePage() {
     <>
       <div className="page-header">
         <div>
+          <div className="eyebrow">Delivery</div>
           <h1>Knowledge</h1>
           <p>Internal documents the assistant can cite. You only see what you're allowed to read.</p>
         </div>

@@ -73,6 +73,13 @@ class RetrievalError(AppException):
     code = "retrieval_error"
 
 
+class ValidationAppError(AppException):
+    """A request that is well-formed but cannot be processed as given."""
+
+    status_code = 422
+    code = "validation_error"
+
+
 class NotFoundError(AppException):
     """Raised when a requested resource does not exist."""
 

@@ -129,13 +129,17 @@ const TONES: Record<string, string> = {
   success: "good", completed: "good", executed: "good", on_track: "good", low: "good", balanced: "good",
   live: "good", healthy: "good", pass: "good",
   pending: "warn", pending_approval: "warn", awaiting_approval: "warn", at_risk: "warn", medium: "warn",
-  underused: "info", running: "info", demo: "info",
+  underused: "info", running: "info", demo: "info", info: "info", muted: "muted",
   error: "bad", failed: "bad", denied: "bad", rejected: "bad", off_track: "bad", high: "bad", fail: "bad",
   overloaded: "bad", expired: "muted", disabled: "muted", unknown: "muted", warn: "warn", bad: "bad", good: "good",
 };
 
 export function Badge({ value, label }: { value: string; label?: string }) {
-  return <span className={`badge badge-${TONES[value] ?? "muted"}`}>{label ?? value.replace(/_/g, " ")}</span>;
+  return (
+    <span className={`badge badge-${TONES[value] ?? "muted"}`}>
+      <span className="badge-text">{label ?? value.replace(/_/g, " ")}</span>
+    </span>
+  );
 }
 
 export function Spinner({ label = "Loading…" }: { label?: string }) {

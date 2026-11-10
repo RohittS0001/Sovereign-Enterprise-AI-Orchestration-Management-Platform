@@ -189,6 +189,7 @@ class Incident(BaseModel):
     service: str | None = None
     created: date | None = None
     url: str | None = None
+    resolved: date | None = None
 
 
 class ErrorGroup(BaseModel):

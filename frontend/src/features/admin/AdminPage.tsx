@@ -6,6 +6,7 @@ import { useAuth } from "../../shared/auth/AuthContext";
 import { Badge, Card, ErrorNote, PageHeader, Spinner, formatDate } from "../../shared/ui/components";
 
 const ROLES: Role[] = ["admin", "project_manager", "team_lead", "member", "auditor"];
+const roleLabel = (r: string) => r.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 
 function Users() {
   const queryClient = useQueryClient();
@@ -50,7 +51,7 @@ function Users() {
           <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
             {ROLES.map((r) => (
               <option key={r} value={r}>
-                {r.replace("_", " ")}
+                {roleLabel(r)}
               </option>
             ))}
           </select>
@@ -88,7 +89,7 @@ function Users() {
                   >
                     {ROLES.map((r) => (
                       <option key={r} value={r}>
-                        {r.replace("_", " ")}
+                        {roleLabel(r)}
                       </option>
                     ))}
                   </select>
@@ -140,6 +141,11 @@ function Usage() {
           </tr>
         </thead>
         <tbody>
+          {u.by_user.length === 0 && (
+            <tr>
+              <td colSpan={4} className="muted" style={{ textAlign: "center" }}>No assistant usage in this period.</td>
+            </tr>
+          )}
           {u.by_user.map((row) => (
             <tr key={row.user_id}>
               <td>{row.email ?? row.user_id}</td>

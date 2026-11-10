@@ -88,10 +88,13 @@ export function HomePage() {
                     <div className="small muted truncate">{p.top_risks[0] ?? "No active risk factors"}</div>
                   </div>
                   <div style={{ textAlign: "right" }}>
-                    <div className="num" style={{ fontWeight: 600 }}>
-                      {p.chance_by_target === null ? "—" : `${Math.round(p.chance_by_target * 100)}%`}
+                    <div>
+                      <span className="num" style={{ fontWeight: 600 }}>
+                        {p.chance_by_target === null ? "—" : `${Math.round(p.chance_by_target * 100)}%`}
+                      </span>{" "}
+                      <span className="xs muted">chance on time</span>
                     </div>
-                    <div className="xs faint">by {formatDay(p.target_date)} · likely {formatDay(p.likely_finish)}</div>
+                    <div className="xs faint">Target {formatDay(p.target_date)} · likely {formatDay(p.likely_finish)}</div>
                   </div>
                 </li>
               ))}

@@ -17,6 +17,7 @@ tool output.
 | **Integrations** | **36 systems**, all configured from `.env` ([docs/integrations.md](docs/integrations.md)): Jira, GitHub, Keka, Gmail; Linear, GitLab, Azure DevOps, Asana, ClickUp, Bitbucket; PagerDuty, Opsgenie, Sentry, Jenkins, Argo CD, SonarQube; BambooHR, Zoho People, Darwinbox, Workday; Zoho Books, Tally, SAP; Salesforce, HubSpot; Confluence, Notion, SharePoint, Google Drive; Google Calendar, Outlook; Zoom, Teams and Meet transcripts; Slack and Teams chat. Each has a **demo twin**, so everything works without credentials |
 | **MCP server** | Claude Desktop, IDEs and other agents use the governed tools in **code mode** (`search_tools` + sandboxed `execute_code`) with personal access tokens; see [docs/mcp.md](docs/mcp.md) |
 | **Planning intelligence** | Monte Carlo **digital twin** (chance to hit a date, P50/P80/P95, what-ifs), **negotiation assistant**, **predictive slip model** trained on your own history, **earned value** (CPI, EAC), production health, customer commitments |
+| **Delivery lifecycle** | **Critical-path roadmap** (dependencies + one task per person, slack, late items), **DORA metrics** with bands and evidence, **release notes** and **retrospectives** from Jira/GitHub/CI facts, **requirements → Jira backlog** with history-based estimates, sent only through approvals |
 | **Org intelligence** | **Knowledge graph** (who knows what, impact of someone's absence, bus factor), **AI chief of staff** (weekly decisions, drafted escalations, spoken briefing), **multi-agent** mode (supervisor + specialist agents), **compliance autopilot** (SOC 2 / ISO 27001 evidence pack) |
 | **Governance** | Human approval for agent writes (optional four-eyes, TTL), RBAC with five roles, SHA-256 hash-chained audit log, redaction (secrets, cards, Aadhaar, PAN, SSN, IBAN), injection scanning |
 | **Knowledge base** | Upload PDF/DOCX/Markdown; hybrid BM25 + vector search with RRF and optional reranking; **access control applied in SQL before ranking**, so the agent never sees a document the user can't |
@@ -212,5 +213,6 @@ docs/               architecture, ADRs, roadmap
 ## Roadmap
 
 Phases 1–10 are complete, including every integration and moonshot in the backlog (LoRA fine-tuning
-aside). Lifecycle features (intake, estimation, Gantt, DORA, …) come next; everything is
+aside), plus most lifecycle features (backlog planning, estimation, critical path, DORA, release notes,
+retrospectives). Next: project intake, staffing, standup digest and enterprise readiness; everything is
 tracked in [docs/ROADMAP.md](docs/ROADMAP.md).

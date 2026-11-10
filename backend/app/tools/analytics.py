@@ -46,6 +46,22 @@ class NegotiationInput(BaseModel):
     target_date: date | None = Field(default=None, description="Default: the sprint end")
 
 
+class DoraInput(BaseModel):
+    project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
+    window_days: int = Field(default=30, ge=7, le=180, description="Look-back window in days")
+
+
+class ReleaseNotesInput(BaseModel):
+    project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
+    since: date | None = Field(default=None, description="Default: the sprint start")
+    until: date | None = Field(default=None, description="Default: today")
+
+
+class EstimateInput(BaseModel):
+    project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
+    title: str = Field(min_length=3, max_length=500, description="The story to estimate")
+
+
 class AnalyticsTools:
     """Computed, evidence-backed project analytics for the agent."""
 
@@ -158,3 +174,69 @@ class AnalyticsTools:
         except AppException as exc:
             return ToolResult(status=ToolStatus.ERROR, error=exc.message)
         return ToolResult(status=ToolStatus.SUCCESS, data=prediction.model_dump(mode="json"))
+
+    # ------------------------------------------------------------ delivery lifecycle
+
+    async def _delivery(
+        self, model: type[BaseModel], payload: dict[str, Any], compute
+    ) -> ToolResult:
+        try:
+            inputs = model.model_validate(payload)
+            snapshot = await self._snapshot(inputs.project_key)
+            data = await compute(inputs, snapshot)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        except AppException as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=exc.message)
+        return ToolResult(status=ToolStatus.SUCCESS, data=data)
+
+    async def critical_path(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.roadmap import build_roadmap
+
+        async def compute(_, snapshot):
+            roadmap = build_roadmap(snapshot).model_dump(mode="json")
+            for item in roadmap["items"]:  # keep what the model needs
+                for name in ("start_day", "finish_day", "after"):
+                    item.pop(name, None)
+            return roadmap
+
+        return await self._delivery(ProjectHealthInput, payload, compute)
+
+    async def dora_metrics(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.dora import dora_metrics, incident_history
+
+        async def compute(i, snapshot):
+            incidents = await incident_history(self.collector.hub, snapshot)
+            return dora_metrics(snapshot, incidents, window_days=i.window_days).model_dump(
+                mode="json"
+            )
+
+        return await self._delivery(DoraInput, payload, compute)
+
+    async def release_notes(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.release import release_notes
+
+        async def compute(i, snapshot):
+            notes = release_notes(snapshot, i.since, i.until)
+            return notes.model_dump(mode="json", exclude={"sections"})
+
+        return await self._delivery(ReleaseNotesInput, payload, compute)
+
+    async def retrospective(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.release import retrospective
+
+        async def compute(i, snapshot):
+            async with self.database.session() as session:
+                health = await project_health(session, self.collector, i.project_key, record=False)
+            return (await retrospective(snapshot, health)).model_dump(mode="json")
+
+        return await self._delivery(ProjectHealthInput, payload, compute)
+
+    async def estimate_story(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.backlog import estimate
+
+        async def compute(i, snapshot):
+            points, basis, similar = estimate(i.title, snapshot.issues)
+            return {"points": points, "basis": basis, "similar_issues": similar}
+
+        return await self._delivery(EstimateInput, payload, compute)

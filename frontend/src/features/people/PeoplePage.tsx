@@ -54,8 +54,8 @@ export function PeoplePage() {
       </div>
       <div className="grid grid-2">
         <Card title={<><Icon name="search" width={16} height={16} /> Who knows…</>}>
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (topic.trim().length >= 2) experts.mutate(topic.trim()); }}>
-            <input style={{ flex: 1 }} aria-label="Topic" placeholder="e.g. refunds, capture timeouts" value={topic} onChange={(e) => setTopic(e.target.value)} />
+          <form className="input-row" onSubmit={(e) => { e.preventDefault(); if (topic.trim().length >= 2) experts.mutate(topic.trim()); }}>
+            <input aria-label="Topic" placeholder="e.g. refunds, capture timeouts" value={topic} onChange={(e) => setTopic(e.target.value)} />
             <button className="button" type="submit" disabled={experts.isPending}>Find experts</button>
           </form>
           <ErrorNote error={experts.error} />
@@ -79,8 +79,8 @@ export function PeoplePage() {
           </ul>
         </Card>
         <Card title={<><Icon name="alert" width={16} height={16} /> What breaks if someone is away?</>}>
-          <form className="row" onSubmit={(e) => { e.preventDefault(); if (person.trim()) impact.mutate(person.trim()); }}>
-            <input style={{ flex: 1 }} aria-label="Person" placeholder="Name as in Jira, e.g. Arjun M" value={person} onChange={(e) => setPerson(e.target.value)} />
+          <form className="input-row" onSubmit={(e) => { e.preventDefault(); if (person.trim()) impact.mutate(person.trim()); }}>
+            <input aria-label="Person" placeholder="Name as in Jira, e.g. Arjun M" value={person} onChange={(e) => setPerson(e.target.value)} />
             <button className="button" type="submit" disabled={impact.isPending}>Assess impact</button>
           </form>
           <ErrorNote error={impact.error} />

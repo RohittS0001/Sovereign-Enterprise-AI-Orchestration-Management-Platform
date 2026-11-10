@@ -21,6 +21,7 @@ export function AuditPage() {
     <>
       <div className="page-header">
         <div>
+          <div className="eyebrow">Platform</div>
           <h1>Audit log</h1>
           <p>Every login, tool call, agent run and approval — chained so edits are detectable.</p>
         </div>
@@ -30,7 +31,7 @@ export function AuditPage() {
             <select value={action} onChange={(e) => setAction(e.target.value)}>
               {ACTIONS.map((a) => (
                 <option key={a} value={a}>
-                  {a || "all"}
+                  {a || "All actions"}
                 </option>
               ))}
             </select>

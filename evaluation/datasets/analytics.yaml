@@ -17,3 +17,10 @@ expected:
   risk_level: high
   risk_score_between: [70, 95]
   failing_main_builds: 2
+  # delivery lifecycle (roadmap / DORA)
+  critical_path: [PHX-7, PHX-5]
+  roadmap_finish: "2026-11-19"
+  dora:
+    lead_time_days: 3.5
+    change_failure_rate: 0.0
+    time_to_restore_days: 1.0

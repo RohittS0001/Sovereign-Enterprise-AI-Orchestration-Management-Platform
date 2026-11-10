@@ -11,9 +11,12 @@ from backend.app.tools import connectors as cx
 from backend.app.tools.analytics import (
     AbsenceInput,
     AnalyticsTools,
+    DoraInput,
+    EstimateInput,
     ListProjectsInput,
     NegotiationInput,
     ProjectHealthInput,
+    ReleaseNotesInput,
     SimulateDeliveryInput,
     WhoKnowsInput,
 )
@@ -367,6 +370,49 @@ def build_tool_registry(
             operation=READ,
             permission=Permission.ANALYTICS_READ,
         )
+        delivery = [
+            (
+                "delivery.critical_path",
+                analytics_tools.critical_path,
+                ProjectHealthInput,
+                "Roadmap and critical path: the chain of open issues (dependencies plus each "
+                "person's queue) that sets the finish date, with start/finish dates, slack, late "
+                "items and external blockers. Use for 'what is on the critical path', 'when does "
+                "X finish', 'what is blocking the release'.",
+            ),
+            (
+                "delivery.dora_metrics",
+                analytics_tools.dora_metrics,
+                DoraInput,
+                "DORA metrics for a project: deployment frequency, lead time for changes, change "
+                "failure rate and time to restore, each banded elite/high/medium/low with "
+                "evidence and recommendations.",
+            ),
+            (
+                "delivery.release_notes",
+                analytics_tools.release_notes,
+                ReleaseNotesInput,
+                "Release notes (markdown) from completed issues and merged pull requests in a "
+                "period; default: the current sprint.",
+            ),
+            (
+                "delivery.retrospective",
+                analytics_tools.retrospective,
+                ProjectHealthInput,
+                "Sprint retrospective from data: what went well, what to improve, proposed "
+                "actions and the sprint metrics.",
+            ),
+            (
+                "delivery.estimate_story",
+                analytics_tools.estimate_story,
+                EstimateInput,
+                "Estimate story points for a new story from the most similar past issues in the "
+                "project, with the evidence.",
+            ),
+        ]
+        for name, handler, model, description in delivery:
+            registry.register(name, handler, description=description, input_model=model,
+                              operation=READ, permission=Permission.ANALYTICS_READ)  # fmt: skip
         registry.register(
             "analytics.project_health",
             analytics_tools.project_health,

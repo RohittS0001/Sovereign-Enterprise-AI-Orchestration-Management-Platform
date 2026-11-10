@@ -12,6 +12,7 @@ from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.briefing import router as briefing_router
 from backend.app.api.v1.chat import router as chat_router
 from backend.app.api.v1.compliance import router as compliance_router
+from backend.app.api.v1.delivery import router as delivery_router
 from backend.app.api.v1.graph import router as graph_router
 from backend.app.api.v1.health import router as health_router
 from backend.app.api.v1.integrations import router as integrations_router
@@ -176,6 +177,7 @@ def create_app(
     app.include_router(briefing_router)
     app.include_router(graph_router)
     app.include_router(compliance_router)
+    app.include_router(delivery_router)
 
     return app
 

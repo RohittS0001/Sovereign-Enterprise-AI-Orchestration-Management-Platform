@@ -9,6 +9,8 @@ from backend.app.domains.analytics.contradictions import find_contradictions
 from backend.app.domains.analytics.forecast import forecast_sprint
 from backend.app.domains.analytics.risk import assess_risk
 from backend.app.domains.analytics.workload import compute_workload
+from backend.app.domains.delivery.dora import dora_metrics, incident_history
+from backend.app.domains.delivery.roadmap import build_roadmap
 from evaluation.core import CaseResult, Metric, SuiteResult, Timer, load_dataset, ratio
 from evaluation.environment import environment
 
@@ -27,6 +29,7 @@ async def run() -> SuiteResult:
                     select(Project).where(Project.key == data["project"])
                 )
             snap = await env.collector.collect(project, today=as_of)
+            incidents = await incident_history(env.collector.hub, snap)
 
         forecast = forecast_sprint(snap)
         workload = compute_workload(snap)
@@ -34,6 +37,8 @@ async def run() -> SuiteResult:
         risk = assess_risk(snap, forecast, workload, contradictions)
         members = {m.name: m for m in workload.members}
         pipeline = next(f for f in risk.factors if f.name == "Delivery pipeline")
+        road = build_roadmap(snap)
+        dora = dora_metrics(snap, incidents)
 
         checks = {
             "forecast_status": (forecast.status, exp["forecast_status"]),
@@ -47,6 +52,11 @@ async def run() -> SuiteResult:
             "blocked": (sorted(i.key for i in snap.sprint_issues if i.is_open and i.is_blocked), sorted(exp["blocked"])),
             "risk_level": (risk.level, exp["risk_level"]),
             "risk_score_in_range": (exp["risk_score_between"][0] <= risk.score <= exp["risk_score_between"][1], True),
+            "critical_path": (road.critical_path, exp["critical_path"]),
+            "roadmap_finish": (road.finish.isoformat(), str(exp["roadmap_finish"])),
+            "dora_lead_time_days": (dora.lead_time.value, exp["dora"]["lead_time_days"]),
+            "dora_change_failure_rate": (dora.change_failure_rate.value, exp["dora"]["change_failure_rate"]),
+            "dora_time_to_restore_days": (dora.time_to_restore.value, exp["dora"]["time_to_restore_days"]),
             "failing_main_builds": (
                 any(f"{exp['failing_main_builds']} consecutive failing builds" in e for e in pipeline.evidence), True
             ),

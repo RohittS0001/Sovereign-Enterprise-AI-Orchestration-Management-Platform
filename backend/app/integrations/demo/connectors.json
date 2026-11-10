@@ -127,7 +127,8 @@
           "status": "resolved",
           "severity": "low",
           "service": "payments-api",
-          "created": "{today-6}"
+          "created": "{today-6}",
+          "resolved": "{today-5}"
         }
       ]
     },

@@ -7,6 +7,29 @@ import { Badge, Card, Empty, ErrorNote, Spinner, formatDate } from "../../shared
 
 const FILTERS = ["pending", "executed", "rejected", "failed", "expired"] as const;
 
+const humanize = (key: string) => key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+
+/** The request as readable fields (multi-line text keeps its line breaks); empty values are hidden. */
+function Fields({ data }: { data: Record<string, unknown> }) {
+  const entries = Object.entries(data).filter(([, v]) => v !== null && v !== undefined && v !== "");
+  if (entries.length === 0) return <p className="small muted">No arguments.</p>;
+  return (
+    <dl className="fields">
+      {entries.map(([key, value]) => (
+        <div key={key}>
+          <dt>{humanize(key)}</dt>
+          <dd>
+            {typeof value === "string" ? value
+              : Array.isArray(value) && value.every((v) => typeof v !== "object") ? value.join(", ")
+              : typeof value === "object" ? <code className="wrap">{JSON.stringify(value)}</code>
+              : String(value)}
+          </dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
 function ApprovalCard({ approval, canDecide }: { approval: Approval; canDecide: boolean }) {
   const queryClient = useQueryClient();
   const [note, setNote] = useState("");
@@ -25,13 +48,18 @@ function ApprovalCard({ approval, canDecide }: { approval: Approval; canDecide: 
             untrusted content — check it carefully.
           </div>
         )}
-        <pre>{JSON.stringify(approval.arguments, null, 2)}</pre>
+        <Fields data={approval.arguments} />
         <div className="small muted">
           Requested {formatDate(approval.created_at)} · expires {formatDate(approval.expires_at)}
         </div>
         {approval.decision_note && <div className="small">Note: {approval.decision_note}</div>}
         {approval.error && <ErrorNote error={new Error(approval.error)} />}
-        {approval.result && <pre>{JSON.stringify(approval.result, null, 2)}</pre>}
+        {approval.result && (
+          <details>
+            <summary className="small">Result</summary>
+            <pre className="wrap">{JSON.stringify(approval.result, null, 2)}</pre>
+          </details>
+        )}
         {approval.status === "pending" && canDecide && (
           <>
             <label>
@@ -67,6 +95,7 @@ export function ApprovalsPage() {
     <>
       <div className="page-header">
         <div>
+          <div className="eyebrow">Workspace</div>
           <h1>Approvals</h1>
           <p>
             {can("approvals:decide")
@@ -79,7 +108,7 @@ export function ApprovalsPage() {
           <select value={status} onChange={(e) => setStatus(e.target.value as typeof status)}>
             {FILTERS.map((f) => (
               <option key={f} value={f}>
-                {f}
+                {humanize(f)}
               </option>
             ))}
           </select>

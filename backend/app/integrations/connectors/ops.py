@@ -52,7 +52,8 @@ class PagerDutyService(ConnectorService):
         return [Incident(source=self.source, id=str(i.get("incident_number") or i.get("id")),
                          title=i.get("title", ""), status=i.get("status", ""),
                          severity=i.get("urgency"), service=(i.get("service") or {}).get("summary"),
-                         created=to_date(i.get("created_at")), url=i.get("html_url"))
+                         created=to_date(i.get("created_at")), url=i.get("html_url"),
+                         resolved=to_date(i.get("resolved_at")))
                 for i in body.get("incidents", [])]  # fmt: skip
 
     async def health_check(self) -> dict[str, Any]:

@@ -326,3 +326,97 @@ describe("Shell", () => {
     expect(document.documentElement.dataset.theme).not.toBe(before);
   });
 });
+
+describe("Delivery lifecycle tabs", () => {
+  const health = {
+    project: "PHX", name: "Phoenix", as_of: "2026-11-09", warnings: [], issue_counts: {},
+    risk: { score: 40, level: "medium", factors: [] }, forecast: null, contradictions: [],
+    workload: { period_end: "2026-11-14", members: [], unassigned_open: [], suggestions: [] },
+  };
+  const item = (key: string, start: number, finish: number, critical: boolean, extra = {}) => ({
+    key, summary: `${key} work`, assignee: "Arjun M", status: "To Do", points: 3, duration_days: finish - start,
+    start: "2026-11-09", finish: "2026-11-12", start_day: start, finish_day: finish, slack_days: critical ? 0 : 2.4,
+    critical, depends_on: [], after: [], due: null, late_by_days: null, ...extra,
+  });
+
+  it("shows the critical path schedule and flags a late finish", async () => {
+    signedInAs(LEAD, {
+      "GET /projects/PHX/health": () => json(health),
+      "GET /projects/PHX/roadmap": () => json({
+        finish: "2026-11-19", total_working_days: 8.1, critical_path: ["PHX-7", "PHX-5"], external_blockers: {},
+        late_vs_sprint: true, sprint_end: "2026-11-14", notes: ["In-progress issues are assumed to be half done."],
+        items: [item("PHX-7", 0, 2, true, { late_by_days: 3 }), item("PHX-2", 0, 4, false), item("PHX-5", 2, 8.1, true)],
+      }),
+    });
+    renderApp("/projects/PHX");
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Roadmap" }));
+    expect(await screen.findByText("PHX-7 → PHX-5")).toBeInTheDocument();
+    expect(screen.getByText("8 days")).toBeInTheDocument();
+    expect(screen.getByText(/finishes after the sprint ends/)).toBeInTheDocument();
+    expect(screen.getByText("3d past due")).toBeInTheDocument();
+    expect(screen.getByText("2 days slack")).toBeInTheDocument();
+  });
+
+  it("shows DORA bands and switches the window", async () => {
+    const metric = (name: string, value: number | null, unit: string, band: string | null) =>
+      ({ name, value, unit, band, evidence: value === null ? [] : [`${name} evidence`], source: "argocd", note: null });
+    const fetchMock = signedInAs(LEAD, {
+      "GET /projects/PHX/health": () => json(health),
+      "GET /projects/PHX/dora": () => json({
+        window_days: 30, overall: "high", ci_failure_rate: 0.67, recommendations: ["Fix the build first."],
+        deployment_frequency: metric("Deployment frequency", 0.47, "per week", "medium"),
+        lead_time: metric("Lead time for changes", 3.5, "days", "high"),
+        change_failure_rate: metric("Change failure rate", 0, "%", "elite"),
+        time_to_restore: metric("Time to restore service", null, "days", null),
+      }),
+    });
+    renderApp("/projects/PHX");
+
+    await userEvent.click(await screen.findByRole("tab", { name: "DORA metrics" }));
+    expect(await screen.findByText("3.5 days")).toBeInTheDocument();
+    expect(screen.getByText("0.47 / week")).toBeInTheDocument();
+    expect(screen.getByText("no data")).toBeInTheDocument();
+    expect(screen.getByText("Fix the build first.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Last 90 days" }));
+    await waitFor(() =>
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes("window_days=90"))).toBe(true),
+    );
+  });
+
+  it("drafts a backlog, lets you edit it, and sends it for approval", async () => {
+    const proposal = {
+      drafted_by: "parser", total_points: 8, assumptions: [], open_questions: [], injection_warning: [],
+      epics: [{ title: "Refund disputes", description: "", stories: [
+        { title: "Open a dispute", description: "", acceptance_criteria: ["merchant notified"], points: 5,
+          estimate_basis: "Similar to PHX-5 (5 pts).", similar_issues: ["PHX-5"] },
+        { title: "Dispute queue", description: "", acceptance_criteria: [], points: 3,
+          estimate_basis: "No similar issue; team median of 3 points.", similar_issues: [] },
+      ] }],
+    };
+    const fetchMock = signedInAs(LEAD, {
+      "GET /projects/PHX/health": () => json(health),
+      "POST /projects/PHX/backlog/draft": () => json(proposal),
+      "POST /projects/PHX/backlog/submit": () => json([
+        { tool: "jira.create_epic", title: "Refund disputes", status: "pending_approval", approval_id: "a1", error: null },
+        { tool: "jira.create_story", title: "Open a dispute", status: "pending_approval", approval_id: "a2", error: null },
+      ]),
+    });
+    renderApp("/projects/PHX");
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Backlog planner" }));
+    const draft = screen.getByRole("button", { name: "Draft backlog" });
+    expect(draft).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Use an example" }));
+    await userEvent.click(draft);
+    expect(await screen.findByText("Similar to PHX-5 (5 pts).")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Remove Dispute queue" }));
+    expect(screen.queryByText("Dispute queue")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Send to Jira for approval" }));
+    expect(await screen.findByText(/2 of 2 item\(s\) are waiting for approval/)).toBeInTheDocument();
+
+    const submit = fetchMock.mock.calls.find(([url]) => String(url).includes("/backlog/submit"))!;
+    const body = JSON.parse(String(submit[1]!.body));
+    expect(body.epics[0].stories.map((s: { title: string }) => s.title)).toEqual(["Open a dispute"]);
+  });
+});

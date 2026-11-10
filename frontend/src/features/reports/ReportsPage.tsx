@@ -59,11 +59,12 @@ export function ReportsPage() {
     <>
       <div className="page-header">
         <div>
+          <div className="eyebrow">Delivery</div>
           <h1>Reports</h1>
           <p>Weekly status reports, generated on demand or on schedule.</p>
         </div>
       </div>
-      <div className="grid" style={{ gridTemplateColumns: "300px minmax(0, 1fr)" }}>
+      <div className="master-detail">
         <Card title="All reports">
           {reports.isLoading && <Spinner />}
           <ErrorNote error={reports.error} />
@@ -83,7 +84,10 @@ export function ReportsPage() {
             ))}
           </ul>
         </Card>
-        <div>{open ? <ReportView id={open} /> : <Empty>Select a report.</Empty>}</div>
+        <div>
+          {open ? <ReportView id={open} />
+            : (reports.data?.items.length ?? 0) > 0 && <Empty>Select a report to read it.</Empty>}
+        </div>
       </div>
     </>
   );

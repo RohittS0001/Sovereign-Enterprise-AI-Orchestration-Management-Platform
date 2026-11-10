@@ -60,12 +60,12 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 ## Backlog C — Lifecycle features (from the same review)
 
 - [ ] Project intake portal → AI-drafted project charter
-- [ ] Requirements doc → proposed epics/stories/estimates in Jira (approval-gated)
-- [ ] Estimation assistant from historical velocity and similar tickets
-- [ ] Roadmap / Gantt / dependency graph with critical path
+- [x] Requirements doc → proposed epics/stories/estimates in Jira (approval-gated) — `domains/delivery/backlog.py`, project page "Backlog planner"
+- [x] Estimation assistant from similar past tickets (`delivery.estimate_story`)
+- [x] Roadmap / Gantt / dependency graph with critical path (resource-aware list scheduling + CPM)
 - [ ] Skill-based staffing (skills, code ownership, load, leave)
 - [ ] Daily standup digest and proactive alerts
-- [ ] Portfolio dashboard, earned value management, DORA metrics
-- [ ] Retrospective generator, lessons-learned library, automatic release notes
+- [x] Portfolio dashboard (Home), earned value management, DORA metrics (`domains/delivery/dora.py`)
+- [x] Retrospective generator and automatic release notes (lessons-learned library still open)
 - [ ] Enterprise readiness: SSO (OIDC/SAML) + SCIM, multi-tenancy, secrets vault, data
       retention / DPDP & GDPR tooling, SIEM export, LLMOps (prompt versions, model routing, costs)
