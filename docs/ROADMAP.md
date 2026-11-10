@@ -44,11 +44,11 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
       failure rates: "62% chance to ship by the 25th"; what-if scenarios (add a person, cut scope)
 - [ ] **Org knowledge graph** — people ↔ skills ↔ code ↔ issues ↔ documents ↔ decisions
       ("who knows the refunds service?", "what breaks if Arjun leaves?")
-- [ ] **AI chief of staff** — always-on agent watching every project, preparing weekly decisions,
+- [x] **AI chief of staff** — always-on agent watching every project, preparing weekly decisions,
       drafting escalations and scope trade-offs; everything through approvals
 - [ ] **Predictive risk model** — learn early slip signals from your own history; optional LoRA
       fine-tuning on org data, kept on-premises
-- [ ] **Voice briefings** — "what's at risk today?" as a 2-minute spoken summary
+- [x] **Voice briefings** — "what's at risk today?" as a 2-minute spoken summary
 - [x] **Negotiation assistant** — when a deadline is at risk, generate options (scope cut,
       added people, phased release) with simulated outcomes and draft stakeholder messages
 - [ ] **Multi-agent org** — planner, QA, delivery and finance agents coordinated by a supervisor

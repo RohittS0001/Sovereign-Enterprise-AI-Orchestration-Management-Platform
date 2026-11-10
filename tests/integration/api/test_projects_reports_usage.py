@@ -347,3 +347,32 @@ async def test_project_links_are_validated_and_feed_production_health(
     assert {g["status"] for g in production["quality_gates"]} == {"ERROR"}
     factor = next(f for f in health["risk"]["factors"] if f["name"] == "Production health")
     assert factor["score"] > 0
+
+
+# ------------------------------------------------------------------ chief of staff & voice briefing
+
+
+async def test_portfolio_brief_and_drafted_escalations(demo_settings, database, staff) -> None:
+    from backend.app.db.models import ApprovalRequest, ApprovalStatus
+
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        await configure_phx(client, h[Role.ADMIN])
+        brief = (await client.get("/api/v1/briefing", headers=h[Role.TEAM_LEAD])).json()
+        denied = await client.get("/api/v1/briefing", headers=h[Role.MEMBER])
+        drafts = (
+            await client.post("/api/v1/briefing/escalations", headers=h[Role.TEAM_LEAD])
+        ).json()
+
+    [phx] = brief["projects"]
+    assert phx["key"] == "PHX" and phx["decision_needed"] and phx["top_risks"]
+    assert brief["decisions"] == [phx["decision_needed"]]
+    assert brief["spoken_text"].startswith("Good morning.") and "Phoenix" in brief["spoken_text"]
+    assert "<" not in brief["spoken_text"] and "*" not in brief["spoken_text"]  # speakable
+    assert denied.status_code == 403
+    [draft] = drafts
+    assert draft["status"] == "pending_approval" and draft["approval_id"]
+    async with database.session() as session:
+        approval = await session.scalar(select(ApprovalRequest))
+    assert approval.tool_name == "gmail.create_draft" and approval.status == ApprovalStatus.PENDING
+    assert approval.arguments["subject"].startswith("[Decision needed]")

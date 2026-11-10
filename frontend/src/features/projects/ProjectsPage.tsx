@@ -1,3 +1,4 @@
+import { BriefingCard } from "./BriefingCard";
 import { DeliveryTwin } from "./DeliveryTwin";
 import { CommitmentsCard, FinanceCard } from "./FinanceCard";
 import { ProductionCard } from "./ProductionCard";
@@ -19,6 +20,7 @@ export function ProjectsPage() {
           <p>Configured projects. Open one to see risk, forecast and team capacity.</p>
         </div>
       </div>
+      {can("analytics:read") && projects.data && projects.data.length > 0 && <BriefingCard />}
       {projects.isLoading && <Spinner />}
       <ErrorNote error={projects.error} />
       {projects.data?.length === 0 && (

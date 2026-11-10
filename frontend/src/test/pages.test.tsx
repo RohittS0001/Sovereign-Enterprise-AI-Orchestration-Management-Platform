@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Approval, CurrentUser, IntegrationStatus } from "../shared/api/types";
 import { json, LEAD, renderApp, signedInAs } from "./utils";
 
@@ -181,6 +181,29 @@ describe("Delivery twin", () => {
     await userEvent.click(screen.getByRole("button", { name: "Negotiation options" }));
     expect(await screen.findByText("recommended")).toBeInTheDocument();
     expect(screen.getByText("We recommend adding one person.")).toBeInTheDocument();
+  });
+});
+
+describe("Chief-of-staff brief", () => {
+  it("lists decisions, speaks the briefing and drafts escalations", async () => {
+    const speak = vi.fn();
+    Object.assign(window, { speechSynthesis: { speak, cancel: vi.fn() } });
+    vi.stubGlobal("SpeechSynthesisUtterance", class { constructor(public text: string) {} });
+    signedInAs(LEAD, {
+      "GET /projects": () => json([{ key: "PHX", name: "Phoenix", github_repos: [], members: [], active_sprint_id: 42, is_active: true }]),
+      "GET /briefing": () =>
+        json({ as_of: "2026-11-09", projects: [], decisions: ["PHX: approve 'Move the date'"], spoken_text: "Good morning. Phoenix is at risk." }),
+      "POST /briefing/escalations": () => json([{ project: "PHX", status: "pending_approval" }]),
+    });
+    renderApp("/projects");
+
+    expect(await screen.findByText("PHX: approve 'Move the date'")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Play briefing" }));
+    expect(speak).toHaveBeenCalledOnce();
+    expect((speak.mock.calls[0][0] as { text: string }).text).toBe("Good morning. Phoenix is at risk.");
+    await userEvent.click(screen.getByRole("button", { name: "Draft escalations" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("PHX: draft waiting for approval");
+    vi.unstubAllGlobals();
   });
 });
 
