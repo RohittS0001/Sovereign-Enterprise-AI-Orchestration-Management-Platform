@@ -138,8 +138,47 @@ def assess_risk(
         )
     )
 
+    if snapshot.ops is not None:
+        factors.append(production_factor(snapshot))
+
     covered = sum(f.max_score for f in factors)
     raw = sum(f.score for f in factors)
     score = round(100 * raw / covered) if covered else 0
     level = "high" if score >= 60 else "medium" if score >= 30 else "low"
     return RiskAssessment(score=score, level=level, factors=factors)
+
+
+HIGH_SEVERITY = {"high", "critical", "p1", "p2", "sev1", "sev2", "blocker"}
+NOISY_ERROR_EVENTS = 100
+
+
+def production_factor(snapshot: ProjectSnapshot) -> RiskFactor:
+    """Open incidents, failing quality gates, failed deployments and noisy errors."""
+    ops = snapshot.ops
+    assert ops is not None  # noqa: S101 - caller checks
+    high = [i for i in ops.incidents if (i.severity or "").lower() in HIGH_SEVERITY]
+    other = [i for i in ops.incidents if i not in high]
+    gates = [g for g in ops.quality_gates if g.status == "ERROR"]
+    failed = [d for d in ops.deployments if d.status in {"failure", "out_of_sync"}]
+    noisy = [e for e in ops.errors if e.events >= NOISY_ERROR_EVENTS]
+    score = 5 * len(high) + 2 * len(other) + 4 * len(gates) + 3 * len(failed) + len(noisy)
+    evidence = (
+        [f"{i.source} incident {i.id} ({i.severity}, {i.status}): {i.title}" for i in ops.incidents]
+        + [
+            f"Quality gate failing on {g.project}: {'; '.join(g.failing) or g.status}"
+            for g in gates
+        ]
+        + [f"Deployment {d.name}: {d.status} ({d.detail or d.source})" for d in failed]
+        + [f"{e.id}: {e.events} events / {e.users} users — {e.title}" for e in noisy]
+    )
+    return RiskFactor(
+        name="Production health",
+        score=_cap(score, 15),
+        max_score=15,
+        evidence=evidence,
+        recommendation=(
+            "Stabilize production (incidents, failing deploys, quality gate) before adding scope"
+            if score
+            else None
+        ),
+    )

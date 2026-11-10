@@ -7,6 +7,7 @@ PHX project. Never touches real services or the developer's database.
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from datetime import date
 
 from backend.app.core.config import Settings
 from backend.app.core.security.passwords import hash_password
@@ -62,12 +63,12 @@ class EvalEnvironment:
 
 @asynccontextmanager
 async def environment(
-    *, real_embeddings: bool = False, **overrides: object
+    *, real_embeddings: bool = False, demo_today: date | None = None, **overrides: object
 ) -> AsyncIterator[EvalEnvironment]:
     settings = eval_settings(**overrides)
     database = Database(settings.database_url)
     await database.create_all()
-    hub = build_integration_hub(settings)
+    hub = build_integration_hub(settings, demo_today=demo_today)
     embedder = (
         build_embedder(settings)
         if real_embeddings

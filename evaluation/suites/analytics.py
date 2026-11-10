@@ -18,17 +18,14 @@ async def run() -> SuiteResult:
     exp = data["expected"]
     result = SuiteResult("analytics")
 
+    as_of = data["as_of"] if isinstance(data["as_of"], date) else date.fromisoformat(data["as_of"])
     with Timer() as timer:
-        async with environment() as env:
+        # Demo data is anchored to as_of too, so golden values never drift with the calendar.
+        async with environment(demo_today=as_of) as env:
             async with env.database.session() as session:
                 project = await session.scalar(
                     select(Project).where(Project.key == data["project"])
                 )
-            as_of = (
-                data["as_of"]
-                if isinstance(data["as_of"], date)
-                else date.fromisoformat(data["as_of"])
-            )
             snap = await env.collector.collect(project, today=as_of)
 
         forecast = forecast_sprint(snap)

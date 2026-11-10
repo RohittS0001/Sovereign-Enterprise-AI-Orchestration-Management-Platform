@@ -109,6 +109,16 @@ class SprintFacts:
 
 
 @dataclass
+class OpsFacts:
+    """Production signals from ops connectors, scoped by the project's links."""
+
+    incidents: list[Any] = field(default_factory=list)
+    errors: list[Any] = field(default_factory=list)
+    deployments: list[Any] = field(default_factory=list)
+    quality_gates: list[Any] = field(default_factory=list)
+
+
+@dataclass
 class ProjectSnapshot:
     key: str
     name: str
@@ -122,6 +132,8 @@ class ProjectSnapshot:
     members: list[Member] = field(default_factory=list)
     default_branch: str = "main"
     warnings: list[str] = field(default_factory=list)
+    links: dict[str, list[str]] = field(default_factory=dict)
+    ops: OpsFacts | None = None  # None when no ops connector covers this project
 
     @property
     def sprint_issues(self) -> list[IssueFacts]:

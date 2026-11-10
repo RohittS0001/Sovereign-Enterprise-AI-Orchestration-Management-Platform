@@ -325,3 +325,25 @@ async def test_simulate_and_negotiate_endpoints(demo_settings, database, staff) 
     assert plan.status_code == 200 and plan.json()["options"]
     assert "| Option |" in plan.json()["message_markdown"]
     assert tool.status_code == 404
+
+
+async def test_project_links_are_validated_and_feed_production_health(
+    demo_settings, database, staff
+) -> None:
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        bad = await client.put("/api/v1/projects/PHX", json={**PHX_CONFIG, "links": {"nope": ["x"]}},
+                               headers=h[Role.ADMIN])  # fmt: skip
+        evil = await client.put("/api/v1/projects/PHX",
+                                json={**PHX_CONFIG, "links": {"sentry_projects": ["../admin"]}},
+                                headers=h[Role.ADMIN])  # fmt: skip
+        saved = await configure_phx(client, h[Role.ADMIN])
+        health = (await client.get("/api/v1/projects/PHX/health", headers=h[Role.TEAM_LEAD])).json()
+
+    assert bad.status_code == 422 and evil.status_code == 422
+    assert saved["links"]["sentry_projects"] == ["payments-api", "checkout-web"]
+    production = health["production"]
+    assert [i["id"] for i in production["incidents"]] == ["4211"]  # resolved one excluded
+    assert {g["status"] for g in production["quality_gates"]} == {"ERROR"}
+    factor = next(f for f in health["risk"]["factors"] if f["name"] == "Production health")
+    assert factor["score"] > 0

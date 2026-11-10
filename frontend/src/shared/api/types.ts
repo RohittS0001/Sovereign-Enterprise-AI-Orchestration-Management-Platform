@@ -95,6 +95,13 @@ export interface ProjectHealth {
   name: string;
   as_of: string;
   risk: { score: number; level: "low" | "medium" | "high"; factors: RiskFactor[] };
+  /** Present when ops connectors cover this project (see project links). */
+  production?: {
+    incidents: { source: string; id: string; title: string; status: string; severity?: string; url?: string }[];
+    errors: { source: string; id: string; title: string; events: number; users: number; url?: string }[];
+    deployments: { source: string; name: string; status: string; detail?: string }[];
+    quality_gates: { source: string; project: string; status: string; failing: string[] }[];
+  } | null;
   forecast: {
     sprint: string;
     end: string | null;

@@ -3,27 +3,196 @@
   "tracker": {
     "linear": {
       "work_items": [
-        {"key": "PLAT-41", "title": "Rotate payment gateway TLS certificates", "status": "In Progress", "category": "in_progress", "assignee": "Dev R", "priority": "Urgent", "points": 3, "due": "{today+2}", "updated": "{today-1}", "url": "https://linear.app/acme/issue/PLAT-41", "project": "PLAT"},
-        {"key": "PLAT-44", "title": "Load test the refunds service before PHX launch", "status": "Todo", "category": "todo", "assignee": "Sara K", "priority": "High", "points": 5, "due": "{today+6}", "updated": "{today-2}", "url": "https://linear.app/acme/issue/PLAT-44", "project": "PLAT"},
-        {"key": "PLAT-38", "title": "Upgrade Postgres to 17 in staging", "status": "Done", "category": "done", "assignee": "Dev R", "priority": "Medium", "points": 2, "updated": "{today-5}", "url": "https://linear.app/acme/issue/PLAT-38", "project": "PLAT"}
+        {
+          "key": "PLAT-41",
+          "title": "Rotate payment gateway TLS certificates",
+          "status": "In Progress",
+          "category": "in_progress",
+          "assignee": "Dev R",
+          "priority": "Urgent",
+          "points": 3,
+          "due": "{today+2}",
+          "updated": "{today-1}",
+          "url": "https://linear.app/acme/issue/PLAT-41",
+          "project": "PLAT"
+        },
+        {
+          "key": "PLAT-44",
+          "title": "Load test the refunds service before PHX launch",
+          "status": "Todo",
+          "category": "todo",
+          "assignee": "Sara K",
+          "priority": "High",
+          "points": 5,
+          "due": "{today+6}",
+          "updated": "{today-2}",
+          "url": "https://linear.app/acme/issue/PLAT-44",
+          "project": "PLAT"
+        },
+        {
+          "key": "PLAT-38",
+          "title": "Upgrade Postgres to 17 in staging",
+          "status": "Done",
+          "category": "done",
+          "assignee": "Dev R",
+          "priority": "Medium",
+          "points": 2,
+          "updated": "{today-5}",
+          "url": "https://linear.app/acme/issue/PLAT-38",
+          "project": "PLAT"
+        }
       ]
     },
     "gitlab": {
       "work_items": [
-        {"key": "acme/mobile-app#212", "title": "Show refund status in the order screen", "status": "opened", "category": "in_progress", "assignee": "Meera S", "priority": "priority::high", "due": "{today+4}", "updated": "{today-1}", "url": "https://gitlab.com/acme/mobile-app/-/issues/212", "project": "acme/mobile-app"},
-        {"key": "acme/mobile-app#215", "title": "Crash when the payment sheet is dismissed twice", "status": "opened", "category": "todo", "assignee": null, "priority": "priority::critical", "updated": "{today}", "url": "https://gitlab.com/acme/mobile-app/-/issues/215", "project": "acme/mobile-app"}
+        {
+          "key": "acme/mobile-app#212",
+          "title": "Show refund status in the order screen",
+          "status": "opened",
+          "category": "in_progress",
+          "assignee": "Meera S",
+          "priority": "priority::high",
+          "due": "{today+4}",
+          "updated": "{today-1}",
+          "url": "https://gitlab.com/acme/mobile-app/-/issues/212",
+          "project": "acme/mobile-app"
+        },
+        {
+          "key": "acme/mobile-app#215",
+          "title": "Crash when the payment sheet is dismissed twice",
+          "status": "opened",
+          "category": "todo",
+          "assignee": null,
+          "priority": "priority::critical",
+          "updated": "{today}",
+          "url": "https://gitlab.com/acme/mobile-app/-/issues/215",
+          "project": "acme/mobile-app"
+        }
       ],
       "pull_requests": [
-        {"repository": "acme/mobile-app", "number": 88, "title": "Refund status badge (#212)", "state": "opened", "author": "Meera S", "updated": "{today-1}", "url": "https://gitlab.com/acme/mobile-app/-/merge_requests/88"}
+        {
+          "repository": "acme/mobile-app",
+          "number": 88,
+          "title": "Refund status badge (#212)",
+          "state": "opened",
+          "author": "Meera S",
+          "updated": "{today-1}",
+          "url": "https://gitlab.com/acme/mobile-app/-/merge_requests/88"
+        }
       ]
     },
     "azure_devops": {
       "work_items": [
-        {"key": "1042", "title": "Ledger reconciliation export for finance", "status": "Active", "category": "in_progress", "assignee": "Arjun M", "priority": "2", "points": 5, "updated": "{today-3}", "url": "https://dev.azure.com/acme/Finance/_workitems/edit/1042", "project": "Finance"}
+        {
+          "key": "1042",
+          "title": "Ledger reconciliation export for finance",
+          "status": "Active",
+          "category": "in_progress",
+          "assignee": "Arjun M",
+          "priority": "2",
+          "points": 5,
+          "updated": "{today-3}",
+          "url": "https://dev.azure.com/acme/Finance/_workitems/edit/1042",
+          "project": "Finance"
+        }
       ],
       "pull_requests": [
-        {"repository": "ledger-service", "number": 311, "title": "Add CSV export for reconciliation", "state": "active", "author": "Arjun M", "updated": "{today-2}", "url": "https://dev.azure.com/acme/Finance/_git/ledger-service/pullrequest/311"}
+        {
+          "repository": "ledger-service",
+          "number": 311,
+          "title": "Add CSV export for reconciliation",
+          "state": "active",
+          "author": "Arjun M",
+          "updated": "{today-2}",
+          "url": "https://dev.azure.com/acme/Finance/_git/ledger-service/pullrequest/311"
+        }
       ]
+    }
+  },
+  "ops": {
+    "pagerduty": {
+      "incidents": [
+        {
+          "id": "4211",
+          "title": "Payment capture latency above SLO",
+          "status": "acknowledged",
+          "severity": "high",
+          "service": "payments-api",
+          "created": "{today-1}",
+          "url": "https://acme.pagerduty.com/incidents/4211"
+        },
+        {
+          "id": "4190",
+          "title": "Refund webhook retries",
+          "status": "resolved",
+          "severity": "low",
+          "service": "payments-api",
+          "created": "{today-6}"
+        }
+      ]
+    },
+    "sentry": {
+      "errors": [
+        {
+          "id": "PAYMENTS-API-3K",
+          "title": "TimeoutError: gateway capture exceeded 30s",
+          "level": "error",
+          "events": 412,
+          "users": 87,
+          "last_seen": "{today}",
+          "project": "payments-api",
+          "url": "https://acme.sentry.io/issues/3k"
+        },
+        {
+          "id": "CHECKOUT-WEB-1C",
+          "title": "TypeError: cannot read 'amount' of undefined",
+          "level": "error",
+          "events": 36,
+          "users": 21,
+          "last_seen": "{today-1}",
+          "project": "checkout-web"
+        }
+      ]
+    },
+    "argocd": {
+      "deployments": [
+        {
+          "name": "payments-api-prod",
+          "status": "success",
+          "finished": "{today-2}",
+          "detail": "Healthy, Synced"
+        },
+        {
+          "name": "payments-api-staging",
+          "status": "failure",
+          "finished": "{today}",
+          "detail": "Degraded, Synced"
+        }
+      ]
+    },
+    "sonarqube": {
+      "quality_gates": [
+        {
+          "project": "acme_payments",
+          "status": "ERROR",
+          "failing": [
+            "new_coverage = 61.2 (threshold 80)"
+          ]
+        }
+      ]
+    },
+    "jenkins": {
+      "deployments": [
+        {
+          "name": "payments/release",
+          "status": "success",
+          "finished": "{today-3}",
+          "detail": "build #212"
+        }
+      ]
+    },
+    "opsgenie": {
+      "incidents": []
     }
   }
 }

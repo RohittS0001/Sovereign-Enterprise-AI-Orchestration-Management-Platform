@@ -13,6 +13,7 @@ from backend.app.core.logging import get_logger
 from backend.app.db.models import Project
 from backend.app.domains.analytics.snapshot import (
     Member,
+    OpsFacts,
     ProjectSnapshot,
     SprintFacts,
     normalize_issue,
@@ -52,6 +53,7 @@ class SnapshotCollector:
             name=project.name,
             today=today or date.today(),
             default_branch=project.default_branch,
+            links=dict(project.links or {}),
             members=[
                 Member(
                     name=m.get("name") or m.get("jira_account_id") or "unknown",
@@ -67,6 +69,7 @@ class SnapshotCollector:
         await self._jira(project, snapshot)
         await self._github(project, snapshot)
         await self._keka(snapshot)
+        await self._ops(snapshot)
 
         if today is None:
             self._cache[project.key] = (time.monotonic(), snapshot)
@@ -153,3 +156,30 @@ class SnapshotCollector:
             ]
         except Exception as exc:
             snapshot.warnings.append(f"Keka leave unavailable: {_error(exc)}")
+
+    async def _ops(self, snapshot: ProjectSnapshot) -> None:
+        """Incidents, errors, deployments and quality gates for the project's linked records."""
+        from backend.app.integrations.connectors.ops import PROJECT_LINKS, capabilities
+
+        services = self.hub.by_category("ops")
+        facts = OpsFacts()
+        covered = False
+        for source, service in services.items():
+            scope = snapshot.links.get(PROJECT_LINKS.get(source, ""), [])
+            if not scope:
+                continue  # never attribute org-wide signals to a project without links
+            covered = True
+            try:
+                for capability in capabilities(service):
+                    if capability == "list_incidents":
+                        facts.incidents += await service.list_incidents(open_only=True, scope=scope)
+                    elif capability == "list_errors":
+                        facts.errors += await service.list_errors(scope=scope)
+                    elif capability == "list_deployments":
+                        facts.deployments += await service.list_deployments(scope=scope)
+                    else:
+                        facts.quality_gates += await service.quality_gates(scope=scope)
+            except Exception as exc:
+                snapshot.warnings.append(f"{source} data unavailable: {_error(exc)}")
+        if covered:
+            snapshot.ops = facts

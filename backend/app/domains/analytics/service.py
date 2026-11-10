@@ -11,7 +11,7 @@ from backend.app.db.models import Project
 from backend.app.domains.analytics.collector import SnapshotCollector
 from backend.app.domains.analytics.contradictions import find_contradictions
 from backend.app.domains.analytics.forecast import forecast_sprint
-from backend.app.domains.analytics.results import ProjectHealth
+from backend.app.domains.analytics.results import ProductionHealth, ProjectHealth
 from backend.app.domains.analytics.risk import assess_risk
 from backend.app.domains.analytics.workload import compute_workload
 
@@ -50,4 +50,8 @@ async def project_health(
         contradictions=contradictions,
         issue_counts=dict(Counter(i.category for i in scope)),
         warnings=snapshot.warnings,
-    )
+        production=ProductionHealth(
+            **{name: [item.model_dump(mode="json", exclude_none=True) for item in items]
+               for name, items in vars(snapshot.ops).items()}
+        ) if snapshot.ops else None,
+    )  # fmt: skip

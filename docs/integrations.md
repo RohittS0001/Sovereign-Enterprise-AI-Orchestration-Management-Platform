@@ -97,3 +97,52 @@ Atlassian account → API tokens (Bitbucket scopes: repository, pull request rea
 - Required: `BITBUCKET_WORKSPACE`, `BITBUCKET_USERNAME`, `BITBUCKET_API_TOKEN`
 - Optional: `BITBUCKET_REPOS`
 - API docs: https://developer.atlassian.com/cloud/bitbucket/rest/
+
+## Engineering operations
+
+### PagerDuty (`pagerduty`)
+
+PagerDuty → Integrations → API Access Keys (read-only key).
+
+- Required: `PAGERDUTY_API_KEY`
+- Optional: `PAGERDUTY_SERVICES`
+- API docs: https://developer.pagerduty.com/api-reference/
+
+### Opsgenie (`opsgenie`)
+
+Opsgenie → Settings → API key management (read access); EU accounts set OPSGENIE_API_URL.
+
+- Required: `OPSGENIE_API_KEY`
+- Optional: `OPSGENIE_API_URL`
+- API docs: https://docs.opsgenie.com/docs/alert-api
+
+### Sentry (`sentry`)
+
+Sentry → Settings → Auth Tokens (scopes: project:read, event:read); self-hosted: SENTRY_URL.
+
+- Required: `SENTRY_TOKEN`, `SENTRY_ORG`
+- Optional: `SENTRY_URL`
+- API docs: https://docs.sentry.io/api/
+
+### Jenkins (`jenkins`)
+
+Jenkins → your user → Configure → API Token.
+
+- Required: `JENKINS_URL`, `JENKINS_USERNAME`, `JENKINS_API_TOKEN`
+- Optional: `JENKINS_JOBS`
+- API docs: https://www.jenkins.io/doc/book/using/remote-access-api/
+
+### Argo CD (`argocd`)
+
+argocd account generate-token --account <read-only account>.
+
+- Required: `ARGOCD_URL`, `ARGOCD_TOKEN`
+- API docs: https://argo-cd.readthedocs.io/en/stable/developer-guide/api-docs/
+
+### SonarQube / SonarCloud (`sonarqube`)
+
+My Account → Security → Generate token (Browse permission); self-hosted: SONARQUBE_URL.
+
+- Required: `SONARQUBE_TOKEN`
+- Optional: `SONARQUBE_URL`
+- API docs: https://docs.sonarsource.com/sonarqube-server/latest/extension-guide/web-api/

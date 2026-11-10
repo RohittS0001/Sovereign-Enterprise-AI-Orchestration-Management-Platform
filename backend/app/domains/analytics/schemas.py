@@ -4,7 +4,16 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from backend.app.integrations.connectors.base import safe_id
 from backend.app.integrations.github.service import validate_ref, validate_repository
+
+# Project.links keys: which records in other systems belong to this project.
+LINK_KEYS = {
+    "pagerduty_services": "PagerDuty service ids", "opsgenie_tags": "Opsgenie alert tags",
+    "sentry_projects": "Sentry project slugs", "jenkins_jobs": "Jenkins job names",
+    "argocd_apps": "Argo CD application names", "sonarqube_projects": "SonarQube project keys",
+    "cost_centers": "Finance project / cost-centre names (budget vs actuals)",
+}  # fmt: skip
 
 
 class ProjectMember(BaseModel):
@@ -21,7 +30,21 @@ class ProjectUpsert(BaseModel):
     active_sprint_id: int | None = Field(default=None, gt=0)
     members: list[ProjectMember] = Field(default_factory=list, max_length=100)
     report_recipients: list[EmailStr] = Field(default_factory=list, max_length=50)
+    links: dict[str, list[str]] = Field(default_factory=dict, description=str(LINK_KEYS))
     is_active: bool = True
+
+    @field_validator("links")
+    @classmethod
+    def _links(cls, links: dict[str, list[str]]) -> dict[str, list[str]]:
+        unknown = set(links) - set(LINK_KEYS)
+        if unknown:
+            raise ValueError(f"unknown link keys {sorted(unknown)}; allowed: {sorted(LINK_KEYS)}")
+        for values in links.values():
+            if len(values) > 20:
+                raise ValueError("at most 20 values per link")
+            for value in values:
+                safe_id(value, "link value")
+        return links
 
     @field_validator("github_repos")
     @classmethod
@@ -47,5 +70,6 @@ class ProjectRead(BaseModel):
     active_sprint_id: int | None
     members: list[dict[str, Any]]
     report_recipients: list[str]
+    links: dict[str, list[str]] = Field(default_factory=dict)
     is_active: bool
     updated_at: datetime

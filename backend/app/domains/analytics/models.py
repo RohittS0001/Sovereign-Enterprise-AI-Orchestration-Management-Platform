@@ -22,4 +22,6 @@ class Project(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     active_sprint_id: Mapped[int | None]
     members: Mapped[list[dict[str, Any]]] = mapped_column(default=list)
     report_recipients: Mapped[list[str]] = mapped_column(default=list)
+    # Where this project lives in other systems, e.g. {"sentry_projects": ["payments-api"]}.
+    links: Mapped[dict[str, Any]] = mapped_column(default=dict)
     is_active: Mapped[bool] = mapped_column(default=True)

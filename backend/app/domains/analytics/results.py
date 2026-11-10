@@ -74,6 +74,13 @@ class RiskAssessment(BaseModel):
     factors: list[RiskFactor]
 
 
+class ProductionHealth(BaseModel):
+    incidents: list[dict] = Field(default_factory=list)
+    errors: list[dict] = Field(default_factory=list)
+    deployments: list[dict] = Field(default_factory=list)
+    quality_gates: list[dict] = Field(default_factory=list)
+
+
 class ProjectHealth(BaseModel):
     project: str
     name: str
@@ -84,3 +91,4 @@ class ProjectHealth(BaseModel):
     contradictions: list[Contradiction]
     issue_counts: dict[str, int]
     warnings: list[str]
+    production: ProductionHealth | None = None

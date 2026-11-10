@@ -75,16 +75,19 @@ class IntegrationHub:
                 await close()
 
 
-def build_integration_hub(settings: Settings) -> IntegrationHub:
+def build_integration_hub(settings: Settings, *, demo_today: date | None = None) -> IntegrationHub:
     """Real services for configured integrations, or demo services in DEMO_MODE.
 
     Services build their HTTP clients lazily, so this never touches the network.
+    ``demo_today`` anchors the demo dataset's relative dates (tests and evaluations pin it
+    so results do not drift with the calendar).
     """
     from backend.app.integrations.connectors.registry import CONNECTOR_SPECS
 
     if settings.demo_mode:
-        demo = build_demo_services()
-        data, today = load_connector_dataset(), date.today()
+        today = demo_today or date.today()
+        demo = build_demo_services(today)
+        data = load_connector_dataset(today)
         return IntegrationHub(
             mode="demo",
             jira=demo["jira"],

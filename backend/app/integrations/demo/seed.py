@@ -9,6 +9,13 @@ PHX_CONFIG = {
     "github_repos": ["acme/payments", "acme/checkout-web"],
     "default_branch": "main",
     "active_sprint_id": 42,
+    "links": {
+        "pagerduty_services": ["payments-api"],
+        "sentry_projects": ["payments-api", "checkout-web"],
+        "argocd_apps": ["payments-api-prod", "payments-api-staging"],
+        "sonarqube_projects": ["acme_payments"],
+        "jenkins_jobs": ["payments/release"],
+    },
     "members": [
         {
             "name": "Arjun M",

@@ -49,6 +49,22 @@ def register_connector_tools(registry: ToolRegistry, hub: IntegrationHub) -> Non
             registry.register(name, handler, description=description, input_model=model,
                               operation=READ, permission=read)  # fmt: skip
 
+    sources = tools.sources("ops")
+    if sources:
+        names = ", ".join(sources)
+        for name, handler, model, description in (
+            ("ops.list_incidents", tools.list_incidents, cx.IncidentsInput,
+             f"Open (or all) production incidents/alerts from {names}."),
+            ("ops.list_errors", tools.list_errors, cx.OpsInput,
+             "Unresolved error groups (events, affected users) for given Sentry projects."),
+            ("ops.list_deployments", tools.list_deployments, cx.OpsInput,
+             "Latest build/deployment status (Jenkins jobs, Argo CD applications)."),
+            ("ops.quality_gates", tools.quality_gates, cx.OpsInput,
+             "Code quality gate status and failing conditions for SonarQube project keys."),
+        ):  # fmt: skip
+            registry.register(name, handler, description=description, input_model=model,
+                              operation=READ, permission=read)  # fmt: skip
+
 
 def register_jira_tools(registry: ToolRegistry, tools: JiraTools) -> None:
     read = Permission.PROJECTS_READ

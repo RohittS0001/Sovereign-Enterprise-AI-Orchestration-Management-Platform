@@ -1,6 +1,7 @@
 """Every integration the platform knows about, in one list."""
 
 from backend.app.core.config import Settings
+from backend.app.integrations.connectors.ops import OPS_SPECS
 from backend.app.integrations.connectors.spec import ConnectorSpec
 from backend.app.integrations.connectors.trackers import TRACKER_SPECS
 
@@ -40,7 +41,7 @@ CORE_SPECS: tuple[ConnectorSpec, ...] = (
 )  # fmt: skip
 
 # Connectors beyond the core four, grouped by category.
-CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (*TRACKER_SPECS,)
+CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (*TRACKER_SPECS, *OPS_SPECS)
 
 ALL_SPECS: tuple[ConnectorSpec, ...] = CORE_SPECS + CONNECTOR_SPECS
 

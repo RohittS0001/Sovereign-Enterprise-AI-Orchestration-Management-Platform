@@ -42,9 +42,9 @@ def team_snapshot(issues, *, members=2, capacity=10.0, leave=(), runs=()) -> Pro
 @pytest.fixture
 async def phx() -> ProjectSnapshot:
     settings = Settings(_env_file=None, demo_mode=True)
-    return await SnapshotCollector(build_integration_hub(settings), settings).collect(
-        phx_project(), today=MONDAY
-    )
+    return await SnapshotCollector(
+        build_integration_hub(settings, demo_today=MONDAY), settings
+    ).collect(phx_project(), today=MONDAY)
 
 
 def test_same_seed_same_answer(phx) -> None:

@@ -19,7 +19,7 @@ MONDAY = date(2026, 11, 9)
 @pytest.fixture
 async def snapshot() -> ProjectSnapshot:
     settings = Settings(_env_file=None, demo_mode=True)
-    collector = SnapshotCollector(build_integration_hub(settings), settings)
+    collector = SnapshotCollector(build_integration_hub(settings, demo_today=MONDAY), settings)
     return await collector.collect(phx_project(), today=MONDAY)
 
 
@@ -176,7 +176,7 @@ async def test_collector_reports_missing_integrations_as_warnings() -> None:
 
 async def test_collector_survives_a_failing_integration(snapshot) -> None:
     settings = Settings(_env_file=None, demo_mode=True)
-    hub = build_integration_hub(settings)
+    hub = build_integration_hub(settings, demo_today=MONDAY)
 
     async def broken(*args, **kwargs):
         raise RuntimeError("keka down")

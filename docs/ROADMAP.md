@@ -28,9 +28,9 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
       Google Drive; incremental sync that mirrors each source's permissions
 - [ ] **Calendar & meetings** — Google Calendar / Outlook (availability, scheduling);
       Zoom / Google Meet / Teams transcripts → decisions and action items
-- [ ] **Other trackers** — Linear, Azure DevOps, Asana, ClickUp, GitLab, Bitbucket behind a
+- [x] **Other trackers** — Linear, Azure DevOps, Asana, ClickUp, GitLab, Bitbucket behind a
       common issue/PR model (no Jira lock-in)
-- [ ] **Engineering operations** — PagerDuty/Opsgenie incidents, Sentry errors, Jenkins/Argo
+- [x] **Engineering operations** — PagerDuty/Opsgenie incidents, Sentry errors, Jenkins/Argo
       CI/CD, SonarQube quality feeding the risk score
 - [ ] **HR & finance** — Darwinbox, Zoho People, BambooHR, Workday (alongside Keka);
       Zoho Books, Tally, SAP for budget and actuals (enables earned value management)
