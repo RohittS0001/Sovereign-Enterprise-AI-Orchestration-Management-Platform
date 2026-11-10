@@ -1,0 +1,14 @@
+# Synthetic ground truth for "Why is it late?" (see evaluation/suites/delivery.py).
+# Scenarios are generated from the seed: one planted dominant cause each, cycling through
+# all seven causes, with background noise and a smaller competing cause. Every fourth
+# scenario is "hard": misleading wording and a one-day gap to the competing cause. Claims have a known true/false status.
+seed: 11
+scenarios: 140
+claims: 60
+thresholds:
+  top_cause_accuracy: 0.85
+  hard_tier_accuracy: 0.5    # honest floor: keyword rules miss unusual wording
+  cause_macro_f1: 0.85
+  external_root_cause_recall: 0.95
+  claim_verdict_accuracy: 0.95
+  false_contradiction_rate: 0.02

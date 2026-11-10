@@ -173,10 +173,14 @@ TEST_POSTGRES_URL=postgresql://sovereign:sovereign@localhost:5432/sovereign_test
 .venv/Scripts/python.exe -m evaluation run --suite agent --judge     # real model + LLM judge
 ```
 
-The offline suites measure retrieval quality and **leak rate**, guardrail precision/recall,
-analytics against golden values, and red-team scenarios (a hostile planner trying to bypass
-approvals, exfiltrate data or follow injected instructions). Thresholds live in
-`evaluation/datasets/*.yaml`, and CI fails if they regress. See [evaluation/README.md](evaluation/README.md).
+Nine suites, each with its own dataset, thresholds and bootstrap 95% confidence intervals:
+retrieval (hit rate, MRR, graded nDCG, context precision, latency, leak rate, a BM25/vector/hybrid
+ablation), RAG (context recall/precision, faithfulness, answer relevance, semantic similarity,
+factual correctness, citations), agent (tool F1, trajectory, argument accuracy, approval
+compliance, negative rejection, latency, tokens), the delay engine (140 synthetic sprints with
+planted causes, false-contradiction rate), forecasting calibration, guardrails, red team and MCP
+sandbox. Ragas/DeepEval export and Phoenix-compatible traces included. CI fails if any gate
+regresses. Full method, results and limitations: [docs/evaluation.md](docs/evaluation.md).
 
 ## Monitoring
 

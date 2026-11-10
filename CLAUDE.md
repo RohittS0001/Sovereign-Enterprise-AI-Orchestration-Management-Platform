@@ -135,9 +135,10 @@ usage and enforces `AGENT_DAILY_TOKEN_QUOTA`.
 
 **Evaluation** (top-level `evaluation/`, see its README). `environment.py` builds an isolated seeded
 instance (in-memory DB, demo integrations, a user per role, demo docs, PHX from
-`integrations/demo/seed.py` — the single source of demo seed data). Suites in `evaluation/suites/`
+`integrations/demo/seed.py` — the single source of demo seed data). Formulas in `evaluation/metrics.py`
+(+ `judges.py` LLM-as-judge, `frameworks.py` Ragas/DeepEval export); guide in `docs/evaluation.md`. Suites in `evaluation/suites/`
 read `evaluation/datasets/*.yaml` (data + thresholds): retrieval (incl. leak rate), guardrails,
-analytics (golden values at a fixed date), redteam (scripted hostile planner through the real
+analytics (golden values at a fixed date), delivery (synthetic sprints with planted delay causes), redteam (scripted hostile planner through the real
 `AgentService`/gateway), agent (real model; optional LLM-2 judge fed the exact responder prompt via a
 recording wrapper). `tests/evaluation/test_quality_gates.py` enforces the offline suites in CI and
 proves they fail when approvals, access control or redaction are broken — keep that property when

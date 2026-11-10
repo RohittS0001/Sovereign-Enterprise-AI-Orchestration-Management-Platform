@@ -1,13 +1,17 @@
 # Retrieval-augmented answering over the demo knowledge base.
 # facts: phrases a correct answer must contain; the retrieved context must hold all of them.
 # relevant_titles: documents a good retrieval draws from (for context precision).
+# reference: a short correct answer written by hand (semantic similarity, factual correctness).
 k: 4
 thresholds:
-  context_recall: 0.85        # share of required facts present in the top-k chunks
-  context_precision: 0.6      # share of top-k chunks from a relevant document
-  citation_validity: 1.0      # every [S#] in an answer points at a successful tool call
-  faithfulness: 0.9           # answer sentences found verbatim in the cited context
-  sync_leak_rate: 0.0         # restricted synced documents reaching a member
+  context_recall: 0.85          # share of required facts present in the top-k chunks
+  context_precision_at_k: 0.7   # rank-aware share of top-k chunks from relevant documents
+  faithfulness: 0.9             # answer claims supported by the context the responder saw
+  answer_relevance: 0.2         # offline embedder is lexical: a floor, not a quality bar
+  semantic_similarity: 0.5      # lexical offline embedder; --real-embeddings for semantic
+  factual_correctness_f1: 0.6   # reference facts recovered and answer grounded in reference
+  citation_validity: 1.0        # every [S#] in an answer points at a successful tool call
+  sync_leak_rate: 0.0           # restricted synced documents reaching a member
 
 questions:
   - id: vendor-no-fix
@@ -15,36 +19,73 @@ questions:
     query: What should we do if the vendor gives no fix date?
     relevant_titles: [Incident Escalation Policy]
     facts: [fix date]
+    reference: If the vendor gives no fix date within 3 business days, the team must switch to the documented fallback route and inform the delivery lead.
   - id: sev1-paging
     role: member
     query: When is an incident SEV1 and who gets paged?
     relevant_titles: [Incident Escalation Policy]
     facts: [SEV1]
+    reference: SEV1 means customer payments are failing or data is at risk; page the on-call engineer and the engineering manager immediately.
   - id: customer-status
     role: member
     query: Who sends customer-facing status updates during an incident?
     relevant_titles: [Incident Escalation Policy]
     facts: [status]
+    reference: Customer-facing updates are sent by the delivery lead, never directly by engineers; status updates go out every 2 hours during SEV1.
   - id: release-freeze
     role: member
     query: Can we release to production right before a merchant sale event?
     relevant_titles: [Release Process]
     facts: [5 days before a major merchant sale]
+    reference: No production releases during the 5 days before a major merchant sale event; hotfixes need written approval from the engineering manager.
   - id: ci-gate
     role: member
     query: Which CI job must pass on main before any release?
     relevant_titles: [Release Process]
     facts: [integration-tests]
+    reference: The integration-tests job must pass on main before any release.
   - id: velocity-commitment
     role: team_lead
     query: How much of our average velocity should a team commit to?
     relevant_titles: [Release Process]
     facts: [85% of their average velocity]
+    reference: Teams commit to at most 85% of their average velocity of the last three sprints, minus planned leave.
   - id: contract-credits
     role: project_manager
     query: What service credits does the gateway vendor owe for an SLA breach?
     relevant_titles: [Gateway Vendor Contract Summary]
     facts: [credit]
+    reference: Each SLA breach earns a service credit of 5% of the monthly fee, capped at 30%, claimed in writing within 30 days.
+  - id: definition-of-done
+    role: member
+    query: When is a story considered done?
+    relevant_titles: [Release Process]
+    facts: [approved by at least one reviewer]
+    reference: A story is done when the pull request is approved by at least one reviewer, all CI checks on main pass, QA has signed off, and payment capture changes are behind a feature flag.
+  - id: two-failing-builds
+    role: team_lead
+    query: What happens when two builds on main fail in a row?
+    relevant_titles: [Release Process]
+    facts: [stop all merges]
+    reference: Two consecutive failing main builds stop all merges until the build is green again.
+  - id: sev2-notify
+    role: member
+    query: How quickly must the engineering manager be told about a SEV2 incident?
+    relevant_titles: [Incident Escalation Policy]
+    facts: [within 1 hour]
+    reference: For SEV2, degraded payments such as timeouts above 2%, notify the engineering manager within 1 hour.
+  - id: contract-exit
+    role: project_manager
+    query: When can we terminate the gateway vendor contract?
+    relevant_titles: [Gateway Vendor Contract Summary]
+    facts: [60 days' notice]
+    reference: Three SLA breaches in a quarter allow termination with 60 days' notice and no exit fee.
+  - id: unplanned-leave
+    role: project_manager
+    query: What happens if unplanned leave is high during a sprint?
+    relevant_titles: [Release Process]
+    facts: [scope review]
+    reference: Unplanned leave above 20% of team capacity triggers a scope review with the delivery lead.
 
 sync:
   restricted_query: gateway pricing volume discount tiers

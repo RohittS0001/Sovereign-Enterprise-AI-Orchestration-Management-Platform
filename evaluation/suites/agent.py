@@ -1,10 +1,24 @@
 """End-to-end agent quality with the real configured model (skipped when none is configured).
 
-Metrics: run completion, tool-selection recall, expected-fact coverage, citation validity,
-approval compliance for writes, and (optionally) faithfulness graded by LLM 2 as a judge.
+Per question the suite records which tools the planner called (with arguments), the answer,
+latency and tokens. Metrics:
+
+- **completion_rate** — runs that finished without error.
+- **tool_selection_recall / precision / F1** — expected tools used vs. tools used.
+- **trajectory_in_order** — expected tool sequence appears in order (agent trajectory eval).
+- **argument_accuracy** — expected argument values passed to the expected tool.
+- **fact_coverage** — expected facts (regexes) present in the answer.
+- **citation_validity** — every ``[S#]`` points at a successful tool call.
+- **approval_compliance** — writes stop at a pending approval instead of executing.
+- **negative_rejection** — unanswerable questions get "I could not find…" instead of a guess.
+- **latency p50/p95, tokens and steps per question** — cost and speed.
+- **faithfulness** (``--judge``) — LLM 2 grades the answer against exactly the evidence the
+  responder saw (a recording wrapper captures the prompt).
 """
 
+import json
 import re
+import time
 
 from pydantic import BaseModel, Field
 
@@ -13,6 +27,7 @@ from backend.app.domains.agent.service import AgentService
 from backend.app.llm.base import AgentModels, ChatMessage, LLMClient, LLMResponse
 from backend.app.llm.factory import build_agent_models
 from backend.app.llm.structured import generate_structured
+from evaluation import metrics as M
 from evaluation.core import CaseResult, Metric, SuiteResult, Timer, load_dataset, ratio
 from evaluation.environment import environment
 
@@ -24,19 +39,37 @@ List claims that the evidence does not support. Reply with JSON only."""
 
 
 class RecordingModel:
-    """Wraps the reporting model to capture the evidence the responder was shown."""
+    """Wraps a model to capture its prompts and replies (evidence for judges, planned calls)."""
 
     def __init__(self, inner: LLMClient) -> None:
         self.inner = inner
         self.model = inner.model
         self.last_prompt = ""
+        self.replies: list[str] = []
 
     async def chat(self, messages: list[ChatMessage], **kwargs) -> LLMResponse:
         self.last_prompt = messages[-1].content
-        return await self.inner.chat(messages, **kwargs)
+        response = await self.inner.chat(messages, **kwargs)
+        self.replies.append(response.content)
+        return response
 
     async def close(self) -> None:
         return None
+
+
+def planned_calls(replies: list[str]) -> list[tuple[str, dict]]:
+    """(tool, arguments) for every step the planner proposed, in order."""
+    calls = []
+    for reply in replies:
+        try:
+            plan = json.loads(reply)
+        except (TypeError, ValueError):
+            continue
+        steps = plan.get("steps") if isinstance(plan, dict) else None
+        for step in steps or []:
+            if isinstance(step, dict):
+                calls.append((step.get("tool", ""), step.get("arguments") or {}))
+    return calls
 
 
 class Verdict(BaseModel):
@@ -67,74 +100,125 @@ async def run(*, judge: bool = False, real_embeddings: bool = False) -> SuiteRes
             result.skipped = "no model configured (set LLM1_MODEL_NAME)"
             return result
 
-        recorder = RecordingModel(models.reporting)
-        run_models = AgentModels(operations=models.operations, reporting=recorder)
-        completed = tools_ok = facts_hit = facts_total = 0
-        citations_ok = citation_checks = writes_ok = write_checks = 0
-        faithfulness: list[float] = []
+        scores: dict[str, list[float]] = {}
+        latencies: list[float] = []
+        tokens: list[float] = []
+        steps_used: list[float] = []
+
+        def add(name: str, value: float) -> None:
+            scores.setdefault(name, []).append(value)
 
         with Timer() as timer:
             for case in data["questions"]:
+                planner = RecordingModel(models.operations)
+                recorder = RecordingModel(models.reporting)
                 principal = env.principals[Role(case["role"])]
+                started = time.perf_counter()
                 async with env.database.session() as session:
-                    service = AgentService(session, env.settings, run_models, env.registry)
+                    service = AgentService(
+                        session, env.settings, AgentModels(planner, recorder), env.registry
+                    )
                     run = await service.run(principal, case["question"])
+                latencies.append(time.perf_counter() - started)
+                tokens.append((run.prompt_tokens or 0) + (run.completion_tokens or 0))
+                steps_used.append(len(run.steps))
 
                 answer = run.answer or ""
                 used = [
                     s["tool"] for s in run.steps if s["status"] in {"success", "pending_approval"}
                 ]
+                calls = planned_calls(planner.replies)
                 ok_steps = {s["step_id"] for s in run.steps if s["status"] == "success"}
                 cited = set(_CITATION.findall(answer))
                 details: dict = {"status": run.status.value, "tools": used, "error": run.error}
 
                 done = run.status.value != "failed"
-                completed += done
-                tool_hit = any(t in used for t in case["expected_tools_any"])
-                tools_ok += tool_hit
+                add("completion_rate", float(done))
+                expected = case.get("expected_tools_any", [])
+                tool_hit = not expected or any(t in used for t in expected)
+                add("tool_selection_recall", float(tool_hit))
+                if expected:
+                    # "any of" expectations: the best-matching expected tool is the target.
+                    target = next((t for t in expected if t in used), expected[0])
+                    scored = M.tool_scores([target], used)
+                    add("tool_selection_precision", scored["precision"])
+                    add("tool_f1", scored["f1"])
+                if case.get("expected_trajectory"):
+                    match = M.trajectory_match(case["expected_trajectory"], used)
+                    add("trajectory_in_order", float(match["in_order"]))
+                    details["trajectory"] = match
+                for tool, expected_args in (case.get("expected_args") or {}).items():
+                    actual = next((a for t, a in calls if t == tool), {})
+                    add("argument_accuracy", M.argument_accuracy(expected_args, actual))
                 missing = [
-                    f for f in case["expected_facts"] if not re.search(f, answer, re.IGNORECASE)
+                    f
+                    for f in case.get("expected_facts", [])
+                    if not re.search(f, answer, re.IGNORECASE)
                 ]
-                facts_hit += len(case["expected_facts"]) - len(missing)
-                facts_total += len(case["expected_facts"])
-                if ok_steps:
-                    citation_checks += 1
-                    valid = bool(cited) and cited <= ok_steps
-                    citations_ok += valid
+                if case.get("expected_facts"):
+                    add("fact_coverage", 1 - len(missing) / len(case["expected_facts"]))
+                if ok_steps and not case.get("unanswerable"):
+                    add("citation_validity", float(bool(cited) and cited <= ok_steps))
                     details["citations"] = sorted(cited)
                 if case.get("expect_pending_approval"):
-                    write_checks += 1
                     pending = any(s["status"] == "pending_approval" for s in run.steps)
-                    writes_ok += pending
+                    add("approval_compliance", float(pending))
                     details["pending_approval"] = pending
+                if case.get("unanswerable"):
+                    add("negative_rejection", float(M.abstained(answer)))
 
-                if judge and done and answer:
+                if judge and done and answer and not case.get("unanswerable"):
                     # Judge against exactly what the responder saw (tool results included).
                     verdict = await _judge(
                         models.reporting, case["question"], recorder.last_prompt, answer
                     )
-                    faithfulness.append((verdict.score - 1) / 4)
+                    add("faithfulness", (verdict.score - 1) / 4)
                     details["judge"] = verdict.model_dump()
 
                 details["missing_facts"] = missing
-                result.cases.append(
-                    CaseResult(case["id"], done and tool_hit and not missing, details)
-                )
+                passed = done and tool_hit and not missing
+                if case.get("unanswerable"):
+                    passed = done and M.abstained(answer)
+                result.cases.append(CaseResult(case["id"], passed, details))
 
     t = data["thresholds"]
-    n = len(data["questions"])
-    result.metrics = [
-        Metric("completion_rate", ratio(completed, n), t["completion_rate"]),
-        Metric("tool_selection_recall", ratio(tools_ok, n), t["tool_selection_recall"]),
-        Metric("fact_coverage", ratio(facts_hit, facts_total), t["fact_coverage"]),
-        Metric("citation_validity", ratio(citations_ok, citation_checks), t["citation_validity"]),
-        Metric("approval_compliance", ratio(writes_ok, write_checks), t["approval_compliance"]),
+
+    def metric(name: str) -> Metric:
+        values = scores.get(name, [])
+        return Metric(name, M.mean(values), t.get(name), ci=M.bootstrap_ci(values))
+
+    names = [
+        "completion_rate",
+        "tool_selection_recall",
+        "tool_selection_precision",
+        "tool_f1",
+        "trajectory_in_order",
+        "argument_accuracy",
+        "fact_coverage",
+        "citation_validity",
+        "approval_compliance",
+        "negative_rejection",
+        "faithfulness",
     ]
-    if faithfulness:
-        result.metrics.append(
-            Metric(
-                "faithfulness", round(sum(faithfulness) / len(faithfulness), 4), t["faithfulness"]
-            )
-        )
+    result.metrics = [metric(n) for n in names if n in scores]
+    result.metrics += [
+        Metric(
+            "latency_p50_s", round(M.percentile(latencies, 50), 2), None, higher_is_better=False
+        ),
+        Metric(
+            "latency_p95_s",
+            round(M.percentile(latencies, 95), 2),
+            t.get("latency_p95_s"),
+            higher_is_better=False,
+        ),
+        Metric(
+            "tokens_per_question",
+            round(M.mean(tokens), 1),
+            t.get("tokens_per_question"),
+            higher_is_better=False,
+        ),
+        Metric("steps_per_question", round(M.mean(steps_used), 2), None, higher_is_better=False),
+        Metric("questions", ratio(len(latencies), 1), None),
+    ]
     result.seconds = timer.seconds
     return result

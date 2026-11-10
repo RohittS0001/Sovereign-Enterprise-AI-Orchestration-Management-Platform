@@ -51,7 +51,9 @@ class _HttpLLM:
         LLM_TOKENS.labels(self.model, "completion").inc(completion_tokens)
 
     async def _post(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        with span("llm.request", provider=self.provider, model=self.model):
+        attributes = {"openinference.span.kind": "LLM", "llm.model_name": self.model,
+                      "llm.provider": self.provider}  # fmt: skip
+        with span("llm.request", provider=self.provider, model=self.model, **attributes):
             return await self._post_unspanned(path, payload)
 
     async def _post_unspanned(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:

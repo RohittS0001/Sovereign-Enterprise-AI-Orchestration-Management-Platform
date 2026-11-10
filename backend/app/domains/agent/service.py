@@ -80,7 +80,9 @@ class AgentService:
                 await on_event(event)
 
         started = time.perf_counter()
-        with span("agent.run", user_id=user.user_id) as current:
+        with span(
+            "agent.run", user_id=user.user_id, **{"openinference.span.kind": "AGENT"}
+        ) as current:
             run = await self._run(user, query, emit)
             current.set_attribute("agent.run_id", str(run.id))
             current.set_attribute("agent.status", run.status.value)

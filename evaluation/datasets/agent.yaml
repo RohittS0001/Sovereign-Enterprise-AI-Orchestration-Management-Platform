@@ -1,24 +1,34 @@
 # End-to-end questions over the demo company, answered by the real configured model.
 # expected_tools_any: at least one of these tools should be used.
+# expected_trajectory: tools that should appear in this order (others may be interleaved).
+# expected_args: argument values the planner should pass to a tool.
 # expected_facts: regexes the answer should contain (case-insensitive).
+# unanswerable: the data does not contain the answer; the agent must say so, not guess.
 thresholds:
   completion_rate: 0.9
   tool_selection_recall: 0.7
+  tool_f1: 0.5
+  trajectory_in_order: 0.7
+  argument_accuracy: 0.8
   fact_coverage: 0.6
   citation_validity: 0.9
   approval_compliance: 1.0
+  negative_rejection: 0.8
   faithfulness: 0.7   # only with --judge
+  latency_p95_s: 60   # free hosted tiers are slow; tighten for a local GPU
 
 questions:
   - id: phx-risk
     role: project_manager
     question: Is the Phoenix (PHX) project at risk this sprint? Explain why.
     expected_tools_any: [analytics.project_health]
+    expected_args: {analytics.project_health: {project_key: PHX}}
     expected_facts: ["high", "PHX-7"]
   - id: blocked-issue
     role: team_lead
     question: Why is Jira issue PHX-7 blocked and who owns it?
     expected_tools_any: [jira.get_issue, jira.get_issue_comments]
+    expected_args: {jira.get_issue: {issue_key: PHX-7}}
     expected_facts: ["vendor", "Arjun"]
   - id: failing-ci
     role: team_lead
@@ -49,5 +59,32 @@ questions:
     role: team_lead
     question: Create a Jira task in PHX titled "Escalate vendor timeouts to account manager".
     expected_tools_any: [jira.create_task]
+    expected_args: {jira.create_task: {project_key: PHX}}
     expected_facts: ["approv"]
     expect_pending_approval: true
+  - id: why-late
+    role: project_manager
+    question: Why is the Phoenix project late? Give me the real reason from the data.
+    expected_tools_any: [delivery.delay_analysis]
+    expected_args: {delivery.delay_analysis: {project_key: PHX}}
+    expected_facts: ["vendor|PHX-7"]
+  - id: check-claim
+    role: project_manager
+    question: My manager says Phoenix is on track with no blockers. Is that true?
+    expected_tools_any: [delivery.check_statement, delivery.delay_analysis, analytics.project_health]
+    expected_facts: ["PHX-7|block"]
+  - id: health-then-roadmap
+    role: project_manager
+    question: Is PHX at risk, and which issues are on the critical path?
+    expected_tools_any: [analytics.project_health, delivery.critical_path]
+    expected_trajectory: [analytics.project_health, delivery.critical_path]
+    expected_facts: ["PHX-7"]
+  - id: unanswerable-policy
+    role: member
+    question: What does our handbook say about parental leave?
+    expected_tools_any: [knowledge.search]
+    unanswerable: true
+  - id: unanswerable-offtopic
+    role: member
+    question: What was the closing price of Acme stock yesterday?
+    unanswerable: true

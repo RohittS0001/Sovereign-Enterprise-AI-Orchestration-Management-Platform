@@ -67,7 +67,11 @@ class ToolGateway:
         risk_flags: list[str] | None = None,
     ) -> ToolResult:
         with span(
-            "tool.invoke", tool=tool_name, actor=principal.actor_type, run_id=run_id
+            "tool.invoke",
+            tool=tool_name,
+            actor=principal.actor_type,
+            run_id=run_id,
+            **{"openinference.span.kind": "TOOL", "tool.name": tool_name},
         ) as current:
             result = await self._invoke(principal, tool_name, arguments, run_id, risk_flags or [])
             current.set_attribute("tool.status", result.status.value)

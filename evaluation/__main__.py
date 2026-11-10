@@ -4,6 +4,8 @@
     python -m evaluation run --suite retrieval   # one suite
     python -m evaluation run --suite agent       # needs LLM1_MODEL_NAME (e.g. Ollama)
     python -m evaluation run --suite agent --judge --real-embeddings
+    python -m evaluation export --format ragas     # RAG samples for Ragas / DeepEval
+    python -m evaluation frameworks --ragas        # grade with Ragas (optional install)
 
 Writes JSON + Markdown reports to evaluation/reports/ and exits 1 if any threshold fails.
 """
@@ -15,7 +17,16 @@ from pathlib import Path
 
 from evaluation.core import SuiteResult, to_markdown, write_reports
 
-OFFLINE = ["retrieval", "rag", "guardrails", "analytics", "planning", "redteam", "codemode"]
+OFFLINE = [
+    "retrieval",
+    "rag",
+    "guardrails",
+    "analytics",
+    "delivery",
+    "planning",
+    "redteam",
+    "codemode",
+]
 ALL = [*OFFLINE, "agent"]
 
 
@@ -26,6 +37,7 @@ async def run_suites(
         agent,
         analytics,
         codemode,
+        delivery,
         guardrails,
         planning,
         rag,
@@ -39,7 +51,8 @@ async def run_suites(
         "analytics": analytics.run,
         "redteam": redteam.run,
         "codemode": codemode.run,
-        "rag": rag.run,
+        "rag": lambda: rag.run(judge=judge),
+        "delivery": delivery.run,
         "planning": planning.run,
         "agent": lambda: agent.run(judge=judge, real_embeddings=real_embeddings),
     }
@@ -60,9 +73,29 @@ def main() -> None:
         "--real-embeddings", action="store_true", help="use EMBEDDING_MODEL_NAME instead of hashing"
     )
     run.add_argument("--out", default=str(Path(__file__).parent / "reports"))
+    export = sub.add_parser("export", help="RAG samples in a framework's dataset format")
+    export.add_argument("--format", choices=["ragas", "deepeval"], required=True)
+    frameworks = sub.add_parser("frameworks", help="grade with Ragas/DeepEval if installed")
+    frameworks.add_argument("--ragas", action="store_true")
+    frameworks.add_argument("--deepeval", action="store_true")
     args = parser.parse_args()
     if hasattr(sys.stdout, "reconfigure"):  # Windows consoles default to a legacy code page
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+    if args.command == "export":
+        from evaluation import frameworks as fw
+
+        samples = asyncio.run(fw.rag_samples())
+        print(fw.to_ragas(samples) if args.format == "ragas" else fw.to_deepeval(samples))
+        return
+    if args.command == "frameworks":
+        from evaluation import frameworks as fw
+
+        if args.ragas:
+            print(asyncio.run(fw.run_ragas()))
+        if args.deepeval:
+            print(asyncio.run(fw.run_deepeval()))
+        return
 
     results = asyncio.run(
         run_suites(args.suite or OFFLINE, judge=args.judge, real_embeddings=args.real_embeddings)

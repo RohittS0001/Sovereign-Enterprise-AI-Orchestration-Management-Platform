@@ -1,11 +1,18 @@
 # Knowledge-base retrieval over the demo documents.
-# relevant: what a good result looks like (title + text in the section path).
+# relevant: passages a good result returns (title + text in the section path). A result in the
+#   exact section scores gain 2; another section of a relevant document scores gain 1.
 # forbidden: documents this role must never receive (access-control leak test).
+# Queries mix near-verbatim wording, paraphrases with little word overlap, and multi-part
+# questions with more than one relevant section (so recall@k differs from hit rate).
 k: 3
 thresholds:
   hit_at_1: 0.7
-  recall_at_k: 0.85
+  hit_at_k: 0.85
+  recall_at_k: 0.8
   mrr: 0.75
+  ndcg_at_k: 0.7
+  context_precision_at_k: 0.7
+  latency_p95_ms: 500
   leak_rate: 0.0
 
 queries:
@@ -61,6 +68,52 @@ queries:
     role: project_manager
     query: can we terminate the vendor contract after repeated breaches
     relevant: [{title: Gateway Vendor Contract Summary, section: Exit clause}]
+
+  # Paraphrases: the same needs, worded the way people actually ask.
+  - id: para-vendor-silent
+    role: team_lead
+    query: the supplier still has not said when the bug will be fixed, what now
+    relevant: [{title: Incident Escalation Policy, section: Vendor incidents}]
+  - id: para-who-talks-to-customers
+    role: member
+    query: can an engineer email merchants directly during an outage
+    relevant: [{title: Incident Escalation Policy, section: Communication}]
+  - id: para-story-complete
+    role: member
+    query: when can I move my ticket to done
+    relevant: [{title: Release Process, section: Definition of done}]
+  - id: para-merge-stop
+    role: member
+    query: why are merges blocked on main right now
+    relevant: [{title: Release Process, section: CI requirements}]
+  - id: para-latency-guarantee
+    role: project_manager
+    query: how fast must the capture API respond under the contract
+    relevant: [{title: Gateway Vendor Contract Summary, section: Service levels}]
+  - id: para-page-manager
+    role: member
+    query: payments are failing for customers, who do I wake up
+    relevant: [{title: Incident Escalation Policy, section: Severity levels}]
+
+  # Multi-part questions: two relevant sections each.
+  - id: multi-vendor-breach
+    role: project_manager
+    query: the vendor broke the SLA again, what credit do we get and can we leave the contract
+    relevant:
+      - {title: Gateway Vendor Contract Summary, section: Penalties}
+      - {title: Gateway Vendor Contract Summary, section: Exit clause}
+  - id: multi-release-rules
+    role: team_lead
+    query: before a release which CI job must pass and are there freeze periods
+    relevant:
+      - {title: Release Process, section: CI requirements}
+      - {title: Release Process, section: Release freeze}
+  - id: multi-sev2-vendor
+    role: team_lead
+    query: a vendor caused elevated timeouts, which severity is it and who escalates
+    relevant:
+      - {title: Incident Escalation Policy, section: Severity levels}
+      - {title: Incident Escalation Policy, section: Vendor incidents}
 
   # Access control: restricted contract must never reach these roles.
   - id: leak-member-sla

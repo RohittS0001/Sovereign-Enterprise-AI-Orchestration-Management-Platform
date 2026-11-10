@@ -24,6 +24,7 @@ class Metric:
     threshold: float | None = None
     higher_is_better: bool = True
     description: str = ""
+    ci: tuple[float, float] | None = None  # bootstrap 95% interval over cases
 
     @property
     def passed(self) -> bool:
@@ -48,6 +49,7 @@ class SuiteResult:
     cases: list[CaseResult] = field(default_factory=list)
     skipped: str | None = None
     seconds: float = 0.0
+    artifacts: dict[str, Any] = field(default_factory=dict)  # e.g. samples for export
 
     @property
     def passed(self) -> bool:
@@ -78,7 +80,7 @@ def to_markdown(results: list[SuiteResult]) -> str:
     lines += ["| Suite | Result | Metrics |", "|---|---|---|"]
     for r in results:
         status = f"skipped ({r.skipped})" if r.skipped else ("✅ pass" if r.passed else "❌ FAIL")
-        metrics = ", ".join(f"{m.name}={m.value:g}" for m in r.metrics)
+        metrics = ", ".join(f"{m.name}={m.value:g}" for m in r.metrics if m.threshold is not None)
         lines.append(f"| {r.suite} | {status} | {metrics} |")
     for r in results:
         if r.skipped:
@@ -87,13 +89,15 @@ def to_markdown(results: list[SuiteResult]) -> str:
             "",
             f"## {r.suite} ({r.seconds}s)",
             "",
-            "| Metric | Value | Threshold | |",
-            "|---|---|---|---|",
+            "| Metric | Value | 95% CI | Threshold | |",
+            "|---|---|---|---|---|",
         ]
         for m in r.metrics:
             op = "≥" if m.higher_is_better else "≤"
             threshold = f"{op} {m.threshold:g}" if m.threshold is not None else "—"
-            lines.append(f"| {m.name} | {m.value:g} | {threshold} | {'✅' if m.passed else '❌'} |")
+            ci = f"{m.ci[0]:g}–{m.ci[1]:g}" if m.ci else "—"
+            mark = "✅" if m.passed else "❌"
+            lines.append(f"| {m.name} | {m.value:g} | {ci} | {threshold} | {mark} |")
         failed = [c for c in r.cases if not c.passed]
         if failed:
             lines += ["", "Failed cases:", ""]

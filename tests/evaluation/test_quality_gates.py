@@ -90,6 +90,14 @@ async def test_agent_suite_skips_without_a_model(monkeypatch) -> None:
 async def test_agent_suite_scores_a_model(monkeypatch) -> None:
     """Drive the suite with a scripted 'model' that answers every question well."""
     plans = {
+        "critical path": [
+            ("analytics.project_health", {"project_key": "PHX"}),
+            ("delivery.critical_path", {"project_key": "PHX"}),
+        ],
+        "project late": [("delivery.delay_analysis", {"project_key": "PHX"})],
+        "on track": [("delivery.check_statement", {"project_key": "PHX", "statement": "on track"})],
+        "parental": [("knowledge.search", {"query": "parental leave"})],
+        "closing price": [],
         "risk": [("analytics.project_health", {"project_key": "PHX"})],
         "PHX-7": [("jira.get_issue", {"issue_key": "PHX-7"})],
         "CI": [("github.list_workflow_runs", {"repository": "acme/payments", "branch": "main"})],
@@ -113,12 +121,14 @@ async def test_agent_suite_scores_a_model(monkeypatch) -> None:
             return {"thought": "", "done": True, "steps": []}
         question = prompt.split("User question:", 1)[1].split("\n\n", 1)[0]
         steps = next(v for k, v in plans.items() if k in question)
-        return {"thought": "", "done": False, "steps": [
+        return {"thought": "", "done": not steps, "steps": [
             {"tool": t, "arguments": a, "purpose": "eval"} for t, a in steps]}  # fmt: skip
 
     def responder(messages, schema):
         if schema is not None:  # the judge
             return {"score": 5, "unsupported_claims": []}
+        if any(w in messages[-1].content for w in ("parental", "closing price")):
+            return "I could not find this in the documents or project data."
         return answer
 
     models = AgentModels(
@@ -132,6 +142,10 @@ async def test_agent_suite_scores_a_model(monkeypatch) -> None:
     assert result.metric("tool_selection_recall").value == 1
     assert result.metric("approval_compliance").value == 1
     assert result.metric("faithfulness").value == 1
+    assert result.metric("trajectory_in_order").value == 1
+    assert result.metric("argument_accuracy").value == 1
+    assert result.metric("negative_rejection").value == 1
+    assert result.metric("latency_p95_s").value >= 0
 
 
 # ------------------------------------------------------------------ reports
@@ -217,3 +231,57 @@ async def test_planning_detects_an_optimistic_twin(monkeypatch) -> None:
     result = await planning.run()
 
     assert not result.passed and result.metric("p80_coverage").value < 0.65
+
+
+# ------------------------------------------------------------------ delivery ("why is it late?")
+
+
+async def test_delivery_gate() -> None:
+    from evaluation.suites import delivery
+
+    result = await delivery.run()
+    assert_passed(result)
+    assert result.metric("false_contradiction_rate").value <= 0.02
+
+
+async def test_delivery_gate_fails_without_root_cause_tracing(monkeypatch) -> None:
+    import re
+
+    from backend.app.domains.delivery import delay
+    from evaluation.suites import delivery
+
+    # Regression: if external causes are never recognized, vendor delays look internal.
+    monkeypatch.setattr(delay, "EXTERNAL", re.compile(r"(?!x)x"))
+
+    result = await delivery.run()
+
+    assert not result.passed and result.metric("external_root_cause_recall").value < 0.5
+
+
+async def test_rag_gate_catches_a_responder_that_echoes_the_question(monkeypatch) -> None:
+    from evaluation.suites import rag
+
+    def echo(query):
+        return lambda messages, schema: f"{query} [S1]"
+
+    monkeypatch.setattr(rag, "extractive_responder", echo)
+
+    result = await rag.run()
+
+    assert not result.passed
+    assert result.metric("answer_relevance").value == 0  # the echo guard
+    assert result.metric("factual_correctness_f1").value < 0.6
+
+
+async def test_ragas_and_deepeval_exports() -> None:
+    import json
+
+    from evaluation import frameworks
+
+    samples = await frameworks.rag_samples()
+    ragas = [json.loads(line) for line in frameworks.to_ragas(samples).splitlines()]
+    deepeval = json.loads(frameworks.to_deepeval(samples))
+
+    assert set(ragas[0]) == {"user_input", "retrieved_contexts", "response", "reference"}
+    assert set(deepeval[0]) == {"input", "actual_output", "expected_output", "retrieval_context"}
+    assert len(ragas) == len(deepeval) == len(samples) >= 10

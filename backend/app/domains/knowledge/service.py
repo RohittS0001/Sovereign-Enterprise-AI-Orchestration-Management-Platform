@@ -12,7 +12,7 @@ databases (SQLite in tests/dev) permitted chunks are ranked in Python.
 import hashlib
 import uuid
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Literal
 
 from sqlalchemy import ColumnElement, Select, and_, delete, func, literal_column, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -238,8 +238,14 @@ class KnowledgeService:
         )  # fmt: skip
 
     async def search(
-        self, principal: Principal, query: str, *, top_k: int | None = None
+        self,
+        principal: Principal,
+        query: str,
+        *,
+        top_k: int | None = None,
+        strategy: Literal["hybrid", "semantic", "keyword"] = "hybrid",
     ) -> list[SearchHit]:
+        """Hybrid search; ``strategy`` restricts it to one retriever (used for ablations)."""
         if not principal.has(Permission.KNOWLEDGE_READ):
             raise AuthorizationError("You cannot search the knowledge base")
         query = " ".join(query.split())
@@ -256,6 +262,10 @@ class KnowledgeService:
         else:
             rows, dense, sparse = await self._python_candidates(principal, query, query_vector)
 
+        if strategy == "semantic":
+            sparse = []
+        elif strategy == "keyword":
+            dense = []
         fused = reciprocal_rank_fusion([r for r in (dense, sparse) if r])
         ordered = cap_per_group(
             [chunk_id for chunk_id, _ in fused],
