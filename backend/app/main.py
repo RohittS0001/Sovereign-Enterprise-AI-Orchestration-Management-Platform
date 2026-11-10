@@ -9,6 +9,7 @@ from backend.app.api.v1.agent import router as agent_router
 from backend.app.api.v1.approvals import router as approvals_router
 from backend.app.api.v1.audit import router as audit_router
 from backend.app.api.v1.auth import router as auth_router
+from backend.app.api.v1.chat import router as chat_router
 from backend.app.api.v1.health import router as health_router
 from backend.app.api.v1.integrations import router as integrations_router
 from backend.app.api.v1.knowledge import router as knowledge_router
@@ -168,6 +169,7 @@ def create_app(
     app.include_router(usage_router)
     app.include_router(tokens_router)
     app.include_router(mcp_router)
+    app.include_router(chat_router)
 
     return app
 

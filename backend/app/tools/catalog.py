@@ -93,6 +93,13 @@ def register_connector_tools(
         ):  # fmt: skip
             registry.register(name, handler, description=description, input_model=model,
                               operation=READ, permission=Permission.PROJECTS_READ)  # fmt: skip
+    if tools.sources("chat"):
+        registry.register(
+            "chat.post_message", tools.post_message, input_model=cx.PostMessageInput,
+            operation=WRITE, permission=Permission.EMAIL_SEND,
+            description=f"Post a message to a chat channel ({', '.join(tools.sources('chat'))}), "
+            "e.g. a status digest. Needs human approval.",
+        )  # fmt: skip
     if tools.sources("crm"):
         registry.register(
             "crm.list_deals", tools.list_deals, input_model=cx.DealsInput, operation=READ,

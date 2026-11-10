@@ -2,6 +2,7 @@
 
 from backend.app.core.config import Settings
 from backend.app.integrations.connectors.calendar_meetings import CALENDAR_SPECS, MEETING_SPECS
+from backend.app.integrations.connectors.chat import CHAT_SPECS
 from backend.app.integrations.connectors.crm import CRM_SPECS
 from backend.app.integrations.connectors.docs import DOCS_SPECS
 from backend.app.integrations.connectors.hr_finance import FINANCE_SPECS, HR_SPECS
@@ -54,6 +55,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
     *DOCS_SPECS,
     *CALENDAR_SPECS,
     *MEETING_SPECS,
+    *CHAT_SPECS,
 )
 
 ALL_SPECS: tuple[ConnectorSpec, ...] = CORE_SPECS + CONNECTOR_SPECS

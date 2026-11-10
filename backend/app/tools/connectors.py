@@ -127,6 +127,14 @@ def _window(start: date, end: date, max_days: int = 31) -> tuple[datetime, datet
     )
 
 
+class PostMessageInput(BaseModel):
+    source: str = Field(default="slack", description="'slack' or 'teams_chat'")
+    channel: str | None = Field(
+        default=None, description="Slack channel id or #name (default: digest channel)"
+    )
+    text: str = Field(min_length=1, max_length=3900)
+
+
 class ConnectorTools:
     def __init__(self, hub: IntegrationHub, reporting_model: Any = None) -> None:
         self.hub = hub
@@ -306,3 +314,12 @@ class ConnectorTools:
             return {"meeting": match.title, "held_on": str(match.held_on), **outcome.model_dump()}
 
         return await run_tool("meetings", "extract actions", payload, MeetingActionsInput, run)
+
+    # ---------------------------------------------------------------- chat
+
+    async def post_message(self, payload: dict[str, Any]) -> ToolResult:
+        async def run(i: PostMessageInput) -> Any:
+            service = self._pick("chat", i.source)[i.source]
+            return await service.post_message(i.channel, i.text)
+
+        return await run_tool("chat", "post message", payload, PostMessageInput, run)

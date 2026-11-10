@@ -294,3 +294,20 @@ Service account with domain-wide delegation (scope meetings.space.readonly) impe
 
 - Required: `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_DELEGATED_USER`
 - API docs: https://developers.google.com/meet/api/reference/rest
+
+## Chat (Slack / Teams)
+
+### Slack (`slack`)
+
+api.slack.com/apps → bot scopes app_mentions:read, chat:write, im:history, users:read, users:read.email; Event Subscriptions → https://<host>/api/v1/chat/slack/events (app_mention, message.im); Interactivity → https://<host>/api/v1/chat/slack/interactions.
+
+- Required: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`
+- Optional: `SLACK_DIGEST_CHANNEL`
+- API docs: https://api.slack.com/apis/events-api
+
+### Microsoft Teams chat (`teams_chat`)
+
+Teams → channel → Manage → Outgoing webhook to https://<host>/api/v1/chat/teams/messages (copy the security token); a Workflows 'post to channel when a webhook request is received' URL for answers; MS_* settings map senders to platform users.
+
+- Required: `TEAMS_OUTGOING_WEBHOOK_SECRET`, `TEAMS_WORKFLOW_WEBHOOK_URL`
+- API docs: https://learn.microsoft.com/microsoftteams/platform/webhooks-and-connectors/how-to/add-outgoing-webhook

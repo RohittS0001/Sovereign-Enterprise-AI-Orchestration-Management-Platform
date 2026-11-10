@@ -157,3 +157,36 @@ async def test_model_extraction_wraps_untrusted_text_and_flags_injection() -> No
     assert "<untrusted_data" in prompt and "4111 1111 1111 1111" not in prompt  # redacted
     assert outcome.extracted_by == "fake" and outcome.action_items[0].owner == "Arjun M"
     assert outcome.injection_warning  # the hostile line is flagged, not obeyed
+
+
+async def test_slack_client_checks_ok_and_channels() -> None:
+    from backend.app.integrations.connectors.chat import SlackService
+
+    api = MockApi({
+        "GET /api/users.info": {"ok": True, "user": {"profile": {"email": "pm@example.com"}}},
+        "POST /api/chat.postMessage": {"ok": False, "error": "not_in_channel"},
+    })  # fmt: skip
+    svc = SlackService(api.factory("Slack", "https://slack.com/api"), default_channel="#payments")
+
+    assert await svc.email_of("U123") == "pm@example.com"
+    with pytest.raises(ValueError, match="not_in_channel"):
+        await svc.post_message(None, "hello")
+    assert api.json_body()["channel"] == "#payments"
+    with pytest.raises(ValueError, match="channel"):
+        await svc.post_message("../../admin", "x")
+
+
+async def test_teams_chat_posts_an_adaptive_card() -> None:
+    from backend.app.integrations.connectors.chat import TeamsChatService
+
+    api = MockApi({"POST /workflows/abc": {"ok": True}})
+    svc = TeamsChatService(
+        api.factory("Teams", "https://prod.example.com"), "https://prod.example.com/workflows/abc"
+    )
+
+    await svc.post_message(None, "Status: on track")
+
+    card = api.json_body()["attachments"][0]
+    assert card["contentType"] == "application/vnd.microsoft.card.adaptive"
+    assert card["content"]["body"][0]["text"] == "Status: on track"
+    assert await svc.email_of("aad-1") is None  # no Graph credentials configured
