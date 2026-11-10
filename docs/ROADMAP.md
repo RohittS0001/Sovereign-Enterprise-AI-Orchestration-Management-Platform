@@ -42,7 +42,7 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 
 - [x] **Project digital twin** — Monte Carlo simulation over dependencies, leave, velocity and CI
       failure rates: "62% chance to ship by the 25th"; what-if scenarios (add a person, cut scope)
-- [ ] **Org knowledge graph** — people ↔ skills ↔ code ↔ issues ↔ documents ↔ decisions
+- [x] **Org knowledge graph** — people ↔ skills ↔ code ↔ issues ↔ documents ↔ decisions
       ("who knows the refunds service?", "what breaks if Arjun leaves?")
 - [x] **AI chief of staff** — always-on agent watching every project, preparing weekly decisions,
       drafting escalations and scope trade-offs; everything through approvals

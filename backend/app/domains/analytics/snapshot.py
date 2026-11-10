@@ -98,6 +98,7 @@ class Member:
     keka_employee_id: str | None
     capacity_points: float
     hr_employee_id: str | None = None  # id in another HR system (BambooHR, Workday, ...)
+    github_login: str | None = None  # links PR authors to this person
 
     @property
     def ids(self) -> set[str]:

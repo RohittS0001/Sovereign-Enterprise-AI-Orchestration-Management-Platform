@@ -376,3 +376,22 @@ async def test_portfolio_brief_and_drafted_escalations(demo_settings, database, 
         approval = await session.scalar(select(ApprovalRequest))
     assert approval.tool_name == "gmail.create_draft" and approval.status == ApprovalStatus.PENDING
     assert approval.arguments["subject"].startswith("[Decision needed]")
+
+
+async def test_knowledge_graph_endpoints(demo_settings, database, staff) -> None:
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        await configure_phx(client, h[Role.ADMIN])
+        experts = (await client.get("/api/v1/graph/who-knows", params={"topic": "refunds idempotency"},
+                                    headers=h[Role.TEAM_LEAD])).json()  # fmt: skip
+        impact = (
+            await client.get("/api/v1/graph/people/Arjun M/impact", headers=h[Role.TEAM_LEAD])
+        ).json()
+        stats = (await client.get("/api/v1/graph/summary", headers=h[Role.TEAM_LEAD])).json()
+        denied = await client.get("/api/v1/graph/summary", headers=h[Role.MEMBER])
+
+    assert experts[0]["person"] == "Arjun M"  # Jira name and GitHub login merged
+    assert impact["blocked_behind"] == ["PHX-3"] and impact["sole_open_work"]
+    assert "arjun-m" not in [b["person"] for b in impact["suggested_backups"]]
+    assert stats["bus_factor"]["acme/checkout-web"] == 1 and stats["people"] >= 4
+    assert denied.status_code == 403  # people:read

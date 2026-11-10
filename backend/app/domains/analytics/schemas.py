@@ -23,6 +23,9 @@ class ProjectMember(BaseModel):
     hr_employee_id: str | None = Field(
         default=None, max_length=64, description="Id in another HR system"
     )
+    github_login: str | None = Field(
+        default=None, max_length=39, pattern=r"^[A-Za-z0-9-]+$", description="GitHub username"
+    )
     capacity_points: float = Field(default=10.0, gt=0, le=200, description="Points per sprint")
 
 

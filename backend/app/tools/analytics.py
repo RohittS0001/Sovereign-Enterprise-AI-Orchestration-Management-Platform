@@ -33,6 +33,14 @@ class SimulateDeliveryInput(BaseModel):
     resolve_blockers: bool = Field(default=False, description="What-if: blockers clear today")
 
 
+class WhoKnowsInput(BaseModel):
+    topic: str = Field(min_length=2, max_length=200, description="e.g. 'refunds service'")
+
+
+class AbsenceInput(BaseModel):
+    person: str = Field(min_length=1, max_length=200, description="Person's name as in Jira")
+
+
 class NegotiationInput(BaseModel):
     project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
     target_date: date | None = Field(default=None, description="Default: the sprint end")
@@ -80,11 +88,15 @@ class AnalyticsTools:
         except AppException as exc:
             return ToolResult(status=ToolStatus.ERROR, error=exc.message)
         scenario = Scenario(
-            name="what_if" if (i.add_people or i.cut_points or i.extra_leave_days
-                               or i.resolve_blockers) else "baseline",
-            target_date=i.target_date, add_people=i.add_people, cut_points=i.cut_points,
-            extra_leave_days=i.extra_leave_days, resolve_blockers=i.resolve_blockers,
-        )  # fmt: skip
+            name="what_if"
+            if (i.add_people or i.cut_points or i.extra_leave_days or i.resolve_blockers)
+            else "baseline",
+            target_date=i.target_date,
+            add_people=i.add_people,
+            cut_points=i.cut_points,
+            extra_leave_days=i.extra_leave_days,
+            resolve_blockers=i.resolve_blockers,
+        )
         result = await asyncio.to_thread(simulate, snapshot, scenario)
         data = result.model_dump(mode="json", exclude={"histogram"})
         return ToolResult(status=ToolStatus.SUCCESS, data=data)
@@ -102,3 +114,33 @@ class AnalyticsTools:
         for item in [data["baseline"], *(o["result"] for o in data["options"])]:
             item.pop("histogram", None)
         return ToolResult(status=ToolStatus.SUCCESS, data=data)
+
+    async def _graph(self):
+        from backend.app.domains.graph.service import build_graph
+
+        async with self.database.session() as session:
+            return await build_graph(session, self.collector)
+
+    async def who_knows(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.graph.service import who_knows
+
+        try:
+            i = WhoKnowsInput.model_validate(payload)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        experts = who_knows(await self._graph(), i.topic)
+        return ToolResult(
+            status=ToolStatus.SUCCESS, data={"experts": [e.model_dump() for e in experts]}
+        )
+
+    async def impact_of_absence(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.graph.service import impact_of_absence
+
+        try:
+            i = AbsenceInput.model_validate(payload)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        return ToolResult(
+            status=ToolStatus.SUCCESS,
+            data=impact_of_absence(await self._graph(), i.person).model_dump(),
+        )

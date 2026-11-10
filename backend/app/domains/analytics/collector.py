@@ -61,6 +61,7 @@ class SnapshotCollector:
                     jira_account_id=m.get("jira_account_id"),
                     keka_employee_id=m.get("keka_employee_id"),
                     hr_employee_id=m.get("hr_employee_id"),
+                    github_login=m.get("github_login"),
                     capacity_points=float(
                         m.get("capacity_points") or self.settings.analytics_default_capacity_points
                     ),

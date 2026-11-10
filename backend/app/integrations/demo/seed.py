@@ -20,24 +20,28 @@ PHX_CONFIG = {
     "members": [
         {
             "name": "Arjun M",
+            "github_login": "arjun-m",
             "jira_account_id": "acc-arjun",
             "keka_employee_id": "e-002",
             "capacity_points": 8,
         },
         {
             "name": "Meera S",
+            "github_login": "meera-s",
             "jira_account_id": "acc-meera",
             "keka_employee_id": "e-005",
             "capacity_points": 10,
         },
         {
             "name": "Sara K",
+            "github_login": "sara-k",
             "jira_account_id": "acc-sara",
             "keka_employee_id": "e-003",
             "capacity_points": 8,
         },
         {
             "name": "Dev R",
+            "github_login": "dev-r",
             "jira_account_id": "acc-dev",
             "keka_employee_id": "e-004",
             "capacity_points": 20,

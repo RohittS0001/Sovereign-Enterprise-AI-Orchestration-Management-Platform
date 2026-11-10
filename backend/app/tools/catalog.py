@@ -9,11 +9,13 @@ from backend.app.core.security.permissions import Permission
 from backend.app.integrations.hub import IntegrationHub, build_integration_hub
 from backend.app.tools import connectors as cx
 from backend.app.tools.analytics import (
+    AbsenceInput,
     AnalyticsTools,
     ListProjectsInput,
     NegotiationInput,
     ProjectHealthInput,
     SimulateDeliveryInput,
+    WhoKnowsInput,
 )
 from backend.app.tools.base import ToolOperation
 from backend.app.tools.github import schemas as github_schemas
@@ -319,6 +321,18 @@ def build_tool_registry(
             operation=READ,
             permission=Permission.ANALYTICS_READ,
         )
+        registry.register(
+            "graph.who_knows", analytics_tools.who_knows, input_model=WhoKnowsInput,
+            operation=READ, permission=Permission.PEOPLE_READ,
+            description="Who knows a topic (service, feature, area): people ranked by delivered "
+            "issues, merged PRs and owned documents, with evidence.",
+        )  # fmt: skip
+        registry.register(
+            "graph.impact_of_absence", analytics_tools.impact_of_absence, input_model=AbsenceInput,
+            operation=READ, permission=Permission.PEOPLE_READ,
+            description="What breaks if a person is away: open work only they hold, work blocked "
+            "behind it, repositories where they wrote most changes, and suggested backups.",
+        )  # fmt: skip
         registry.register(
             "analytics.simulate_delivery",
             analytics_tools.simulate_delivery,
