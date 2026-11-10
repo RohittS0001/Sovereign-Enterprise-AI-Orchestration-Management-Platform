@@ -73,7 +73,11 @@ def create_app(
         )
         analytics_tools = AnalyticsTools(database, collector) if database is not None else None
         tool_registry = build_tool_registry(
-            settings, integrations, knowledge_tools=knowledge_tools, analytics_tools=analytics_tools
+            settings,
+            integrations,
+            knowledge_tools=knowledge_tools,
+            analytics_tools=analytics_tools,
+            reporting_model=agent_models.reporting if agent_models else None,
         )
     scheduler = (
         ReportScheduler(database, collector, settings, agent_models)

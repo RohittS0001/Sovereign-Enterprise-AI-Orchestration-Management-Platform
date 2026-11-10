@@ -7,7 +7,7 @@ instead of failing the whole call. Tools never raise (``run_tool``).
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import date
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -93,9 +93,44 @@ class DealsInput(SourceInput):
     limit: int = Field(default=25, ge=1, le=100)
 
 
+class FreeSlotsInput(SourceInput):
+    people: list[str] = Field(min_length=1, max_length=20, description="Email addresses")
+    from_date: date
+    to_date: date
+    duration_minutes: int = Field(default=30, ge=15, le=480)
+
+
+class EventsInput(SourceInput):
+    from_date: date
+    to_date: date
+    limit: int = Field(default=25, ge=1, le=100)
+
+
+class MeetingsInput(SourceInput):
+    from_date: date
+    to_date: date
+    limit: int = Field(default=20, ge=1, le=50)
+
+
+class MeetingActionsInput(BaseModel):
+    source: str = Field(description="Meeting source, e.g. 'zoom'")
+    meeting_id: str = Field(min_length=1, max_length=300)
+    from_date: date = Field(description="Window to look the meeting up in")
+    to_date: date
+
+
+def _window(start: date, end: date, max_days: int = 31) -> tuple[datetime, datetime]:
+    if end < start or (end - start).days > max_days:
+        raise ValueError(f"date range must be forward and at most {max_days} days")
+    return datetime.combine(start, time(0), UTC), datetime.combine(end, time(0), UTC) + timedelta(
+        days=1
+    )
+
+
 class ConnectorTools:
-    def __init__(self, hub: IntegrationHub) -> None:
+    def __init__(self, hub: IntegrationHub, reporting_model: Any = None) -> None:
         self.hub = hub
+        self.reporting_model = reporting_model  # LLM 2 for meeting outcomes (optional)
 
     def sources(self, category: str) -> list[str]:
         return sorted(self.hub.by_category(category))
@@ -215,3 +250,59 @@ class ConnectorTools:
             lambda i: self._fan_out("crm", i.source, lambda s: s.list_deals(
                 project=i.project_key, open_only=i.open_only, limit=i.limit)),
         )  # fmt: skip
+
+    # ---------------------------------------------------------------- calendar & meetings
+
+    async def find_free_slots(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.integrations.connectors.calendar_meetings import free_slots
+
+        async def run(i: FreeSlotsInput) -> Any:
+            start, end = _window(i.from_date, i.to_date, 14)
+            busy = await self._fan_out(
+                "calendar", i.source, lambda s: s.free_busy(i.people, start, end)
+            )
+            from backend.app.integrations.connectors.base import BusySlot
+
+            slots = [BusySlot(**b) for b in busy["results"]]
+            return {"sources": busy["sources"], "warnings": busy["warnings"],
+                    "free": free_slots(slots, start, end, i.duration_minutes),
+                    "note": "Weekdays 09:00-18:00 UTC; busy, tentative and out-of-office count as busy."}  # fmt: skip
+
+        return await run_tool("calendar", "find free slots", payload, FreeSlotsInput, run)
+
+    async def list_events(self, payload: dict[str, Any]) -> ToolResult:
+        async def run(i: EventsInput) -> Any:
+            start, end = _window(i.from_date, i.to_date)
+            return await self._fan_out(
+                "calendar", i.source, lambda s: s.list_events(start, end, i.limit)
+            )
+
+        return await run_tool("calendar", "list events", payload, EventsInput, run)
+
+    async def list_meetings(self, payload: dict[str, Any]) -> ToolResult:
+        async def run(i: MeetingsInput) -> Any:
+            _window(i.from_date, i.to_date)
+            return await self._fan_out(
+                "meetings",
+                i.source,
+                lambda s: s.list_transcripts(i.from_date, i.to_date, i.limit, with_text=False),
+            )
+
+        return await run_tool("meetings", "list meetings", payload, MeetingsInput, run)
+
+    async def extract_meeting_actions(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.meetings.actions import extract_outcome
+
+        async def run(i: MeetingActionsInput) -> Any:
+            _window(i.from_date, i.to_date)
+            service = self._pick("meetings", i.source)[i.source]
+            transcripts = await service.list_transcripts(i.from_date, i.to_date, 50, with_text=True)
+            match = next((t for t in transcripts if t.meeting_id == i.meeting_id), None)
+            if match is None:
+                raise ValueError(
+                    f"Meeting {i.meeting_id} not found between {i.from_date} and {i.to_date}"
+                )
+            outcome = await extract_outcome(match.text, self.reporting_model)
+            return {"meeting": match.title, "held_on": str(match.held_on), **outcome.model_dump()}
+
+        return await run_tool("meetings", "extract actions", payload, MeetingActionsInput, run)

@@ -295,5 +295,54 @@
         }
       ]
     }
+  },
+  "calendar": {
+    "google_calendar": {
+      "busy": [
+        {
+          "person": "priya@example.com",
+          "start_hour": 33,
+          "end_hour": 35
+        },
+        {
+          "person": "arjun@example.com",
+          "start_hour": 34,
+          "end_hour": 37
+        },
+        {
+          "person": "priya@example.com",
+          "start_hour": 39,
+          "end_hour": 40
+        }
+      ],
+      "events": [
+        {
+          "id": "ev1",
+          "title": "PHX sprint review",
+          "start_hour": 34,
+          "end_hour": 35,
+          "attendees": 6
+        },
+        {
+          "id": "ev2",
+          "title": "Vendor escalation sync",
+          "start_hour": 39,
+          "end_hour": 40,
+          "attendees": 3
+        }
+      ]
+    }
+  },
+  "meetings": {
+    "zoom": {
+      "transcripts": [
+        {
+          "meeting_id": "zm-881",
+          "title": "PHX go/no-go prep",
+          "held_on": "{today-1}",
+          "text": "Priya N: We decided to keep the launch on the 14th if the load test passes.\nArjun M: The capture timeout is still a blocker; the vendor has no fix date.\nPriya N: Arjun, can you draft the escalation to the vendor by tomorrow?\nArjun M: I will send it by EOD.\nSara K: Risk: the refunds load test may slip to Thursday.\nMeera S: Agreed, we'll go with the fallback gateway for refunds."
+        }
+      ]
+    }
   }
 }

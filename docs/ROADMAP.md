@@ -26,7 +26,7 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 - [ ] **Slack / Microsoft Teams bot** — ask the agent, approve actions and receive digests in chat
 - [x] **Document connectors for the knowledge base** — Confluence, Notion, SharePoint/OneDrive,
       Google Drive; incremental sync that mirrors each source's permissions
-- [ ] **Calendar & meetings** — Google Calendar / Outlook (availability, scheduling);
+- [x] **Calendar & meetings** — Google Calendar / Outlook (availability, scheduling);
       Zoom / Google Meet / Teams transcripts → decisions and action items
 - [x] **Other trackers** — Linear, Azure DevOps, Asana, ClickUp, GitLab, Bitbucket behind a
       common issue/PR model (no Jira lock-in)

@@ -254,3 +254,43 @@ Service account JSON key; share the folder with the service account (or use doma
 - Required: `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_DRIVE_FOLDER_ID`
 - Optional: `GOOGLE_DELEGATED_USER`
 - API docs: https://developers.google.com/drive/api/reference/rest/v3
+
+## Calendars
+
+### Google Calendar (`google_calendar`)
+
+Service account with domain-wide delegation (scope calendar.readonly) impersonating GOOGLE_DELEGATED_USER; free/busy works for colleagues in the same Workspace.
+
+- Required: `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_DELEGATED_USER`
+- Optional: `GOOGLE_CALENDAR_ID`
+- API docs: https://developers.google.com/calendar/api/v3/reference
+
+### Outlook / Microsoft 365 calendar (`outlook_calendar`)
+
+Entra ID app with application permission Calendars.ReadBasic.All (or Calendars.Read); OUTLOOK_MAILBOX is the calendar used for events and getSchedule.
+
+- Required: `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `OUTLOOK_MAILBOX`
+- API docs: https://learn.microsoft.com/graph/api/calendar-getschedule
+
+## Meeting transcripts
+
+### Zoom (`zoom`)
+
+Zoom Marketplace → Server-to-Server OAuth app (scope cloud_recording:read:list_user_recordings); enable cloud recording audio transcripts.
+
+- Required: `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID`, `ZOOM_CLIENT_SECRET`
+- API docs: https://developers.zoom.us/docs/api/
+
+### Microsoft Teams transcripts (`teams_meetings`)
+
+Entra ID app with OnlineMeetingTranscript.Read.All plus an application access policy for the organizer; transcription must be on in the meetings.
+
+- Required: `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `TEAMS_ORGANIZER_USER`
+- API docs: https://learn.microsoft.com/graph/api/resources/calltranscript
+
+### Google Meet transcripts (`google_meet`)
+
+Service account with domain-wide delegation (scope meetings.space.readonly) impersonating the meeting organizer; Meet transcripts must be on.
+
+- Required: `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_DELEGATED_USER`
+- API docs: https://developers.google.com/meet/api/reference/rest

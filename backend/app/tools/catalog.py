@@ -30,9 +30,11 @@ from backend.app.tools.registry import ToolRegistry
 READ, WRITE = ToolOperation.READ, ToolOperation.WRITE
 
 
-def register_connector_tools(registry: ToolRegistry, hub: IntegrationHub) -> None:
+def register_connector_tools(
+    registry: ToolRegistry, hub: IntegrationHub, reporting_model: object = None
+) -> None:
     """Category tools for the connectors beyond the core four (only active categories)."""
-    tools = cx.ConnectorTools(hub)
+    tools = cx.ConnectorTools(hub, reporting_model)
     read = Permission.PROJECTS_READ
     sources = tools.sources("tracker")
     if sources:
@@ -72,6 +74,25 @@ def register_connector_tools(registry: ToolRegistry, hub: IntegrationHub) -> Non
             description=f"Approved leave in a date range from {', '.join(tools.sources('hr'))} "
             "(Keka leave: keka.get_leave_requests).",
         )  # fmt: skip
+    if tools.sources("calendar"):
+        for name, handler, model, description in (
+            ("calendar.find_free_slots", tools.find_free_slots, cx.FreeSlotsInput,
+             "Common free time for a list of people (emails) in a date range, for scheduling."),
+            ("calendar.list_events", tools.list_events, cx.EventsInput,
+             "Calendar events (title, time, attendee count) in a date range."),
+        ):  # fmt: skip
+            registry.register(name, handler, description=description, input_model=model,
+                              operation=READ, permission=Permission.PEOPLE_READ)  # fmt: skip
+    if tools.sources("meetings"):
+        for name, handler, model, description in (
+            ("meetings.list_meetings", tools.list_meetings, cx.MeetingsInput,
+             "Recent meetings that have transcripts (Zoom/Teams/Meet): id, title, date."),
+            ("meetings.extract_actions", tools.extract_meeting_actions, cx.MeetingActionsInput,
+             "Summary, decisions, action items (owner, due) and risks from a meeting transcript. "
+             "Propose Jira tasks from the action items with jira.create_task (needs approval)."),
+        ):  # fmt: skip
+            registry.register(name, handler, description=description, input_model=model,
+                              operation=READ, permission=Permission.PROJECTS_READ)  # fmt: skip
     if tools.sources("crm"):
         registry.register(
             "crm.list_deals", tools.list_deals, input_model=cx.DealsInput, operation=READ,
@@ -240,6 +261,7 @@ def build_tool_registry(
     keka_tools: KekaTools | None = None,
     knowledge_tools: KnowledgeTools | None = None,
     analytics_tools: AnalyticsTools | None = None,
+    reporting_model: object = None,
 ) -> ToolRegistry:
     """Register tools for every active integration (explicit tool objects win)."""
     hub = hub or build_integration_hub(settings)
@@ -268,7 +290,7 @@ def build_tool_registry(
         register_keka_tools(registry, keka_tools)
     if email_tools is not None:
         register_email_tools(registry, email_tools)
-    register_connector_tools(registry, hub)
+    register_connector_tools(registry, hub, reporting_model)
     if knowledge_tools is not None:
         registry.register(
             "knowledge.search",
