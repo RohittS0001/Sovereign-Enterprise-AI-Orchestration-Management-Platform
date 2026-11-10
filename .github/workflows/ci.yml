@@ -1,9 +1,10 @@
 name: CI
 
+# Manual only, so the project never runs up Actions minutes: start it from the
+# Actions tab → CI → Run workflow (or `gh workflow run CI`). To run on every push again,
+# add back:  push: {branches: [main]}  and  pull_request:
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
