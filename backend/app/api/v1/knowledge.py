@@ -3,6 +3,7 @@ import uuid
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, Query, Request, Response, UploadFile, status
+from pydantic import BaseModel, Field
 
 from backend.app.api.deps import PrincipalDep, SessionDep, SettingsDep, require_permissions
 from backend.app.core.errors import AppException
@@ -148,3 +149,36 @@ async def search(
         principal, body.query, top_k=body.top_k
     )
     return SearchResponse(query=body.query, results=[SearchResult(**hit.as_dict()) for hit in hits])
+
+
+class SyncRequest(BaseModel):
+    source: str | None = Field(default=None, description="One document source; default: all")
+
+
+@router.post("/sync")
+async def sync_sources(
+    body: SyncRequest,
+    principal: Manager,
+    session: SessionDep,
+    settings: SettingsDep,
+    request: Request,
+) -> list[dict]:
+    """Pull Confluence / Notion / SharePoint / Drive documents into the knowledge base."""
+    from dataclasses import asdict
+
+    from backend.app.core.errors import NotFoundError
+    from backend.app.domains.knowledge.sync import sync_source
+
+    sources = request.app.state.integrations.by_category("docs")
+    if body.source:
+        if body.source not in sources:
+            raise NotFoundError(f"Document source {body.source!r} is not configured",
+                                details={"available": sorted(sources)})  # fmt: skip
+        sources = {body.source: sources[body.source]}
+    results = []
+    for name, service in sources.items():
+        result = await sync_source(
+            session, settings, request.app.state.embedder, principal, name, service
+        )
+        results.append(asdict(result))
+    return results

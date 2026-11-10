@@ -221,3 +221,36 @@ Settings → Integrations → Private apps (scope crm.objects.deals.read); add a
 - Required: `HUBSPOT_TOKEN`
 - Optional: `HUBSPOT_PROJECT_PROPERTY`
 - API docs: https://developers.hubspot.com/docs/api/crm/deals
+
+## Document sources (knowledge base sync)
+
+### Confluence Cloud (`confluence`)
+
+Atlassian API token (can reuse the Jira one); CONFLUENCE_URL=https://<site>.atlassian.net/wiki; page read-restrictions are mirrored (restricted pages become admin-only).
+
+- Required: `CONFLUENCE_URL`, `CONFLUENCE_EMAIL`, `CONFLUENCE_API_TOKEN`, `CONFLUENCE_SPACES`
+- API docs: https://developer.atlassian.com/cloud/confluence/rest/v2/
+
+### Notion (`notion`)
+
+notion.so/my-integrations → internal integration; share the pages to sync with it.
+
+- Required: `NOTION_TOKEN`
+- Optional: `NOTION_VERSION`
+- API docs: https://developers.notion.com/reference/intro
+
+### SharePoint / OneDrive (`sharepoint`)
+
+Entra ID app registration with application permission Sites.Selected (granted to the site) or Sites.Read.All; reads .md/.txt/.pdf/.docx in the library root.
+
+- Required: `MS_TENANT_ID`, `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `SHAREPOINT_SITE_ID`
+- Optional: `SHAREPOINT_DRIVE_ID`
+- API docs: https://learn.microsoft.com/graph/api/resources/sharepoint
+
+### Google Drive (`google_drive`)
+
+Service account JSON key; share the folder with the service account (or use domain-wide delegation with GOOGLE_DELEGATED_USER).
+
+- Required: `GOOGLE_SERVICE_ACCOUNT_FILE`, `GOOGLE_DRIVE_FOLDER_ID`
+- Optional: `GOOGLE_DELEGATED_USER`
+- API docs: https://developers.google.com/drive/api/reference/rest/v3

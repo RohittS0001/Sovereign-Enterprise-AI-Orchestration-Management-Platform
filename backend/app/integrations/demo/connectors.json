@@ -264,5 +264,36 @@
         }
       ]
     }
+  },
+  "docs": {
+    "confluence": {
+      "documents": [
+        {
+          "id": "98311",
+          "title": "Payments Release Checklist",
+          "text": "# Payments Release Checklist\n\n## Before the release\nFreeze the refunds schema two days before go-live. Run the load test (PLAT-44) and attach the report.\n\n## Rollback\nRoll back if capture latency stays above 800 ms for 10 minutes. The on-call lead decides.",
+          "url": "https://acme.atlassian.net/wiki/spaces/ENG/pages/98311",
+          "updated": "{today-4}"
+        },
+        {
+          "id": "98420",
+          "title": "Gateway Pricing Negotiation Notes",
+          "text": "# Gateway pricing\nVolume discount tiers under negotiation; do not share outside finance and leadership.",
+          "restricted": true,
+          "updated": "{today-2}"
+        }
+      ]
+    },
+    "notion": {
+      "documents": [
+        {
+          "id": "a1b2c3",
+          "title": "Team Working Agreements",
+          "text": "# Working agreements\n- Reviews within one working day.\n- Demo every Friday.\n- Incidents: page the on-call, then post in #payments-incidents.",
+          "url": "https://www.notion.so/acme/Team-Working-Agreements-a1b2c3",
+          "updated": "{today-9}"
+        }
+      ]
+    }
   }
 }

@@ -190,6 +190,13 @@ class Settings(ConnectorSettings):
         # Relative paths in .env are relative to the project, not the working directory.
         return value if value.is_absolute() else PROJECT_ROOT / value
 
+    @field_validator("google_service_account_file")
+    @classmethod
+    def _resolve_optional_path(cls, value: Path | None) -> Path | None:
+        if value is None or str(value) in ("", "."):
+            return None
+        return value if value.is_absolute() else PROJECT_ROOT / value
+
     @model_validator(mode="after")
     def _ensure_jwt_secret(self) -> Self:
         secret = self.jwt_secret_key.get_secret_value()

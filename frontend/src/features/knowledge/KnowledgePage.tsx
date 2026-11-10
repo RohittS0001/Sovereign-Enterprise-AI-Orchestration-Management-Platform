@@ -80,6 +80,13 @@ export function KnowledgePage() {
   const search = useMutation({
     mutationFn: (q: string) => api<{ results: SearchResult[] }>("/knowledge/search", { body: { query: q, top_k: 8 } }),
   });
+  const sync = useMutation({
+    mutationFn: () =>
+      api<{ source: string; added: number; updated: number; removed: number; error: string | null }[]>("/knowledge/sync", {
+        body: {},
+      }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
+  });
   const remove = useMutation({
     mutationFn: (id: string) => api(`/knowledge/documents/${id}`, { method: "DELETE" }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
@@ -92,6 +99,23 @@ export function KnowledgePage() {
           <h1>Knowledge</h1>
           <p>Internal documents the assistant can cite. You only see what you're allowed to read.</p>
         </div>
+        {can("knowledge:manage") && (
+          <div className="stack" style={{ alignItems: "end" }}>
+            <button className="button secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
+              {sync.isPending ? "Syncing…" : "Sync sources"}
+            </button>
+            {sync.data && (
+              <span className="small muted" role="status">
+                {sync.data.length === 0
+                  ? "No document sources configured."
+                  : sync.data
+                      .map((r) => (r.error ? `${r.source}: ${r.error}` : `${r.source}: +${r.added} ~${r.updated} -${r.removed}`))
+                      .join(" · ")}
+              </span>
+            )}
+            <ErrorNote error={sync.error} />
+          </div>
+        )}
       </div>
       <Card title="Search">
         <form

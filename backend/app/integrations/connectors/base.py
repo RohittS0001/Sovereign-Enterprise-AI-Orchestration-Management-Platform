@@ -69,6 +69,18 @@ class ConnectorClient(HttpIntegrationClient):
     ) -> Any:
         return await self._request("POST", path, params=params, payload=payload)
 
+    async def get_bytes(self, url: str, max_bytes: int = 20_000_000) -> bytes:
+        """Download a file (e.g. a PDF from SharePoint), following redirects, size-capped."""
+        async with self._client.stream("GET", url, headers=await self._auth_headers(),
+                                       follow_redirects=True) as response:  # fmt: skip
+            response.raise_for_status()
+            data = bytearray()
+            async for chunk in response.aiter_bytes():
+                data.extend(chunk)
+                if len(data) > max_bytes:
+                    raise ValueError(f"File larger than {max_bytes // 1_000_000} MB")
+            return bytes(data)
+
     async def get_text(self, url: str) -> str:
         """Download a text body (e.g. a transcript), following redirects, size-capped."""
         response = await self._client.get(url, headers=await self._auth_headers(),
@@ -267,3 +279,5 @@ class SourceDocument(BaseModel):
     url: str | None = None
     updated: date | None = None
     restricted: bool = False  # the source limits who may read it
+    content: bytes | None = None  # raw file (PDF, DOCX, ...) when text is empty
+    filename: str | None = None
