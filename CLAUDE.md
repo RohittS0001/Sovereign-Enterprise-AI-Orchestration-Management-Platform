@@ -11,8 +11,9 @@ knowledge base and project analytics, with human approval for writes, RBAC and a
 
 Work proceeds in phases, one local commit each (never push unless asked). Done: 1–7 (foundation,
 auth/RBAC, agent + approvals + audit + guardrails, GitHub/Keka/Gmail drafts + demo mode, RAG, analytics
-+ reports + quotas, React frontend), the domain restructure, 8 (evaluation + observability) and 9
-(Docker Compose, CI, Helm, README). Further work comes from the backlog.
++ reports + quotas, React frontend), the domain restructure, 8 (evaluation + observability), 9
+(Docker Compose, CI, Helm, README) and 10 (connection registry, MCP code mode, digital twin, all of
+Backlog A and B except LoRA fine-tuning, RAG/planning evals). Remaining work: Backlog C.
 `docs/ROADMAP.md` is the backlog source of truth (integrations, moonshots, lifecycle features) — tick
 items there as they land.
 
@@ -36,7 +37,16 @@ npm --prefix frontend test                        # Vitest + Testing Library
 .venv/Scripts/python.exe -m alembic revision --autogenerate --rev-id 0005 -m "describe change"
 .venv/Scripts/python.exe -m scripts.create_admin --email you@example.com --name "Name"
 .venv/Scripts/python.exe -m scripts.gmail_auth    # one-time interactive Gmail consent -> token.json
+.venv/Scripts/python.exe -m scripts.connections [--check|--markdown]  # integration status / regen docs
+.venv/Scripts/python.exe -m scripts.sync_documents --as admin@example.com  # docs sources → knowledge
+.venv/Scripts/python.exe -m scripts.mcp_stdio     # MCP over stdio (SOVEREIGN_MCP_TOKEN)
 ```
+
+- Adding/changing an integration's settings: update `.env.example` and run
+  `python -m scripts.connections --markdown` — `tests/unit/integrations/test_connector_registry.py`
+  fails if either is stale.
+- Bash heredocs with quotes/backslashes often break in this Git Bash; write multi-line edits as a
+  Python script file (scratchpad) or use the Edit tool. Avoid `# fmt: skip` on long lines (E501).
 
 - Run Alembic as `python -m alembic` (invoking `alembic.exe` directly is denied). Target a scratch DB
   with `-x url=sqlite:///path/to.db`. `tests/integration/db/test_database.py` runs `alembic check`, so
@@ -151,6 +161,30 @@ to `${API_UPSTREAM}`, SSE unbuffered, `/metrics` blocked). Compose: db + api + w
 hook Job, optional Ingress/HPA/ServiceMonitor. CI: backend (ruff, pytest incl. Postgres service, eval
 reports), frontend (types, Vitest, build), then image builds, compose config and `helm lint`. None of
 Docker/Helm is runnable locally — CI is the only check.
+
+**Connectors** (`integrations/connectors/`) — the pattern for every integration beyond the core four.
+`spec.py:ConnectorSpec` (required/optional Settings fields → env vars, setup hint, docs URL, `build`,
+`demo`); `registry.py` lists them all (`CONNECTOR_SPECS`, `ALL_SPECS`); settings live in
+`core/connector_settings.py` (a `Settings` mixin). `base.py`: `ConnectorClient` (HttpIntegrationClient +
+token-provider auth, `get_bytes`/`get_text`), `ConnectorService` (lazy client), `safe_id`, and common
+models (WorkItem, PullRequest, Incident, ErrorGroup, Deployment, QualityGate, LeaveRecord, BudgetLine,
+Deal, CalendarEvent, Transcript, SourceDocument). `auth.py`: OAuth client-credentials/refresh tokens,
+Microsoft/Zoho/Google helpers. Category modules: `trackers`, `ops`, `hr_finance`, `crm`, `docs`,
+`calendar_meetings`, `chat`. Hub: `hub.connectors` + `hub.by_category(cat)`; `build_integration_hub(
+settings, demo_today=...)` (pin `demo_today` in tests/evals). Category tools in `tools/connectors.py`
+(`tracker.*`, `ops.*`, `hr.list_leave`, `finance.budget_vs_actual`, `crm.list_deals`, `calendar.*`,
+`meetings.*`, `chat.post_message`) fan out over sources with per-source warnings. Mocked-API tests use
+`tests/support/connectors.py:MockApi`; demo data in `integrations/demo/connectors.json`.
+
+**Phase 10 features.** `domains/mcp/` (code mode: `sandbox.py` AST interpreter — never exec;
+`codemode.py` over ToolGateway as `principal.as_agent()`; `server.py` JSON-RPC; `api/v1/mcp.py`,
+`scripts/mcp_stdio.py`; tokens in `identity/token_service.py`, MCP-only). Analytics: `twin.py`
+(Monte Carlo), `negotiation.py`, `evm.py`, `predictive.py` + `ProjectSignal`, production/commitment/
+budget risk factors (only when that data exists); `Project.links` scopes ops/finance per project;
+members may carry `hr_employee_id`/`github_login`. `domains/knowledge/sync.py` (restricted → admin-only),
+`domains/meetings/actions.py`, `domains/chat/` + `api/v1/chat.py` (Slack/Teams, signature-verified,
+background tasks on `app.state.chat_tasks`), `domains/graph/`, `domains/briefing/` (chief of staff +
+voice script), `domains/compliance/`, `domains/agent/team.py` (supervisor + tool-subset specialists).
 
 **Database** (`db/`). Async SQLAlchemy 2; PostgreSQL in prod, SQLite in tests. `db/types.py`:
 `UTCDateTime` (always tz-aware UTC — applied to every `datetime` via `Base.type_annotation_map`) and
