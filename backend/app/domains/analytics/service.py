@@ -10,6 +10,7 @@ from backend.app.core.errors import NotFoundError
 from backend.app.db.models import Project
 from backend.app.domains.analytics.collector import SnapshotCollector
 from backend.app.domains.analytics.contradictions import find_contradictions
+from backend.app.domains.analytics.evm import earned_value
 from backend.app.domains.analytics.forecast import forecast_sprint
 from backend.app.domains.analytics.results import ProductionHealth, ProjectHealth
 from backend.app.domains.analytics.risk import assess_risk
@@ -54,4 +55,5 @@ async def project_health(
             **{name: [item.model_dump(mode="json", exclude_none=True) for item in items]
                for name, items in vars(snapshot.ops).items()}
         ) if snapshot.ops else None,
+        finance=value.model_dump(mode="json") if (value := earned_value(snapshot)) else None,
     )  # fmt: skip

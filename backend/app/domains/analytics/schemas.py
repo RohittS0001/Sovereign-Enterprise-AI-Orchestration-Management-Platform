@@ -20,6 +20,9 @@ class ProjectMember(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     jira_account_id: str | None = Field(default=None, max_length=128)
     keka_employee_id: str | None = Field(default=None, max_length=64)
+    hr_employee_id: str | None = Field(
+        default=None, max_length=64, description="Id in another HR system"
+    )
     capacity_points: float = Field(default=10.0, gt=0, le=200, description="Points per sprint")
 
 

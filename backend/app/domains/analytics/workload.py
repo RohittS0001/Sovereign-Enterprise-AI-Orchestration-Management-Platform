@@ -16,7 +16,7 @@ def _leave_days(
     periods = []
     days = 0
     for leave in snapshot.leave:
-        if leave.employee_id != member.keka_employee_id:
+        if leave.employee_id not in member.ids:
             continue
         overlap_start, overlap_end = max(leave.start, start), min(leave.end, end)
         if overlap_start <= overlap_end:

@@ -95,6 +95,19 @@ export interface ProjectHealth {
   name: string;
   as_of: string;
   risk: { score: number; level: "low" | "medium" | "high"; factors: RiskFactor[] };
+  /** Earned value when a finance connector covers this project. */
+  finance?: {
+    sources: string[];
+    currency: string | null;
+    budget_at_completion: number | null;
+    actual_cost: number;
+    percent_complete: number | null;
+    earned_value: number | null;
+    cpi: number | null;
+    estimate_at_completion: number | null;
+    variance_at_completion: number | null;
+    note: string | null;
+  } | null;
   /** Present when ops connectors cover this project (see project links). */
   production?: {
     incidents: { source: string; id: string; title: string; status: string; severity?: string; url?: string }[];

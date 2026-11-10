@@ -146,3 +146,60 @@ My Account → Security → Generate token (Browse permission); self-hosted: SON
 - Required: `SONARQUBE_TOKEN`
 - Optional: `SONARQUBE_URL`
 - API docs: https://docs.sonarsource.com/sonarqube-server/latest/extension-guide/web-api/
+
+## HR systems
+
+### BambooHR (`bamboohr`)
+
+BambooHR → your name → API Keys (a user who can see time off).
+
+- Required: `BAMBOOHR_COMPANY`, `BAMBOOHR_API_KEY`
+- API docs: https://documentation.bamboohr.com/reference/get-a-list-of-whos-out-1
+
+### Zoho People (`zoho_people`)
+
+api-console.zoho.com → Self Client → scope ZOHOPEOPLE.forms.READ → refresh token; regional accounts use their domain (e.g. accounts.zoho.in).
+
+- Required: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`
+- Optional: `ZOHO_ACCOUNTS_URL`, `ZOHO_PEOPLE_URL`
+- API docs: https://www.zoho.com/people/api/overview.html
+
+### Darwinbox (`darwinbox`)
+
+Darwinbox admin → API settings (leave action API key + basic-auth user).
+
+- Required: `DARWINBOX_URL`, `DARWINBOX_USERNAME`, `DARWINBOX_PASSWORD`, `DARWINBOX_API_KEY`
+- API docs: https://darwinbox.com/
+
+### Workday (`workday`)
+
+Create a custom report of time off (Employee_ID, Worker, Start_Date, End_Date, Time_Off_Type, Status) enabled as a web service; use an integration system user.
+
+- Required: `WORKDAY_LEAVE_REPORT_URL`, `WORKDAY_USERNAME`, `WORKDAY_PASSWORD`
+- API docs: https://community.workday.com/
+
+## Finance & accounting
+
+### Zoho Books (`zoho_books`)
+
+Same Zoho self client with scope ZohoBooks.projects.READ,ZohoBooks.expenses.READ; organization id from Settings → Organization profile.
+
+- Required: `ZOHO_CLIENT_ID`, `ZOHO_CLIENT_SECRET`, `ZOHO_REFRESH_TOKEN`, `ZOHO_BOOKS_ORGANIZATION_ID`
+- Optional: `ZOHO_BOOKS_URL`
+- API docs: https://www.zoho.com/books/api/v3/
+
+### Tally Prime (`tally`)
+
+Tally Prime → F1 Help → Settings → Connectivity: enable the HTTP server (port 9000).
+
+- Required: `TALLY_URL`
+- Optional: `TALLY_COMPANY`
+- API docs: https://help.tallysolutions.com/integration-with-tallyprime/
+
+### SAP S/4HANA (OData) (`sap`)
+
+Expose a CDS view / OData service with project, budget, actual and currency; a communication user with read access; map the field names if they differ.
+
+- Required: `SAP_ODATA_URL`, `SAP_USERNAME`, `SAP_PASSWORD`
+- Optional: `SAP_PROJECT_FIELD`, `SAP_BUDGET_FIELD`, `SAP_ACTUAL_FIELD`, `SAP_CURRENCY_FIELD`
+- API docs: https://api.sap.com/

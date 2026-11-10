@@ -84,10 +84,11 @@ class RunFacts:
 
 @dataclass
 class LeaveFacts:
-    employee_id: str
+    employee_id: str  # a member id (Keka id, HR id or "name:<name>"), see Member.ids
     start: date
     end: date
     status_code: Any = None
+    source: str = "keka"
 
 
 @dataclass
@@ -96,6 +97,14 @@ class Member:
     jira_account_id: str | None
     keka_employee_id: str | None
     capacity_points: float
+    hr_employee_id: str | None = None  # id in another HR system (BambooHR, Workday, ...)
+
+    @property
+    def ids(self) -> set[str]:
+        """Every id leave records may carry for this member."""
+        ids = {f"name:{self.name.lower()}"}
+        ids.update(i for i in (self.keka_employee_id, self.hr_employee_id) if i)
+        return ids
 
 
 @dataclass
@@ -134,6 +143,7 @@ class ProjectSnapshot:
     warnings: list[str] = field(default_factory=list)
     links: dict[str, list[str]] = field(default_factory=dict)
     ops: OpsFacts | None = None  # None when no ops connector covers this project
+    finance: list[Any] | None = None  # BudgetLines when a finance connector covers it
 
     @property
     def sprint_issues(self) -> list[IssueFacts]:

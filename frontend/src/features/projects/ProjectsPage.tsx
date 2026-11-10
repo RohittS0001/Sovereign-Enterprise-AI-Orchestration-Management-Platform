@@ -1,4 +1,5 @@
 import { DeliveryTwin } from "./DeliveryTwin";
+import { FinanceCard } from "./FinanceCard";
 import { ProductionCard } from "./ProductionCard";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -131,6 +132,7 @@ export function ProjectHealthPage() {
       </div>
 
       {h.production && <ProductionCard production={h.production} />}
+      {h.finance && <FinanceCard finance={h.finance} />}
       {can("analytics:read") && <DeliveryTwin projectKey={h.project} />}
 
       <Card title="Risk factors">

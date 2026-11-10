@@ -140,6 +140,12 @@ def assess_risk(
 
     if snapshot.ops is not None:
         factors.append(production_factor(snapshot))
+    if snapshot.finance:
+        from backend.app.domains.analytics.evm import budget_factor, earned_value
+
+        value = earned_value(snapshot)
+        if value is not None and value.cpi is not None:
+            factors.append(budget_factor(value))
 
     covered = sum(f.max_score for f in factors)
     raw = sum(f.score for f in factors)

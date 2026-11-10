@@ -12,6 +12,7 @@ from backend.app.core.config import Settings
 from backend.app.core.logging import get_logger
 from backend.app.db.models import Project
 from backend.app.domains.analytics.snapshot import (
+    LeaveFacts,
     Member,
     OpsFacts,
     ProjectSnapshot,
@@ -59,6 +60,7 @@ class SnapshotCollector:
                     name=m.get("name") or m.get("jira_account_id") or "unknown",
                     jira_account_id=m.get("jira_account_id"),
                     keka_employee_id=m.get("keka_employee_id"),
+                    hr_employee_id=m.get("hr_employee_id"),
                     capacity_points=float(
                         m.get("capacity_points") or self.settings.analytics_default_capacity_points
                     ),
@@ -70,6 +72,8 @@ class SnapshotCollector:
         await self._github(project, snapshot)
         await self._keka(snapshot)
         await self._ops(snapshot)
+        await self._hr(snapshot)
+        await self._finance(snapshot)
 
         if today is None:
             self._cache[project.key] = (time.monotonic(), snapshot)
@@ -183,3 +187,44 @@ class SnapshotCollector:
                 snapshot.warnings.append(f"{source} data unavailable: {_error(exc)}")
         if covered:
             snapshot.ops = facts
+
+    async def _hr(self, snapshot: ProjectSnapshot) -> None:
+        """Approved leave from other HR systems, matched to members by HR id or name."""
+        services = self.hub.by_category("hr")
+        if not services or not snapshot.members:
+            return
+        sprint_end = snapshot.sprint.end if snapshot.sprint and snapshot.sprint.end else None
+        end = max(sprint_end or snapshot.today, snapshot.today) + timedelta(days=14)
+        by_id = {i.lower(): m for m in snapshot.members for i in m.ids}
+        for source, service in services.items():
+            try:
+                records = await service.list_leave(snapshot.today, end)
+            except Exception as exc:
+                snapshot.warnings.append(f"{source} leave unavailable: {_error(exc)}")
+                continue
+            for record in records:
+                member = by_id.get(record.employee_id.lower()) or by_id.get(
+                    f"name:{(record.name or '').lower()}"
+                )
+                if member is not None:
+                    member_id = next(
+                        iter(sorted(member.ids - {f"name:{member.name.lower()}"})), None
+                    )
+                    snapshot.leave.append(LeaveFacts(
+                        member_id or f"name:{member.name.lower()}", record.start, record.end,
+                        record.status, source))  # fmt: skip
+
+    async def _finance(self, snapshot: ProjectSnapshot) -> None:
+        """Budget vs actuals for the project's cost centres (default: its key and name)."""
+        services = self.hub.by_category("finance")
+        if not services:
+            return
+        scope = snapshot.links.get("cost_centers") or [snapshot.key, snapshot.name]
+        lines: list[Any] = []
+        for source, service in services.items():
+            try:
+                lines += await service.budget_lines(scope=scope)
+            except Exception as exc:
+                snapshot.warnings.append(f"{source} budget unavailable: {_error(exc)}")
+        if lines:
+            snapshot.finance = lines

@@ -135,7 +135,7 @@ def _prepare(snapshot: ProjectSnapshot, scenario: Scenario) -> _Inputs:
     member_days = []
     for member in snapshot.members:
         per_day = member.capacity_points / sprint_days
-        leave = [lv for lv in snapshot.leave if lv.employee_id == member.keka_employee_id]
+        leave = [lv for lv in snapshot.leave if lv.employee_id in member.ids]
         member_days.append(
             [0.0 if any(lv.start <= d <= lv.end for lv in leave) else per_day for d in dates]
         )

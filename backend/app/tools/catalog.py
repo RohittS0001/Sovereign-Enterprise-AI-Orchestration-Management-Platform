@@ -65,6 +65,22 @@ def register_connector_tools(registry: ToolRegistry, hub: IntegrationHub) -> Non
             registry.register(name, handler, description=description, input_model=model,
                               operation=READ, permission=read)  # fmt: skip
 
+    if tools.sources("hr"):
+        registry.register(
+            "hr.list_leave", tools.list_leave, input_model=cx.LeaveInput, operation=READ,
+            permission=Permission.PEOPLE_READ,
+            description=f"Approved leave in a date range from {', '.join(tools.sources('hr'))} "
+            "(Keka leave: keka.get_leave_requests).",
+        )  # fmt: skip
+    if tools.sources("finance"):
+        registry.register(
+            "finance.budget_vs_actual", tools.budget_vs_actual, input_model=cx.BudgetInput,
+            operation=READ, permission=Permission.ANALYTICS_READ,
+            description=f"Budget and actual cost per project/cost centre from "
+            f"{', '.join(tools.sources('finance'))}. "
+            "Earned value (CPI) is in analytics.project_health.",
+        )  # fmt: skip
+
 
 def register_jira_tools(registry: ToolRegistry, tools: JiraTools) -> None:
     read = Permission.PROJECTS_READ

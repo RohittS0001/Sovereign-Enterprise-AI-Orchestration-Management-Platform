@@ -7,6 +7,7 @@ instead of failing the whole call. Tools never raise (``run_tool``).
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import date
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -67,6 +68,23 @@ class OpsInput(SourceInput):
 
 class IncidentsInput(OpsInput):
     open_only: bool = True
+
+
+# ------------------------------------------------------------------ hr / finance inputs
+
+
+class LeaveInput(SourceInput):
+    from_date: date
+    to_date: date
+    employee_ids: list[str] = Field(default_factory=list, max_length=100)
+
+
+class BudgetInput(SourceInput):
+    scope: list[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Project or cost-centre names; default: all",
+    )
 
 
 class ConnectorTools:
@@ -160,4 +178,25 @@ class ConnectorTools:
             "ops", "quality gates", payload, OpsInput,
             lambda i: self._fan_out("ops", i.source, lambda s: s.quality_gates(
                 scope=i.scope or None), "quality_gates"),
+        )  # fmt: skip
+
+    # ---------------------------------------------------------------- hr / finance
+
+    async def list_leave(self, payload: dict[str, Any]) -> ToolResult:
+        async def run(i: LeaveInput) -> Any:
+            if i.to_date < i.from_date or (i.to_date - i.from_date).days > 92:
+                raise ValueError("date range must be forward and at most 92 days")
+            return await self._fan_out(
+                "hr",
+                i.source,
+                lambda s: s.list_leave(i.from_date, i.to_date, i.employee_ids or None),
+            )
+
+        return await run_tool("hr", "list leave", payload, LeaveInput, run)
+
+    async def budget_vs_actual(self, payload: dict[str, Any]) -> ToolResult:
+        return await run_tool(
+            "finance", "budget vs actual", payload, BudgetInput,
+            lambda i: self._fan_out("finance", i.source,
+                                    lambda s: s.budget_lines(scope=i.scope or None)),
         )  # fmt: skip

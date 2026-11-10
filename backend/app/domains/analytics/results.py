@@ -92,3 +92,4 @@ class ProjectHealth(BaseModel):
     issue_counts: dict[str, int]
     warnings: list[str]
     production: ProductionHealth | None = None
+    finance: dict | None = None  # earned value (analytics/evm.py)

@@ -15,6 +15,7 @@ PHX_CONFIG = {
         "argocd_apps": ["payments-api-prod", "payments-api-staging"],
         "sonarqube_projects": ["acme_payments"],
         "jenkins_jobs": ["payments/release"],
+        "cost_centers": ["Phoenix Payments Revamp"],
     },
     "members": [
         {

@@ -32,7 +32,7 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
       common issue/PR model (no Jira lock-in)
 - [x] **Engineering operations** — PagerDuty/Opsgenie incidents, Sentry errors, Jenkins/Argo
       CI/CD, SonarQube quality feeding the risk score
-- [ ] **HR & finance** — Darwinbox, Zoho People, BambooHR, Workday (alongside Keka);
+- [x] **HR & finance** — Darwinbox, Zoho People, BambooHR, Workday (alongside Keka);
       Zoho Books, Tally, SAP for budget and actuals (enables earned value management)
 - [ ] **CRM** — Salesforce / HubSpot: which customer commitments depend on which project
 - [x] **MCP server** (code mode, see docs/mcp.md) — expose the platform's governed tools (permissions, approvals, audit) to

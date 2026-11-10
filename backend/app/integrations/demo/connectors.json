@@ -194,5 +194,45 @@
     "opsgenie": {
       "incidents": []
     }
+  },
+  "hr": {
+    "bamboohr": {
+      "leave": [
+        {
+          "employee_id": "b-118",
+          "name": "Ravi A",
+          "start": "{today+3}",
+          "end": "{today+5}",
+          "type": "Vacation",
+          "status": "approved"
+        },
+        {
+          "employee_id": "b-120",
+          "name": "Kiran P",
+          "start": "{today-1}",
+          "end": "{today}",
+          "type": "Sick",
+          "status": "approved"
+        }
+      ]
+    }
+  },
+  "finance": {
+    "zoho_books": {
+      "budget_lines": [
+        {
+          "project": "Phoenix Payments Revamp",
+          "budget": 120000,
+          "actual": 36000,
+          "currency": "USD"
+        },
+        {
+          "project": "Ledger Modernisation",
+          "budget": 80000,
+          "actual": 31000,
+          "currency": "USD"
+        }
+      ]
+    }
   }
 }
