@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { api } from "../../shared/api/client";
-import type { IntegrationStatus, Page, Role, UsageSummary, UserRow } from "../../shared/api/types";
+import type { Page, Role, UsageSummary, UserRow } from "../../shared/api/types";
 import { useAuth } from "../../shared/auth/AuthContext";
-import { Badge, Card, ErrorNote, Spinner, formatDate } from "../../shared/ui/components";
+import { Badge, Card, ErrorNote, PageHeader, Spinner, formatDate } from "../../shared/ui/components";
 
 const ROLES: Role[] = ["admin", "project_manager", "team_lead", "member", "auditor"];
 
@@ -113,77 +113,6 @@ function Users() {
   );
 }
 
-function groupByCategory(items: IntegrationStatus[]): [string, IntegrationStatus[]][] {
-  const groups = new Map<string, IntegrationStatus[]>();
-  for (const item of items) groups.set(item.category, [...(groups.get(item.category) ?? []), item]);
-  return [...groups.entries()];
-}
-
-function Integrations() {
-  const [check, setCheck] = useState(false);
-  const status = useQuery({
-    queryKey: ["integrations", check],
-    queryFn: () => api<IntegrationStatus[]>(`/integrations${check ? "?check=true" : ""}`),
-  });
-  return (
-    <Card
-      title="Integrations"
-      actions={
-        <button className="button secondary" onClick={() => setCheck(true)} disabled={status.isFetching}>
-          Test connections
-        </button>
-      }
-    >
-      {status.isLoading && <Spinner />}
-      <ErrorNote error={status.error} />
-      {status.data && (
-        <p className="small muted">
-          {status.data.filter((i) => i.mode !== "disabled").length} of {status.data.length} connected. Fill in the
-          listed variables in <code>.env</code> and restart to connect more (see <code>docs/integrations.md</code>).
-        </p>
-      )}
-      {groupByCategory(status.data ?? []).map(([category, items]) => (
-        <section key={category} aria-label={category}>
-          <h3 className="small muted" style={{ textTransform: "uppercase", margin: "12px 0 4px" }}>
-            {category}
-          </h3>
-          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {items.map((i) => (
-              <li key={i.name} style={{ padding: "6px 0" }}>
-                <div className="row" style={{ justifyContent: "space-between" }}>
-                  <span>
-                    <strong>{i.title}</strong> <span className="small muted">{i.tools.length} tools</span>
-                  </span>
-                  <span className="row">
-                    {i.healthy !== null && (
-                      <Badge value={i.healthy ? "healthy" : "failed"} label={i.healthy ? "ok" : i.detail ?? "failed"} />
-                    )}
-                    <Badge value={i.mode} />
-                  </span>
-                </div>
-                {i.missing_env.length > 0 && (
-                  <div className="small muted">
-                    Needs {i.missing_env.map((v) => <code key={v}>{v} </code>)}
-                    {i.docs_url && (
-                      <>
-                        {" · "}
-                        <a href={i.docs_url} target="_blank" rel="noreferrer">
-                          API docs
-                        </a>
-                      </>
-                    )}
-                    {i.setup && <div>{i.setup}</div>}
-                  </div>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-    </Card>
-  );
-}
-
 function Usage() {
   const usage = useQuery({ queryKey: ["usage"], queryFn: () => api<UsageSummary>("/usage?days=30") });
   if (usage.isLoading) return <Spinner />;
@@ -231,16 +160,8 @@ function Usage() {
 export function AdminPage() {
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1>Admin</h1>
-          <p>Users, integrations and AI usage.</p>
-        </div>
-      </div>
-      <div className="grid grid-2">
-        <Integrations />
-        <Usage />
-      </div>
+      <PageHeader eyebrow="Platform" title="Admin" description="People, roles and AI usage. Integrations have their own page." />
+      <Usage />
       <Users />
     </>
   );

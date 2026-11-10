@@ -37,7 +37,7 @@ export function CommitmentsCard({ deals }: { deals: NonNullable<ProjectHealth["c
       {deals.length === 0 ? (
         <p className="small muted">No open deals depend on this project.</p>
       ) : (
-        <ul className="small">
+        <ul className="list small">
           {deals.map((d) => (
             <li key={`${d.source}-${d.id}`}>
               {d.url ? <a href={d.url} target="_blank" rel="noreferrer">{d.name}</a> : <strong>{d.name}</strong>}{" "}

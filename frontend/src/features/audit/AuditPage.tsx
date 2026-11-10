@@ -1,7 +1,6 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "../../shared/api/client";
-import { ComplianceCard } from "./ComplianceCard";
 import type { AuditEvent, Page } from "../../shared/api/types";
 import { Badge, Card, Empty, ErrorNote, Spinner, formatDate } from "../../shared/ui/components";
 
@@ -49,7 +48,6 @@ export function AuditPage() {
         </div>
       )}
       <ErrorNote error={verify.error} />
-      <ComplianceCard />
       <Card>
         {events.isLoading && <Spinner />}
         <ErrorNote error={events.error} />

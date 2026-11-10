@@ -9,7 +9,7 @@ export function ProductionCard({ production }: { production: NonNullable<Project
   return (
     <Card title="Production">
       {quiet && <Empty>No open incidents, failing deploys or quality gate problems.</Empty>}
-      <ul className="small">
+      <ul className="list small">
         {incidents.map((i) => (
           <li key={`${i.source}-${i.id}`}>
             <Badge value={i.severity === "high" ? "bad" : "warn"} label={`${i.source} ${i.status}`} />{" "}

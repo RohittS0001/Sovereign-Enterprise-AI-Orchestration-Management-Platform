@@ -3,23 +3,26 @@ import { DeliveryTwin } from "./DeliveryTwin";
 import { CommitmentsCard, FinanceCard } from "./FinanceCard";
 import { ProductionCard } from "./ProductionCard";
 import { useMutation, useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api } from "../../shared/api/client";
 import type { Project, ProjectHealth, Report } from "../../shared/api/types";
 import { useAuth } from "../../shared/auth/AuthContext";
-import { Badge, Card, Empty, ErrorNote, Spinner } from "../../shared/ui/components";
+import { Badge, Card, Empty, ErrorNote, PageHeader, Ring, Spinner, Tabs, formatDay, toneFor } from "../../shared/ui/components";
+import { Icon } from "../../shared/ui/icons";
 
 export function ProjectsPage() {
   const { can } = useAuth();
   const projects = useQuery({ queryKey: ["projects"], queryFn: () => api<Project[]>("/projects") });
+  const brief = useQuery({
+    queryKey: ["briefing"],
+    queryFn: () => api<{ projects: { key: string; risk_score: number; risk_level: string; chance_by_target: number | null }[] }>("/briefing"),
+    enabled: can("analytics:read"),
+  });
+  const risk = new Map((brief.data?.projects ?? []).map((p) => [p.key, p]));
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1>Projects</h1>
-          <p>Configured projects. Open one to see risk, forecast and team capacity.</p>
-        </div>
-      </div>
+      <PageHeader eyebrow="Delivery" title="Projects" description="Configured projects. Open one to see risk, forecast and team capacity." />
       {can("analytics:read") && projects.data && projects.data.length > 0 && <BriefingCard />}
       {projects.isLoading && <Spinner />}
       <ErrorNote error={projects.error} />
@@ -27,17 +30,28 @@ export function ProjectsPage() {
         <Empty>No projects configured yet. Use PUT /api/v1/projects/&lt;KEY&gt; to add one.</Empty>
       )}
       <div className="grid grid-3">
-        {projects.data?.map((p) => (
-          <Card key={p.key} title={`${p.name}`} actions={<Badge value={p.is_active ? "live" : "disabled"} label={p.key} />}>
-            <div className="small muted">{p.github_repos.join(", ") || "No repositories"}</div>
-            <div className="small muted">{p.members.length} team members · sprint {p.active_sprint_id ?? "—"}</div>
-            {can("analytics:read") && (
-              <p>
-                <Link to={`/projects/${p.key}`}>View health →</Link>
-              </p>
-            )}
-          </Card>
-        ))}
+        {projects.data?.map((p) => {
+          const r = risk.get(p.key);
+          return (
+            <Card key={p.key} className="interactive" title={p.name} actions={<Badge value={p.is_active ? "live" : "disabled"} label={p.key} />}>
+              <div className="row" style={{ gap: 16, alignItems: "center" }}>
+                {r && <Ring value={r.risk_score} size={56} tone={toneFor(r.risk_score, 30, 60)} label="risk" />}
+                <div className="stack" style={{ gap: 2 }}>
+                  <span className="small muted">{p.github_repos.join(", ") || "No repositories"}</span>
+                  <span className="small muted">{p.members.length} team members · sprint {p.active_sprint_id ?? "—"}</span>
+                  {r?.chance_by_target != null && (
+                    <span className="small"><strong className="num">{Math.round(r.chance_by_target * 100)}%</strong> chance to hit the sprint</span>
+                  )}
+                </div>
+              </div>
+              {can("analytics:read") && (
+                <p style={{ margin: "12px 0 0" }}>
+                  <Link to={`/projects/${p.key}`}>View health →</Link>
+                </p>
+              )}
+            </Card>
+          );
+        })}
       </div>
     </>
   );
@@ -55,6 +69,7 @@ export function ProjectHealthPage() {
     queryKey: ["health", key],
     queryFn: () => api<ProjectHealth>(`/projects/${encodeURIComponent(key)}/health`),
   });
+  const [tab, setTab] = useState<"overview" | "forecast" | "team" | "business">("overview");
   const generate = useMutation({
     mutationFn: () => api<Report>("/reports/generate", { body: { project_key: key } }),
     onSuccess: (report) => navigate(`/reports?open=${report.id}`),
@@ -67,24 +82,23 @@ export function ProjectHealthPage() {
 
   return (
     <>
-      <div className="page-header">
-        <div>
-          <h1>{h.name}</h1>
-          <p>
-            {h.project} · as of {h.as_of}
-          </p>
-        </div>
-        <div className="row">
-          <button className="button secondary" onClick={() => void health.refetch()} disabled={health.isFetching}>
-            Refresh
-          </button>
-          {can("reports:generate") && (
-            <button className="button" onClick={() => generate.mutate()} disabled={generate.isPending}>
-              {generate.isPending ? "Generating…" : "Generate weekly report"}
+      <PageHeader
+        eyebrow={`Project · ${h.project}`}
+        title={h.name}
+        description={`Health as of ${formatDay(h.as_of)} — risk, forecast, team and production in one place.`}
+        actions={
+          <>
+            <button className="button secondary" onClick={() => void health.refetch()} disabled={health.isFetching}>
+              <Icon name="refresh" /> Refresh
             </button>
-          )}
-        </div>
-      </div>
+            {can("reports:generate") && (
+              <button className="button" onClick={() => generate.mutate()} disabled={generate.isPending}>
+                <Icon name="report" /> {generate.isPending ? "Generating…" : "Generate weekly report"}
+              </button>
+            )}
+          </>
+        }
+      />
       <ErrorNote error={generate.error} />
       {h.warnings.map((w) => (
         <div key={w} className="notice small">
@@ -92,52 +106,52 @@ export function ProjectHealthPage() {
         </div>
       ))}
 
-      <div className="grid grid-3">
-        <Card title="Risk">
+      <div className="card" style={{ display: "flex", gap: 24, alignItems: "center", flexWrap: "wrap" }}>
+        <Ring value={h.risk.score} label="risk" size={96} tone={toneFor(h.risk.score, 30, 60)} />
+        <div style={{ flex: 1, minWidth: 220 }}>
           <div className="row">
-            <span className="stat">{h.risk.score}</span>
+            <h2 style={{ fontSize: "1.125rem" }}>{h.risk.level === "high" ? "High risk" : h.risk.level === "medium" ? "Medium risk" : "Low risk"}</h2>
             <Badge value={h.risk.level} />
           </div>
-          <div className={`meter ${tone(h.risk.score, 30, 60)}`} aria-label={`Risk ${h.risk.score} of 100`}>
-            <span style={{ width: `${h.risk.score}%` }} />
-          </div>
-        </Card>
-        <Card title="Sprint forecast">
+          <p className="small muted" style={{ margin: "4px 0 0" }}>
+            {h.risk.factors.filter((x) => x.score > 0).sort((a, b) => b.score / b.max_score - a.score / a.max_score)[0]?.recommendation ?? "No action needed right now."}
+          </p>
+        </div>
+        <div className="stack" style={{ minWidth: 240, gap: 6 }}>
           {f ? (
             <>
-              <div className="row">
-                <span className="stat">{Math.round(f.completion_ratio * 100)}%</span>
+              <div className="row between small">
+                <span className="muted">Sprint forecast</span>
                 <Badge value={f.status} />
               </div>
-              <div className="small muted">
-                {f.done_points}/{f.committed_points} points done · projected {f.projected_points} by {f.end} ·{" "}
-                {f.working_days_left} working days left
+              <div className="row between">
+                <span className="stat">{Math.round(f.completion_ratio * 100)}%</span>
+                <span className="xs faint num">{f.done_points}/{f.committed_points} pts · {f.working_days_left} days left</span>
               </div>
               <div className={`meter ${f.status === "on_track" ? "good" : f.status === "at_risk" ? "warn" : "bad"}`}>
                 <span style={{ width: `${Math.min(100, (f.done_points / (f.committed_points || 1)) * 100)}%` }} />
               </div>
             </>
           ) : (
-            <Empty>No active sprint configured.</Empty>
+            <span className="small muted">No active sprint configured.</span>
           )}
-        </Card>
-        <Card title="Issues">
-          <div className="row">
+          <div className="row xs muted">
             {Object.entries(h.issue_counts).map(([category, count]) => (
-              <div key={category}>
-                <div className="stat">{count}</div>
-                <div className="small muted">{category.replace("_", " ")}</div>
-              </div>
+              <span key={category}><strong className="num">{count}</strong> {category.replace("_", " ")}</span>
             ))}
           </div>
-        </Card>
+        </div>
       </div>
 
-      {h.production && <ProductionCard production={h.production} />}
-      {h.finance && <FinanceCard finance={h.finance} />}
-      {h.commitments && <CommitmentsCard deals={h.commitments} />}
-      {can("analytics:read") && <DeliveryTwin projectKey={h.project} />}
+      <Tabs label="Project sections" value={tab} onChange={setTab} tabs={[
+        { id: "overview", label: "Overview" },
+        ...(can("analytics:read") ? [{ id: "forecast" as const, label: "Forecast & what-ifs" }] : []),
+        { id: "team", label: "Team" },
+        ...(h.production || h.finance || h.commitments ? [{ id: "business" as const, label: "Production & finance" }] : []),
+      ]} />
 
+      {tab === "overview" && (
+        <>
       <Card title="Risk factors">
         <div className="stack">
           {h.risk.factors.map((factor) => (
@@ -166,7 +180,23 @@ export function ProjectHealthPage() {
         </div>
       </Card>
 
-      <div className="grid grid-2">
+        <Card title="Jira ↔ GitHub checks">
+          {h.contradictions.length === 0 ? (
+            <Empty>Jira and GitHub agree.</Empty>
+          ) : (
+            <ul className="small">
+              {h.contradictions.map((c) => (
+                <li key={`${c.kind}-${c.issue}`}>
+                  <Badge value="warn" label={c.kind.replace(/_/g, " ")} /> {c.detail}
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        </>
+      )}
+      {tab === "forecast" && <DeliveryTwin projectKey={h.project} />}
+      {tab === "team" && (
         <Card title="Team capacity">
           <div className="table-wrap">
             <table>
@@ -214,20 +244,14 @@ export function ProjectHealthPage() {
             </>
           )}
         </Card>
-        <Card title="Jira ↔ GitHub checks">
-          {h.contradictions.length === 0 ? (
-            <Empty>Jira and GitHub agree.</Empty>
-          ) : (
-            <ul className="small">
-              {h.contradictions.map((c) => (
-                <li key={`${c.kind}-${c.issue}`}>
-                  <Badge value="warn" label={c.kind.replace(/_/g, " ")} /> {c.detail}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
-      </div>
+      )}
+      {tab === "business" && (
+        <div className="grid grid-2">
+          {h.production && <ProductionCard production={h.production} />}
+          {h.finance && <FinanceCard finance={h.finance} />}
+          {h.commitments && <CommitmentsCard deals={h.commitments} />}
+        </div>
+      )}
     </>
   );
 }

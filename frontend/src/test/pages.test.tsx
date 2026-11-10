@@ -81,17 +81,12 @@ describe("Audit page", () => {
           },
         ]),
       "GET /audit/verify": () => json({ valid: true, checked: 1, first_invalid_seq: null, reason: null }),
-      "GET /compliance/report": () =>
-        json({ generated_at: "2026-11-09T10:00:00Z", summary: { pass: 1, warn: 0, fail: 0, unknown: 0 },
-               controls: [{ id: "logging", title: "Event logging and monitoring", soc2: ["CC7.2"], iso27001: ["A.8.15"],
-                            status: "pass", evidence: ["Audit log hash chain verified: 1 events, intact"], gaps: [] }] }),
     });
     renderApp("/audit");
 
     expect(await screen.findByRole("cell", { name: "auth.login" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Verify integrity" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Chain intact — 1 events verified.");
-    expect(screen.getByText("Event logging and monitoring")).toBeInTheDocument();
   });
 });
 
@@ -176,6 +171,7 @@ describe("Delivery twin", () => {
     });
     renderApp("/projects/PHX");
 
+    await userEvent.click(await screen.findByRole("tab", { name: "Forecast & what-ifs" }));
     await userEvent.type(await screen.findByLabelText("Add people"), "1");
     await userEvent.click(screen.getByRole("button", { name: "Run simulation" }));
     expect(await screen.findByText("90%")).toBeInTheDocument();
@@ -212,7 +208,7 @@ describe("Chief-of-staff brief", () => {
   });
 });
 
-describe("Admin page", () => {
+describe("Integrations page", () => {
   it("shows which integrations are connected and which env vars the rest need", async () => {
     const integrations: IntegrationStatus[] = [
       {
@@ -226,12 +222,15 @@ describe("Admin page", () => {
       },
     ];
     signedInAs(ADMIN, { "GET /integrations": () => json(integrations) });
-    renderApp("/admin");
+    renderApp("/integrations");
 
     const github = (await screen.findByText("GitHub")).closest("li")!;
     expect(within(github).getByText("GITHUB_TOKEN")).toBeInTheDocument();
     expect(within(github).getByRole("link", { name: "API docs" })).toHaveAttribute("href", "https://docs.github.com/rest");
     expect(screen.getByText(/1 of 2 connected/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Core" }));
+    await userEvent.type(screen.getByLabelText("Filter integrations"), "jira");
+    expect(screen.queryByText("GitHub")).not.toBeInTheDocument();
   });
 
   it("is not reachable without users:manage", async () => {
@@ -239,5 +238,91 @@ describe("Admin page", () => {
     renderApp("/admin");
 
     expect(await screen.findByText("You don't have access to this page.")).toBeInTheDocument();
+  });
+});
+
+describe("Compliance page", () => {
+  it("summarises controls and opens the ones needing attention", async () => {
+    signedInAs(ADMIN, {
+      "GET /compliance/report": () =>
+        json({ generated_at: "2026-11-09T10:00:00Z", summary: { pass: 1, warn: 0, fail: 0, unknown: 0 },
+               controls: [{ id: "logging", title: "Event logging and monitoring", soc2: ["CC7.2"], iso27001: ["A.8.15"],
+                            status: "pass", evidence: ["Audit log hash chain verified: 1 events, intact"], gaps: [] }] }),
+    });
+    renderApp("/compliance");
+
+    expect(await screen.findByText("Event logging and monitoring")).toBeInTheDocument();
+    expect(screen.getByText("Passing").closest("section")).toHaveTextContent("1");
+  });
+});
+
+describe("Home dashboard", () => {
+  it("shows portfolio KPIs, project risk and the decisions to take", async () => {
+    signedInAs(LEAD, {
+      "GET /briefing": () =>
+        json({
+          as_of: "2026-11-09", spoken_text: "Good morning.", decisions: ["PHX: approve 'Move the date'"],
+          projects: [{ key: "PHX", name: "Phoenix", risk_score: 81, risk_level: "high", top_risks: ["Blocked work: PHX-3 blocked"],
+                       chance_by_target: 0.12, target_date: "2026-11-14", likely_finish: "2026-12-09",
+                       decision_needed: "PHX: approve 'Move the date'" }],
+        }),
+      "GET /approvals": () => json({ items: [], total: 3, limit: 50, offset: 0 }),
+      "GET /agent/runs": () => json({ items: [], total: 0, limit: 5, offset: 0 }),
+    });
+    renderApp("/home");
+
+    expect(await screen.findByRole("link", { name: "Phoenix" })).toHaveAttribute("href", "/projects/PHX");
+    expect(screen.getByRole("img", { name: "Score 81 of 100" })).toBeInTheDocument();
+    expect(screen.getByText("High-risk projects").closest("section")).toHaveTextContent("1");
+    expect(screen.getByText("Pending approvals").closest("section")).toHaveTextContent("3");
+    expect(screen.getByText("12%")).toBeInTheDocument();
+  });
+});
+
+describe("People page", () => {
+  it("finds experts and assesses the impact of an absence", async () => {
+    const peopleLead = { ...LEAD, permissions: [...LEAD.permissions, "people:read"] };
+    signedInAs(peopleLead, {
+      "GET /graph/summary": () => json({ people: 7, items: 17, edges: 23, bus_factor: { "acme/web": 1 } }),
+      "GET /graph/who-knows": () => json([{ person: "Arjun M", score: 10, evidence: ["issue PHX-1: idempotency (done)"] }]),
+      "GET /graph/people/Arjun%20M/impact": () =>
+        json({ person: "Arjun M", severity: "medium", sole_open_work: ["PHX-5: Refund webhooks"], blocked_behind: ["PHX-3"],
+               concentrated_repositories: [], documents_owned: [], suggested_backups: [{ person: "Meera S", score: 5, evidence: [] }] }),
+    });
+    renderApp("/people");
+
+    expect(await screen.findByText("acme/web")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Topic"), "refunds");
+    await userEvent.click(screen.getByRole("button", { name: "Find experts" }));
+    expect(await screen.findByText("issue PHX-1: idempotency (done)")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Person"), "Arjun M");
+    await userEvent.click(screen.getByRole("button", { name: "Assess impact" }));
+    expect(await screen.findByText("medium impact")).toBeInTheDocument();
+    expect(screen.getByText("PHX-5: Refund webhooks")).toBeInTheDocument();
+    expect(screen.getByText("Meera S")).toBeInTheDocument();
+  });
+});
+
+describe("Shell", () => {
+  it("opens the command palette with Ctrl+K and navigates", async () => {
+    signedInAs(LEAD, { "GET /agent/runs": () => page([]) });
+    renderApp("/assistant");
+
+    await screen.findByRole("heading", { name: "Assistant" });
+    await userEvent.keyboard("{Control>}k{/Control}");
+    const search = await screen.findByLabelText("Search commands");
+    await userEvent.type(search, "knowledge");
+    await userEvent.keyboard("{Enter}");
+    expect(await screen.findByRole("heading", { name: "Knowledge" })).toBeInTheDocument();
+  });
+
+  it("toggles the theme", async () => {
+    signedInAs(LEAD, { "GET /agent/runs": () => page([]) });
+    renderApp("/assistant");
+
+    const toggle = await screen.findByRole("button", { name: /Switch to (dark|light) theme/ });
+    const before = document.documentElement.dataset.theme;
+    await userEvent.click(toggle);
+    expect(document.documentElement.dataset.theme).not.toBe(before);
   });
 });

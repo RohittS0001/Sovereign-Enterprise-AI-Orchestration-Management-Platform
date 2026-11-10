@@ -53,7 +53,9 @@ describe("App", () => {
     await userEvent.type(screen.getByLabelText("Password"), "Str0ng!Passw0rd");
     await userEvent.click(screen.getByRole("button", { name: "Sign in" }));
 
-    expect(await screen.findByRole("heading", { name: "Assistant" })).toBeInTheDocument();
+    // Leads land on the Home dashboard (they have analytics:read).
+    expect(await screen.findByRole("heading", { level: 1, name: /^Good (morning|afternoon|evening), Team$/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Assistant" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Projects" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Admin" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Audit log" })).not.toBeInTheDocument();

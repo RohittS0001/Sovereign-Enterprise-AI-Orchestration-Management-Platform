@@ -1,10 +1,11 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../shared/api/client";
 import { streamAgentQuery, type AgentEvent } from "../../shared/api/stream";
 import type { AgentRun, AgentStep, Page } from "../../shared/api/types";
-import { Badge, Card, Empty, ErrorNote, Markdown, Spinner, formatDate } from "../../shared/ui/components";
+import { Badge, Card, Empty, ErrorNote, Markdown, PageHeader, Spinner, formatDate } from "../../shared/ui/components";
+import { Icon } from "../../shared/ui/icons";
 
 const EXAMPLES = [
   "Is the PHX project at risk this sprint?",
@@ -37,6 +38,14 @@ function StepList({ steps }: { steps: AgentStep[] }) {
   );
 }
 
+interface TeamRun {
+  query: string;
+  rationale: string;
+  answer: string;
+  specialists: { specialist: string; question: string; run_id: string; status: string; answer: string | null;
+                 pending_approvals: string[]; tools: string[] }[];
+}
+
 export function AssistantPage() {
   const queryClient = useQueryClient();
   const [question, setQuestion] = useState("");
@@ -47,6 +56,8 @@ export function AssistantPage() {
   const [error, setError] = useState<unknown>(null);
   const [busy, setBusy] = useState(false);
   const abort = useRef<AbortController | null>(null);
+  const [mode, setMode] = useState<"single" | "team">("single");
+  const [team, setTeam] = useState<TeamRun | null>(null);
 
   const history = useQuery({
     queryKey: ["runs"],
@@ -75,6 +86,7 @@ export function AssistantPage() {
     setAsked(text.trim());
     setSteps([]);
     setRun(null);
+    setTeam(null);
     setError(null);
     setPhase("Planning…");
     try {
@@ -90,75 +102,93 @@ export function AssistantPage() {
     }
   }
 
-  function submit(event: FormEvent) {
-    event.preventDefault();
-    void ask(question);
-  }
-
-  function onKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
-    if (event.key === "Enter" && !event.shiftKey) {
-      event.preventDefault();
-      void ask(question);
-    }
-  }
-
   function showRun(previous: AgentRun) {
+    setTeam(null);
     setAsked(previous.query);
     setRun(previous);
     setSteps(previous.steps);
     setError(null);
   }
 
+  async function askTeam(text: string) {
+    if (!text.trim() || busy) return;
+    setBusy(true);
+    setAsked(text.trim());
+    setSteps([]);
+    setRun(null);
+    setTeam(null);
+    setError(null);
+    setPhase("The supervisor is routing your question to specialists…");
+    try {
+      setTeam(await api<TeamRun>("/agent/team", { body: { query: text.trim() } }));
+      setQuestion("");
+      void queryClient.invalidateQueries({ queryKey: ["runs"] });
+      void queryClient.invalidateQueries({ queryKey: ["approvals"] });
+    } catch (err) {
+      setError(err);
+    } finally {
+      setBusy(false);
+      setPhase(null);
+    }
+  }
+
+  const send = (text: string) => (mode === "team" ? askTeam(text) : ask(text));
+
   return (
     <>
-      <div className="page-header">
+      <PageHeader
+        eyebrow="Workspace"
+        title="Assistant"
+        description="Ask about projects, people, code and documents. Changes always wait for approval."
+      />
+      <div className="split">
         <div>
-          <h1>Assistant</h1>
-          <p>Ask about projects, people, code and documents. Changes always wait for approval.</p>
-        </div>
-      </div>
-      <div className="grid" style={{ gridTemplateColumns: "minmax(0, 1fr) 280px" }}>
-        <div>
-          <Card>
-            <form className="chat-form" onSubmit={submit}>
-              <label style={{ flex: 1 }}>
-                <span className="sr-only">Question</span>
-                <textarea
-                  aria-label="Question"
-                  placeholder="Ask a question… (Enter to send, Shift+Enter for a new line)"
-                  value={question}
-                  maxLength={4000}
-                  onChange={(e) => setQuestion(e.target.value)}
-                  onKeyDown={onKeyDown}
-                />
-              </label>
-              {busy ? (
+          <form className="composer" onSubmit={(e) => { e.preventDefault(); void send(question); }}>
+            <label>
+              <span className="sr-only">Question</span>
+              <textarea
+                aria-label="Question"
+                placeholder="Ask a question… (Enter to send, Shift+Enter for a new line)"
+                value={question}
+                maxLength={4000}
+                onChange={(e) => setQuestion(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void send(question);
+                  }
+                }}
+              />
+            </label>
+            <div className="composer-bar">
+              <div className="segmented" role="group" aria-label="Mode">
+                <button type="button" aria-pressed={mode === "single"} onClick={() => setMode("single")}>Single agent</button>
+                <button type="button" aria-pressed={mode === "team"} onClick={() => setMode("team")}>Team of specialists</button>
+              </div>
+              <span className="xs faint" style={{ marginLeft: "auto" }}>{question.length}/4000</span>
+              {busy && mode === "single" ? (
                 <button type="button" className="button secondary" onClick={() => abort.current?.abort()}>
-                  Stop
+                  <Icon name="stop" /> Stop
                 </button>
               ) : (
-                <button type="submit" className="button" disabled={!question.trim()}>
-                  Ask
+                <button type="submit" className="button" disabled={!question.trim() || busy}>
+                  <Icon name="send" /> Ask
                 </button>
               )}
-            </form>
-            {!asked && (
-              <div className="row small" style={{ marginTop: 10 }}>
-                <span className="muted">Try:</span>
-                {EXAMPLES.map((example) => (
-                  <button key={example} className="button ghost small" onClick={() => void ask(example)}>
-                    {example}
-                  </button>
-                ))}
-              </div>
-            )}
-          </Card>
+            </div>
+          </form>
+          {!asked && (
+            <div className="suggestions">
+              {EXAMPLES.map((example) => (
+                <button key={example} type="button" className="chip" onClick={() => void send(example)}>
+                  {example}
+                </button>
+              ))}
+            </div>
+          )}
 
           {asked && (
-            <Card
-              title={asked}
-              actions={run && <Badge value={run.status} />}
-            >
+            <Card title={asked} actions={run && <Badge value={run.status} />} className="answer-card">
               <div className="stack">
                 <StepList steps={steps} />
                 {phase && <Spinner label={phase} />}
@@ -180,9 +210,28 @@ export function AssistantPage() {
                   </div>
                 )}
                 {run && (
-                  <div className="small muted">
+                  <div className="xs faint">
                     {run.usage.prompt_tokens + run.usage.completion_tokens} tokens · {formatDate(run.started_at)}
                   </div>
+                )}
+                {team && (
+                  <>
+                    <Markdown text={team.answer} />
+                    <div className="divider" />
+                    <div className="small muted">{team.rationale || "Specialists consulted"}</div>
+                    <ul className="list">
+                      {team.specialists.map((s) => (
+                        <li key={s.run_id} style={{ alignItems: "flex-start" }}>
+                          <Badge value="demo" label={s.specialist} />
+                          <div className="grow">
+                            <div className="small"><strong>{s.question}</strong></div>
+                            <div className="xs faint">{s.tools.join(", ") || "no tools"} · {s.status.replace("_", " ")}</div>
+                          </div>
+                          {s.pending_approvals.length > 0 && <Badge value="pending" label={`${s.pending_approvals.length} to approve`} />}
+                        </li>
+                      ))}
+                    </ul>
+                  </>
                 )}
               </div>
             </Card>
@@ -196,9 +245,9 @@ export function AssistantPage() {
           <ul className="history" style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {history.data?.items.map((item) => (
               <li key={item.run_id}>
-                <button onClick={() => showRun(item)}>
-                  <div>{item.query}</div>
-                  <div className="row small muted">
+                <button onClick={() => showRun(item)} aria-current={run?.run_id === item.run_id}>
+                  <div className="truncate">{item.query}</div>
+                  <div className="row xs muted">
                     <Badge value={item.status} /> {formatDate(item.started_at)}
                   </div>
                 </button>
