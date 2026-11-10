@@ -52,7 +52,7 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 - [x] **Voice briefings** — "what's at risk today?" as a 2-minute spoken summary
 - [x] **Negotiation assistant** — when a deadline is at risk, generate options (scope cut,
       added people, phased release) with simulated outcomes and draft stakeholder messages
-- [ ] **Multi-agent org** — planner, QA, delivery and finance agents coordinated by a supervisor
+- [x] **Multi-agent org** — planner, QA, delivery and finance agents coordinated by a supervisor
       over one shared approval and audit layer
 - [x] **Compliance autopilot** — map work to ISO 27001 / SOC 2 controls and collect evidence
       from the audit log, PRs and CI

@@ -161,3 +161,29 @@ async def agent_tools(
         )
         for spec in gateway.available_tools(agent)
     ]
+
+
+@router.post("/team")
+async def agent_team(
+    request: AgentQueryRequest,
+    principal: AgentUser,
+    session: SessionDep,
+    settings: SettingsDep,
+    limiter: RateLimiterDep,
+    models: AgentModelsDep,
+    registry: ToolRegistryDep,
+) -> dict:
+    """Multi-agent mode: a supervisor routes to specialist agents and merges their answers."""
+    from backend.app.domains.agent.team import TeamService
+
+    query = request.normalized_query()
+    if not query:
+        raise AppException("Query must not be blank", 422, code="validation_error")
+    await limiter.hit(
+        f"agent:user:{principal.user_id}",
+        limit=settings.agent_rate_limit_per_minute,
+        window_seconds=60,
+    )
+    await enforce_daily_quota(session, principal.user_id, settings.agent_daily_token_quota)
+    run = await TeamService(session, settings, models, registry).run(principal, query)
+    return run.model_dump()
