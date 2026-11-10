@@ -129,7 +129,7 @@ const TONES: Record<string, string> = {
   success: "good", completed: "good", executed: "good", on_track: "good", low: "good", balanced: "good",
   live: "good", healthy: "good", pass: "good",
   pending: "warn", pending_approval: "warn", awaiting_approval: "warn", at_risk: "warn", medium: "warn",
-  underused: "info", running: "info", demo: "info", info: "info", muted: "muted",
+  underused: "info", running: "info", demo: "info", info: "info", accent: "info", muted: "muted",
   error: "bad", failed: "bad", denied: "bad", rejected: "bad", off_track: "bad", high: "bad", fail: "bad",
   overloaded: "bad", expired: "muted", disabled: "muted", unknown: "muted", warn: "warn", bad: "bad", good: "good",
 };

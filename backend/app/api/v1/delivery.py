@@ -13,6 +13,13 @@ from backend.app.core.errors import ValidationAppError
 from backend.app.core.security.permissions import Permission, Principal
 from backend.app.domains.analytics.service import get_project, project_health
 from backend.app.domains.delivery.backlog import BacklogProposal, draft_backlog, submit_backlog
+from backend.app.domains.delivery.delay import (
+    ClaimCheck,
+    DelayReport,
+    analyze_delay,
+    check_statement,
+    collect_delay_facts,
+)
 from backend.app.domains.delivery.dora import DoraReport, dora_metrics, incident_history
 from backend.app.domains.delivery.release import (
     ReleaseNotes,
@@ -120,3 +127,36 @@ async def submit(
     return await submit_backlog(
         ToolGateway(registry, session, settings), principal, key.upper(), body
     )
+
+
+async def _delay_inputs(request: Request, session, key: str, principal: Principal):
+    snapshot = await _snapshot(request, session, key)
+    facts = await collect_delay_facts(
+        request.app.state.analytics_collector.hub,
+        snapshot,
+        include_email=principal.has(Permission.EMAIL_READ),  # e-mail evidence needs e-mail access
+    )
+    return snapshot, facts, build_roadmap(snapshot)
+
+
+@router.get("/{key}/delay", response_model=DelayReport)
+async def delay(
+    key: KeyPath, principal: Analyst, session: SessionDep, request: Request
+) -> DelayReport:
+    """Why the project is late: person-days lost per cause, issue timelines, and what was
+    reported (comments, e-mails) checked against what the data shows."""
+    snapshot, facts, road = await _delay_inputs(request, session, key, principal)
+    return analyze_delay(snapshot, facts, road)
+
+
+class StatementRequest(BaseModel):
+    statement: str = Field(min_length=3, max_length=2000, description="What you were told")
+
+
+@router.post("/{key}/delay/check", response_model=list[ClaimCheck])
+async def check(
+    key: KeyPath, body: StatementRequest, principal: Analyst, session: SessionDep, request: Request
+) -> list[ClaimCheck]:
+    """Check a status claim ("on track", "no blockers", "PHX-2 done by Friday") against the data."""
+    snapshot, facts, road = await _delay_inputs(request, session, key, principal)
+    return check_statement(body.statement, snapshot, facts, road)

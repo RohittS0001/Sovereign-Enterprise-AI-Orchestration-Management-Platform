@@ -24,3 +24,9 @@ expected:
     lead_time_days: 3.5
     change_failure_rate: 0.0
     time_to_restore_days: 1.0
+  # why is it late (delay attribution + reported vs actual)
+  delay:
+    main_cause: blocked_external
+    main_cause_issues: [PHX-3, PHX-7]
+    slip_days: 3
+    contradicted_claims_by: [priya.n@acme.example, priya.n@acme.example]

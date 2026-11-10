@@ -128,7 +128,7 @@ async def test_demo_github_keka_gmail(demo) -> None:
     assert [p["number"] for p in prs["pull_requests"]] == [102]
     assert runs["conclusions"] == {"failure": 2, "success": 1}
     assert {item["employee_id"] for item in leave["leave_requests"]} == {"e-002"}
-    assert [m["id"] for m in found["messages"]] == ["m-2"]
+    assert [m["id"] for m in found["messages"]] == ["m-2", "m-4"]  # CFO question + PM update
 
     with pytest.raises(ValueError, match="GITHUB_ALLOWED_REPOS"):
         await demo["github"].list_pull_requests("acme/secret")

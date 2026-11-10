@@ -527,3 +527,212 @@ export function BacklogPlanner({ projectKey }: { projectKey: string }) {
     </div>
   );
 }
+
+// ------------------------------------------------------------------ why is it late?
+
+interface Loss {
+  cause: string;
+  label: string;
+  days: number;
+  share: number;
+  issues: string[];
+  evidence: string[];
+}
+
+interface ClaimCheck {
+  claim: string;
+  source: string;
+  said_by: string | null;
+  said_on: string | null;
+  verdict: "contradicted" | "supported" | "unverifiable";
+  reality: string[];
+}
+
+interface IssueStory {
+  key: string;
+  summary: string;
+  assignee: string | null;
+  status: string;
+  days_lost: number;
+  segments: { status: string; start: string; end: string; days: number }[];
+  events: string[];
+}
+
+interface DelayReport {
+  sprint: string | null;
+  target: string | null;
+  projected_finish: string | null;
+  slip_days: number;
+  headline: string;
+  total_days_lost: number;
+  losses: Loss[];
+  stories: IssueStory[];
+  claims: ClaimCheck[];
+  warnings: string[];
+}
+
+const VERDICT: Record<ClaimCheck["verdict"], { tone: string; label: string }> = {
+  contradicted: { tone: "bad", label: "Contradicted by data" },
+  supported: { tone: "good", label: "Matches the data" },
+  unverifiable: { tone: "muted", label: "Can't verify" },
+};
+
+function segmentTone(status: string): string {
+  const s = status.toLowerCase();
+  if (["blocked", "on hold", "impeded", "waiting"].includes(s)) return "bad";
+  if (["done", "closed", "resolved"].includes(s)) return "good";
+  if (s.includes("review") || s === "qa" || s === "testing") return "info";
+  if (s.includes("progress") || s === "doing") return "accent";
+  return "muted";
+}
+
+function ClaimList({ claims }: { claims: ClaimCheck[] }) {
+  return (
+    <ul className="list">
+      {claims.map((c, i) => (
+        <li key={`${c.claim}-${i}`} style={{ alignItems: "flex-start" }}>
+          <div className="grow stack" style={{ gap: 6 }}>
+            <div className="row between">
+              <Badge value={VERDICT[c.verdict].tone} label={VERDICT[c.verdict].label} />
+              <span className="xs faint">
+                {c.said_by ?? "—"}{c.said_on ? ` · ${formatDay(c.said_on)}` : ""}
+              </span>
+            </div>
+            <blockquote className="quote">“{c.claim}”</blockquote>
+            <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+              {c.reality.map((r) => <li key={r}>{r}</li>)}
+            </ul>
+            <span className="xs faint">Source: {c.source}</span>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function DelayPanel({ projectKey }: { projectKey: string }) {
+  const report = useQuery({
+    queryKey: ["delay", projectKey],
+    queryFn: () => api<DelayReport>(`${base(projectKey)}/delay`),
+  });
+  const [statement, setStatement] = useState("");
+  const check = useMutation({
+    mutationFn: () => api<ClaimCheck[]>(`${base(projectKey)}/delay/check`, { body: { statement } }),
+  });
+
+  if (report.isLoading) return <Spinner label="Reading Jira history, pull requests, leave and e-mail…" />;
+  if (report.error || !report.data) return <ErrorNote error={report.error ?? new Error("No data")} />;
+  const r = report.data;
+  const max = Math.max(1, ...r.losses.map((l) => l.days));
+  const contradicted = r.claims.filter((c) => c.verdict === "contradicted").length;
+
+  return (
+    <>
+      <section className={`card verdict ${r.slip_days > 0 ? "late" : "ok"}`}>
+        <div className="row between">
+          <div className="eyebrow" style={{ margin: 0 }}>What the data says</div>
+          <Badge value={r.slip_days > 0 ? "bad" : "good"} label={r.slip_days > 0 ? `${r.slip_days} working days late` : "On time so far"} />
+        </div>
+        <p className="verdict-headline">{r.headline}</p>
+        <div className="row xs muted">
+          <span>Target <strong className="num">{formatDay(r.target)}</strong></span>
+          <span>·</span>
+          <span>Projected <strong className="num">{formatDay(r.projected_finish)}</strong></span>
+          <span>·</span>
+          <span><strong className="num">{r.total_days_lost}</strong> person-days lost{r.sprint ? ` in ${r.sprint}` : ""}</span>
+          {contradicted > 0 && <><span>·</span><span className="tone-bad"><strong className="num">{contradicted}</strong> status claim(s) contradicted</span></>}
+        </div>
+      </section>
+
+      <div className="grid grid-2" style={{ alignItems: "start" }}>
+        <Card title="Where the time went">
+          {r.losses.length === 0 ? (
+            <Empty>No lost time found in Jira, pull requests, leave or incidents.</Empty>
+          ) : (
+            <div className="stack">
+              {r.losses.map((loss) => (
+                <details key={loss.cause} className="loss">
+                  <summary>
+                    <span className="loss-label">
+                      <strong className="small">{loss.label}</strong>
+                      <span className="xs faint">{loss.issues.join(", ")}</span>
+                    </span>
+                    <span className="loss-bar"><span style={{ width: `${(loss.days / max) * 100}%` }} /></span>
+                    <span className="small num loss-days">{loss.days}d · {Math.round(loss.share * 100)}%</span>
+                  </summary>
+                  <ul className="xs muted" style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    {loss.evidence.map((e) => <li key={e}>{e}</li>)}
+                  </ul>
+                </details>
+              ))}
+              <p className="xs faint" style={{ margin: 0 }}>
+                Person working days since the sprint started. Causes can overlap, so shares rank them rather than add up exactly. Click a cause for the evidence.
+              </p>
+            </div>
+          )}
+        </Card>
+
+        <Card title="Reported vs actual">
+          {r.claims.length === 0 ? (
+            <Empty>No status claims found in Jira comments or e-mails about this project.</Empty>
+          ) : (
+            <ClaimList claims={r.claims} />
+          )}
+        </Card>
+      </div>
+
+      <Card title="Check what you were told">
+        <form className="input-row" onSubmit={(e) => { e.preventDefault(); if (statement.trim().length >= 3) check.mutate(); }}>
+          <input
+            aria-label="Statement to check"
+            placeholder={`e.g. “We're on track, no blockers, ${projectKey}-2 done by Friday”`}
+            value={statement}
+            maxLength={2000}
+            onChange={(e) => setStatement(e.target.value)}
+          />
+          <button type="submit" className="button" disabled={statement.trim().length < 3 || check.isPending}>
+            {check.isPending ? "Checking…" : "Check against data"}
+          </button>
+        </form>
+        <ErrorNote error={check.error} />
+        {check.data && <div style={{ marginTop: 16 }}><ClaimList claims={check.data} /></div>}
+      </Card>
+
+      <Card title="Issue timelines">
+        <ul className="list">
+          {r.stories.filter((s) => s.days_lost > 0 || s.segments.length > 1).map((s) => (
+            <li key={s.key} style={{ alignItems: "flex-start" }}>
+              <div className="grow stack" style={{ gap: 6 }}>
+                <div className="row between">
+                  <span className="small"><strong>{s.key}</strong> <span className="muted">{s.summary}</span></span>
+                  <span className="row xs muted">
+                    {s.assignee ?? "Unassigned"} · <Badge value={segmentTone(s.status)} label={s.status} />
+                    {s.days_lost > 0 && <Badge value="bad" label={`${s.days_lost}d lost`} />}
+                  </span>
+                </div>
+                <div className="timeline-bar" role="img"
+                     aria-label={s.segments.map((g) => `${g.status} ${g.days} days`).join(", ")}>
+                  {s.segments.filter((g) => g.days > 0).map((g, i) => (
+                    <span key={`${g.status}-${i}`} className={`seg seg-${segmentTone(g.status)}`} style={{ flexGrow: g.days }}
+                          title={`${g.status}: ${formatDay(g.start)} → ${formatDay(g.end)} (${g.days}d)`}>
+                      {g.days >= 2 ? `${g.status} ${g.days}d` : ""}
+                    </span>
+                  ))}
+                </div>
+                {s.events.length > 0 && (
+                  <details>
+                    <summary className="xs muted">What happened ({s.events.length})</summary>
+                    <ul className="xs muted" style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+                      {s.events.map((e) => <li key={e}>{e}</li>)}
+                    </ul>
+                  </details>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </Card>
+      {r.warnings.length > 0 && <div className="notice small">Some evidence was unavailable: {r.warnings.join(" · ")}</div>}
+    </>
+  );
+}

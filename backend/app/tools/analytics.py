@@ -62,6 +62,11 @@ class EstimateInput(BaseModel):
     title: str = Field(min_length=3, max_length=500, description="The story to estimate")
 
 
+class StatementInput(BaseModel):
+    project_key: ProjectKey = Field(description="Jira project key, e.g. PHX")
+    statement: str = Field(min_length=3, max_length=2000, description="The status claim to check")
+
+
 class AnalyticsTools:
     """Computed, evidence-backed project analytics for the agent."""
 
@@ -240,3 +245,35 @@ class AnalyticsTools:
             return {"points": points, "basis": basis, "similar_issues": similar}
 
         return await self._delivery(EstimateInput, payload, compute)
+
+    async def _delay_inputs(self, snapshot):
+        from backend.app.core.context import principal_var
+        from backend.app.core.security.permissions import Permission
+        from backend.app.domains.delivery.delay import collect_delay_facts
+        from backend.app.domains.delivery.roadmap import build_roadmap
+
+        principal = principal_var.get(None)
+        include_email = bool(principal and principal.has(Permission.EMAIL_READ))
+        facts = await collect_delay_facts(self.collector.hub, snapshot, include_email=include_email)
+        return facts, build_roadmap(snapshot)
+
+    async def delay_analysis(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.delay import analyze_delay
+
+        async def compute(_, snapshot):
+            facts, road = await self._delay_inputs(snapshot)
+            report = analyze_delay(snapshot, facts, road).model_dump(mode="json")
+            report["stories"] = [s for s in report["stories"] if s["days_lost"] > 0][:6]
+            return report
+
+        return await self._delivery(ProjectHealthInput, payload, compute)
+
+    async def check_statement(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.delivery.delay import check_statement
+
+        async def compute(i, snapshot):
+            facts, road = await self._delay_inputs(snapshot)
+            checks = check_statement(i.statement, snapshot, facts, road)
+            return {"checks": [c.model_dump(mode="json") for c in checks]}
+
+        return await self._delivery(StatementInput, payload, compute)

@@ -9,6 +9,7 @@ from backend.app.domains.analytics.contradictions import find_contradictions
 from backend.app.domains.analytics.forecast import forecast_sprint
 from backend.app.domains.analytics.risk import assess_risk
 from backend.app.domains.analytics.workload import compute_workload
+from backend.app.domains.delivery.delay import analyze_delay, collect_delay_facts
 from backend.app.domains.delivery.dora import dora_metrics, incident_history
 from backend.app.domains.delivery.roadmap import build_roadmap
 from evaluation.core import CaseResult, Metric, SuiteResult, Timer, load_dataset, ratio
@@ -30,6 +31,7 @@ async def run() -> SuiteResult:
                 )
             snap = await env.collector.collect(project, today=as_of)
             incidents = await incident_history(env.collector.hub, snap)
+            delay_facts = await collect_delay_facts(env.collector.hub, snap)
 
         forecast = forecast_sprint(snap)
         workload = compute_workload(snap)
@@ -39,6 +41,8 @@ async def run() -> SuiteResult:
         pipeline = next(f for f in risk.factors if f.name == "Delivery pipeline")
         road = build_roadmap(snap)
         dora = dora_metrics(snap, incidents)
+        delay = analyze_delay(snap, delay_facts, road)
+        contradicted = sorted(c.said_by or "" for c in delay.claims if c.verdict == "contradicted")
 
         checks = {
             "forecast_status": (forecast.status, exp["forecast_status"]),
@@ -57,6 +61,10 @@ async def run() -> SuiteResult:
             "dora_lead_time_days": (dora.lead_time.value, exp["dora"]["lead_time_days"]),
             "dora_change_failure_rate": (dora.change_failure_rate.value, exp["dora"]["change_failure_rate"]),
             "dora_time_to_restore_days": (dora.time_to_restore.value, exp["dora"]["time_to_restore_days"]),
+            "delay_main_cause": (delay.losses[0].cause if delay.losses else None, exp["delay"]["main_cause"]),
+            "delay_main_cause_issues": (delay.losses[0].issues if delay.losses else [], exp["delay"]["main_cause_issues"]),
+            "delay_slip_days": (delay.slip_days, exp["delay"]["slip_days"]),
+            "delay_contradicted_claims_by": (contradicted, exp["delay"]["contradicted_claims_by"]),
             "failing_main_builds": (
                 any(f"{exp['failing_main_builds']} consecutive failing builds" in e for e in pipeline.evidence), True
             ),

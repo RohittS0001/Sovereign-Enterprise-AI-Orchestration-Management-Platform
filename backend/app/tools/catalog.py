@@ -18,6 +18,7 @@ from backend.app.tools.analytics import (
     ProjectHealthInput,
     ReleaseNotesInput,
     SimulateDeliveryInput,
+    StatementInput,
     WhoKnowsInput,
 )
 from backend.app.tools.base import ToolOperation
@@ -401,6 +402,22 @@ def build_tool_registry(
                 ProjectHealthInput,
                 "Sprint retrospective from data: what went well, what to improve, proposed "
                 "actions and the sprint metrics.",
+            ),
+            (
+                "delivery.delay_analysis",
+                analytics_tools.delay_analysis,
+                ProjectHealthInput,
+                "Why a project is late, from evidence: person-days lost per cause (blocked on "
+                "an external party or a teammate, late starts, review waits, rework, scope added, "
+                "leave, incidents), issue timelines, and status claims from comments/e-mails "
+                "checked against the data. Use for 'why is X delayed', 'what is really going on'.",
+            ),
+            (
+                "delivery.check_statement",
+                analytics_tools.check_statement,
+                StatementInput,
+                "Check a status claim someone made (e.g. 'we are on track, PHX-2 done by Friday') "
+                "against the project data; returns contradicted/supported/unverifiable with proof.",
             ),
             (
                 "delivery.estimate_story",

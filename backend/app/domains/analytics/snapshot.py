@@ -42,6 +42,7 @@ class IssueFacts:
     issue_type: str
     blocked_by: list[str] = field(default_factory=list)
     updated: date | None = None
+    created: date | None = None
 
     @property
     def is_open(self) -> bool:
@@ -200,6 +201,7 @@ def normalize_issue(raw: dict[str, Any], points_field: str) -> IssueFacts:
         issue_type=(fields.get("issuetype") or {}).get("name") or "Task",
         blocked_by=[key for key in blocked_by if key],
         updated=parse_date(fields.get("updated")),
+        created=parse_date(fields.get("created")),
     )
 
 

@@ -441,3 +441,22 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .fields dd { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 0.8125rem; }
 @media (max-width: 520px) { .fields > div { grid-template-columns: 1fr; gap: 2px; } }
 .wrap { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* ------------------------------------------------------------------ why is it late? */
+.verdict { border-left: 4px solid var(--good); }
+.verdict.late { border-left-color: var(--bad); }
+.verdict-headline { font-size: 1.0625rem; font-weight: 600; letter-spacing: -0.01em; line-height: 1.5; margin: 10px 0 8px; }
+.quote { margin: 0; padding: 6px 12px; border-left: 3px solid var(--border-strong); color: var(--text); font-size: 0.8125rem; background: var(--surface-2); border-radius: 0 var(--radius-md) var(--radius-md) 0; }
+.loss summary { display: grid; grid-template-columns: minmax(150px, 1.3fr) 2fr auto; gap: 12px; align-items: center; padding: 4px 0; }
+.loss-label { display: flex; flex-direction: column; min-width: 0; }
+.loss-bar { height: 8px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+.loss-bar > span { display: block; height: 100%; background: var(--bad); border-radius: 999px; }
+.loss-days { min-width: 72px; text-align: right; }
+@media (max-width: 520px) { .loss summary { grid-template-columns: 1fr auto; } .loss-bar { grid-column: 1 / -1; grid-row: 2; } }
+.timeline-bar { display: flex; gap: 2px; height: 22px; border-radius: var(--radius-md); overflow: hidden; }
+.seg { display: flex; align-items: center; padding: 0 6px; font-size: 0.6875rem; font-weight: 500; white-space: nowrap; overflow: hidden; min-width: 6px; }
+.seg-bad { background: var(--bad-bg); color: var(--bad); }
+.seg-good { background: var(--good-bg); color: var(--good); }
+.seg-info { background: var(--info-bg); color: var(--info); }
+.seg-accent { background: var(--accent-soft); color: var(--accent); }
+.seg-muted { background: var(--surface-2); color: var(--text-muted); }

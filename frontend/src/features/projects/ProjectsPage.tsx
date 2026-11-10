@@ -1,5 +1,5 @@
 import { BriefingCard } from "./BriefingCard";
-import { BacklogPlanner, DoraPanel, ReleasePanel, RoadmapPanel } from "./DeliveryPanels";
+import { BacklogPlanner, DelayPanel, DoraPanel, ReleasePanel, RoadmapPanel } from "./DeliveryPanels";
 import { DeliveryTwin } from "./DeliveryTwin";
 import { CommitmentsCard, FinanceCard } from "./FinanceCard";
 import { ProductionCard } from "./ProductionCard";
@@ -70,7 +70,7 @@ export function ProjectHealthPage() {
     queryKey: ["health", key],
     queryFn: () => api<ProjectHealth>(`/projects/${encodeURIComponent(key)}/health`),
   });
-  const [tab, setTab] = useState<"overview" | "forecast" | "roadmap" | "dora" | "releases" | "planner" | "team" | "business">("overview");
+  const [tab, setTab] = useState<"overview" | "delay" | "forecast" | "roadmap" | "dora" | "releases" | "planner" | "team" | "business">("overview");
   const generate = useMutation({
     mutationFn: () => api<Report>("/reports/generate", { body: { project_key: key } }),
     onSuccess: (report) => navigate(`/reports?open=${report.id}`),
@@ -147,6 +147,7 @@ export function ProjectHealthPage() {
       <Tabs label="Project sections" value={tab} onChange={setTab} tabs={[
         { id: "overview", label: "Overview" },
         ...(can("analytics:read") ? [
+          { id: "delay" as const, label: "Why is it late?" },
           { id: "forecast" as const, label: "Forecast & what-ifs" },
           { id: "roadmap" as const, label: "Roadmap" },
           { id: "dora" as const, label: "DORA metrics" },
@@ -203,6 +204,7 @@ export function ProjectHealthPage() {
         </>
       )}
       {tab === "forecast" && <DeliveryTwin projectKey={h.project} />}
+      {tab === "delay" && <DelayPanel projectKey={h.project} />}
       {tab === "roadmap" && <RoadmapPanel projectKey={h.project} />}
       {tab === "dora" && <DoraPanel projectKey={h.project} />}
       {tab === "releases" && <ReleasePanel projectKey={h.project} />}

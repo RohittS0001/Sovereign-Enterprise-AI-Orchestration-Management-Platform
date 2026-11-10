@@ -114,3 +114,28 @@ async def test_retrospective_and_draft_use_the_reporting_model(
     assert retro["narrative"] == "Blameless summary." and retro["written_by"] == "fake-report"
     assert "<untrusted_data" in reporting.calls[0]["messages"][1].content
     assert draft["drafted_by"] == "fake-report" and draft["epics"][0]["title"] == "Disputes"
+
+
+async def test_delay_report_and_statement_check(demo_settings, database, staff) -> None:
+    async with serve(create_app(demo_settings, database)) as client:
+        await client.put("/api/v1/projects/PHX", json=PHX_CONFIG, headers=staff[Role.ADMIN])
+        lead = staff[Role.TEAM_LEAD]
+        report = await client.get("/api/v1/projects/PHX/delay", headers=lead)
+        check = await client.post(
+            "/api/v1/projects/PHX/delay/check",
+            json={"statement": "We are on track with no blockers."},
+            headers=lead,
+        )
+        member = await client.get("/api/v1/projects/PHX/delay", headers=staff[Role.MEMBER])
+        empty = await client.post(
+            "/api/v1/projects/PHX/delay/check", json={"statement": ""}, headers=lead
+        )
+
+    assert report.status_code == 200, report.text
+    body = report.json()
+    assert body["losses"][0]["cause"] == "blocked_external"
+    assert "Main reason" in body["headline"]
+    assert any(c["source"].startswith("email") for c in body["claims"])  # leads can read e-mail
+    assert check.status_code == 200 and check.json()[0]["verdict"] == "contradicted"
+    assert member.status_code == 403
+    assert empty.status_code == 422

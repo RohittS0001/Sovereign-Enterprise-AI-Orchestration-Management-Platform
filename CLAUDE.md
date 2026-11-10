@@ -193,6 +193,10 @@ critical path; cycles broken and reported), `dora.py` (bands per DORA; non-prod 
 `Incident.resolved` via `incident_history`), `release.py` (release notes, retrospective with optional LLM 2
 summary over untrusted-wrapped facts), `backlog.py` (requirements → epics/stories via LLM 2 or an offline
 parser, estimates from similar issues, submitted as `jira.create_*` through the gateway = approvals only).
+`delay.py` ("Why is it late?"): Jira changelog + comments + e-mails (only with `email:read`) → person-days
+lost per cause; blocked time follows "blocked by" links to the root cause (external if notes mention a
+vendor/partner); claims in comments/e-mails ("on track", "no blockers", "done by <date>") are checked
+against the data *on the day they were said*. Product focus: one owner sees the real reason a project is late.
 
 **Database** (`db/`). Async SQLAlchemy 2; PostgreSQL in prod, SQLite in tests. `db/types.py`:
 `UTCDateTime` (always tz-aware UTC — applied to every `datetime` via `Base.type_annotation_map`) and

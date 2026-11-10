@@ -420,3 +420,47 @@ describe("Delivery lifecycle tabs", () => {
     expect(body.epics[0].stories.map((s: { title: string }) => s.title)).toEqual(["Open a dispute"]);
   });
 });
+
+describe("Why is it late?", () => {
+  it("shows the main reason, contradicted claims and checks a statement", async () => {
+    const health = {
+      project: "PHX", name: "Phoenix", as_of: "2026-11-09", warnings: [], issue_counts: {},
+      risk: { score: 81, level: "high", factors: [] }, forecast: null, contradictions: [],
+      workload: { period_end: "2026-11-14", members: [], unassigned_open: [], suggestions: [] },
+    };
+    const claim = {
+      claim: "Phoenix is on track for the sprint release.", source: "email: PHX weekly update",
+      said_by: "priya.n@acme.example", said_on: "2026-11-07", verdict: "contradicted",
+      reality: ["Projected finish 2026-11-19 is after the target 2026-11-14."],
+    };
+    const fetchMock = signedInAs(LEAD, {
+      "GET /projects/PHX/health": () => json(health),
+      "GET /projects/PHX/delay": () => json({
+        sprint: "Sprint 42", target: "2026-11-14", projected_finish: "2026-11-19", slip_days: 3,
+        headline: "Projected 3 working day(s) late. Main reason: waiting on an external party (PHX-3, PHX-7).",
+        total_days_lost: 13.7, warnings: [], claims: [claim],
+        losses: [{ cause: "blocked_external", label: "Waiting on an external party", days: 7, share: 0.51,
+                   issues: ["PHX-3", "PHX-7"], evidence: ["PHX-7 blocked 3 working day(s): vendor regression"] }],
+        stories: [{ key: "PHX-7", summary: "Vendor timeouts", assignee: "Arjun M", status: "Blocked", days_lost: 3,
+                    segments: [{ status: "In Progress", start: "2026-11-01", end: "2026-11-04", days: 2 },
+                               { status: "Blocked", start: "2026-11-04", end: "2026-11-09", days: 3 }],
+                    events: ["2026-11-04: Arjun M moved it In Progress → Blocked"] }],
+      }),
+      "POST /projects/PHX/delay/check": () => json([{ ...claim, claim: "No blockers", said_by: "you were told" }]),
+    });
+    renderApp("/projects/PHX");
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Why is it late?" }));
+    expect(await screen.findByText(/Main reason: waiting on an external party/)).toBeInTheDocument();
+    expect(screen.getByText("3 working days late")).toBeInTheDocument();
+    expect(screen.getByText("7d · 51%")).toBeInTheDocument();
+    expect(screen.getByText("“Phoenix is on track for the sprint release.”")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "In Progress 2 days, Blocked 3 days" })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Statement to check"), "No blockers");
+    await userEvent.click(screen.getByRole("button", { name: "Check against data" }));
+    expect(await screen.findByText("“No blockers”")).toBeInTheDocument();
+    const post = fetchMock.mock.calls.find(([url]) => String(url).includes("/delay/check"))!;
+    expect(JSON.parse(String(post[1]!.body))).toEqual({ statement: "No blockers" });
+  });
+});
