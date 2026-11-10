@@ -81,12 +81,17 @@ describe("Audit page", () => {
           },
         ]),
       "GET /audit/verify": () => json({ valid: true, checked: 1, first_invalid_seq: null, reason: null }),
+      "GET /compliance/report": () =>
+        json({ generated_at: "2026-11-09T10:00:00Z", summary: { pass: 1, warn: 0, fail: 0, unknown: 0 },
+               controls: [{ id: "logging", title: "Event logging and monitoring", soc2: ["CC7.2"], iso27001: ["A.8.15"],
+                            status: "pass", evidence: ["Audit log hash chain verified: 1 events, intact"], gaps: [] }] }),
     });
     renderApp("/audit");
 
     expect(await screen.findByRole("cell", { name: "auth.login" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Verify integrity" }));
     expect(await screen.findByRole("status")).toHaveTextContent("Chain intact — 1 events verified.");
+    expect(screen.getByText("Event logging and monitoring")).toBeInTheDocument();
   });
 });
 

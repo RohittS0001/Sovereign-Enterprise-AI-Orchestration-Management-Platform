@@ -395,3 +395,35 @@ async def test_knowledge_graph_endpoints(demo_settings, database, staff) -> None
     assert "arjun-m" not in [b["person"] for b in impact["suggested_backups"]]
     assert stats["bus_factor"]["acme/checkout-web"] == 1 and stats["people"] >= 4
     assert denied.status_code == 403  # people:read
+
+
+async def test_compliance_evidence_pack(demo_settings, database, staff) -> None:
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        await configure_phx(client, h[Role.ADMIN])
+        report = (await client.get("/api/v1/compliance/report", headers=h[Role.AUDITOR])).json()
+        markdown = await client.get(
+            "/api/v1/compliance/report?format=markdown", headers=h[Role.AUDITOR]
+        )
+        denied = await client.get("/api/v1/compliance/report", headers=h[Role.TEAM_LEAD])
+
+    controls = {c["id"]: c for c in report["controls"]}
+    assert set(controls) >= {
+        "access-control",
+        "logging",
+        "ai-oversight",
+        "change-management",
+        "data-protection",
+        "incident-management",
+        "secure-configuration",
+    }
+    assert controls["logging"]["status"] in {"pass", "warn"}  # chain intact
+    assert any("intact" in e for e in controls["logging"]["evidence"])
+    assert controls["change-management"]["status"] != "unknown"  # demo PRs were analysed
+    # Demo incident 4211 is high severity but only a day old (the threshold is 2 days).
+    assert controls["incident-management"]["status"] == "pass"
+    assert sum(report["summary"].values()) == len(report["controls"])
+    assert (
+        markdown.text.startswith("# Compliance evidence pack") and "SOC 2: CC6.1" in markdown.text
+    )
+    assert denied.status_code == 403  # audit:read
