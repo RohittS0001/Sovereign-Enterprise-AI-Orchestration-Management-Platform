@@ -1,6 +1,7 @@
 """Every integration the platform knows about, in one list."""
 
 from backend.app.core.config import Settings
+from backend.app.integrations.connectors.crm import CRM_SPECS
 from backend.app.integrations.connectors.hr_finance import FINANCE_SPECS, HR_SPECS
 from backend.app.integrations.connectors.ops import OPS_SPECS
 from backend.app.integrations.connectors.spec import ConnectorSpec
@@ -47,6 +48,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
     *OPS_SPECS,
     *HR_SPECS,
     *FINANCE_SPECS,
+    *CRM_SPECS,
 )
 
 ALL_SPECS: tuple[ConnectorSpec, ...] = CORE_SPECS + CONNECTOR_SPECS

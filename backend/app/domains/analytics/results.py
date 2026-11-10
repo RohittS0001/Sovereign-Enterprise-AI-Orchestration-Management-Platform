@@ -93,3 +93,4 @@ class ProjectHealth(BaseModel):
     warnings: list[str]
     production: ProductionHealth | None = None
     finance: dict | None = None  # earned value (analytics/evm.py)
+    commitments: list[dict] | None = None  # open CRM deals depending on this project

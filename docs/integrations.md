@@ -203,3 +203,21 @@ Expose a CDS view / OData service with project, budget, actual and currency; a c
 - Required: `SAP_ODATA_URL`, `SAP_USERNAME`, `SAP_PASSWORD`
 - Optional: `SAP_PROJECT_FIELD`, `SAP_BUDGET_FIELD`, `SAP_ACTUAL_FIELD`, `SAP_CURRENCY_FIELD`
 - API docs: https://api.sap.com/
+
+## CRM
+
+### Salesforce (`salesforce`)
+
+External Client App / Connected App with the OAuth client-credentials flow and a read-only run-as user; add an Opportunity field holding the Jira project key.
+
+- Required: `SALESFORCE_URL`, `SALESFORCE_CLIENT_ID`, `SALESFORCE_CLIENT_SECRET`
+- Optional: `SALESFORCE_API_VERSION`, `SALESFORCE_PROJECT_FIELD`
+- API docs: https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/
+
+### HubSpot (`hubspot`)
+
+Settings → Integrations → Private apps (scope crm.objects.deals.read); add a deal property holding the Jira project key.
+
+- Required: `HUBSPOT_TOKEN`
+- Optional: `HUBSPOT_PROJECT_PROPERTY`
+- API docs: https://developers.hubspot.com/docs/api/crm/deals

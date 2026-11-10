@@ -29,3 +29,25 @@ export function FinanceCard({ finance: f }: { finance: NonNullable<ProjectHealth
     </Card>
   );
 }
+
+/** Customer deals (CRM) that depend on this project, soonest first. */
+export function CommitmentsCard({ deals }: { deals: NonNullable<ProjectHealth["commitments"]> }) {
+  return (
+    <Card title={`Customer commitments (${deals.length})`}>
+      {deals.length === 0 ? (
+        <p className="small muted">No open deals depend on this project.</p>
+      ) : (
+        <ul className="small">
+          {deals.map((d) => (
+            <li key={`${d.source}-${d.id}`}>
+              {d.url ? <a href={d.url} target="_blank" rel="noreferrer">{d.name}</a> : <strong>{d.name}</strong>}{" "}
+              <span className="muted">
+                {d.stage} · {d.amount ? Math.round(d.amount).toLocaleString() : "—"} · closes {d.close_date ?? "—"} ({d.source})
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Card>
+  );
+}

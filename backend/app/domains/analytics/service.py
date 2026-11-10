@@ -56,4 +56,6 @@ async def project_health(
                for name, items in vars(snapshot.ops).items()}
         ) if snapshot.ops else None,
         finance=value.model_dump(mode="json") if (value := earned_value(snapshot)) else None,
+        commitments=[d.model_dump(mode="json", exclude_none=True) for d in snapshot.deals]
+        if snapshot.deals is not None else None,
     )  # fmt: skip

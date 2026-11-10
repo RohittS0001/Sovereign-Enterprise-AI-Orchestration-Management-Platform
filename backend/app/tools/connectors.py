@@ -87,6 +87,12 @@ class BudgetInput(SourceInput):
     )
 
 
+class DealsInput(SourceInput):
+    project_key: str | None = Field(default=None, description="Jira project key, e.g. PHX")
+    open_only: bool = True
+    limit: int = Field(default=25, ge=1, le=100)
+
+
 class ConnectorTools:
     def __init__(self, hub: IntegrationHub) -> None:
         self.hub = hub
@@ -199,4 +205,13 @@ class ConnectorTools:
             "finance", "budget vs actual", payload, BudgetInput,
             lambda i: self._fan_out("finance", i.source,
                                     lambda s: s.budget_lines(scope=i.scope or None)),
+        )  # fmt: skip
+
+    # ---------------------------------------------------------------- crm
+
+    async def list_deals(self, payload: dict[str, Any]) -> ToolResult:
+        return await run_tool(
+            "crm", "list deals", payload, DealsInput,
+            lambda i: self._fan_out("crm", i.source, lambda s: s.list_deals(
+                project=i.project_key, open_only=i.open_only, limit=i.limit)),
         )  # fmt: skip

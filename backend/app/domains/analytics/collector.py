@@ -74,6 +74,7 @@ class SnapshotCollector:
         await self._ops(snapshot)
         await self._hr(snapshot)
         await self._finance(snapshot)
+        await self._crm(snapshot)
 
         if today is None:
             self._cache[project.key] = (time.monotonic(), snapshot)
@@ -228,3 +229,16 @@ class SnapshotCollector:
                 snapshot.warnings.append(f"{source} budget unavailable: {_error(exc)}")
         if lines:
             snapshot.finance = lines
+
+    async def _crm(self, snapshot: ProjectSnapshot) -> None:
+        """Open deals (customer commitments) tagged with the project's key."""
+        services = self.hub.by_category("crm")
+        if not services:
+            return
+        deals: list[Any] = []
+        for source, service in services.items():
+            try:
+                deals += await service.list_deals(project=snapshot.key)
+            except Exception as exc:
+                snapshot.warnings.append(f"{source} deals unavailable: {_error(exc)}")
+        snapshot.deals = sorted(deals, key=lambda d: d.close_date or snapshot.today)

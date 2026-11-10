@@ -72,6 +72,13 @@ def register_connector_tools(registry: ToolRegistry, hub: IntegrationHub) -> Non
             description=f"Approved leave in a date range from {', '.join(tools.sources('hr'))} "
             "(Keka leave: keka.get_leave_requests).",
         )  # fmt: skip
+    if tools.sources("crm"):
+        registry.register(
+            "crm.list_deals", tools.list_deals, input_model=cx.DealsInput, operation=READ,
+            permission=Permission.ANALYTICS_READ,
+            description=f"Customer deals (stage, amount, close date) tagged with a project key "
+            f"from {', '.join(tools.sources('crm'))}: which commitments depend on a project.",
+        )  # fmt: skip
     if tools.sources("finance"):
         registry.register(
             "finance.budget_vs_actual", tools.budget_vs_actual, input_model=cx.BudgetInput,

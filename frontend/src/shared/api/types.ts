@@ -95,6 +95,8 @@ export interface ProjectHealth {
   name: string;
   as_of: string;
   risk: { score: number; level: "low" | "medium" | "high"; factors: RiskFactor[] };
+  /** Open CRM deals tagged with this project key. */
+  commitments?: { source: string; id: string; name: string; stage?: string; amount?: number; close_date?: string; url?: string }[] | null;
   /** Earned value when a finance connector covers this project. */
   finance?: {
     sources: string[];

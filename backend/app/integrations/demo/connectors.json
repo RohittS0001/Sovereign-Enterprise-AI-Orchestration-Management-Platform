@@ -234,5 +234,35 @@
         }
       ]
     }
+  },
+  "crm": {
+    "hubspot": {
+      "deals": [
+        {
+          "id": "9001",
+          "name": "Northwind — payments migration",
+          "stage": "contractsent",
+          "amount": 180000,
+          "close_date": "{today+12}",
+          "project_key": "PHX"
+        },
+        {
+          "id": "9002",
+          "name": "Contoso — refunds API",
+          "stage": "qualifiedtobuy",
+          "amount": 45000,
+          "close_date": "{today+45}",
+          "project_key": "PHX"
+        },
+        {
+          "id": "9003",
+          "name": "Fabrikam — ledger export",
+          "stage": "presentationscheduled",
+          "amount": 60000,
+          "close_date": "{today+20}",
+          "project_key": "LED"
+        }
+      ]
+    }
   }
 }

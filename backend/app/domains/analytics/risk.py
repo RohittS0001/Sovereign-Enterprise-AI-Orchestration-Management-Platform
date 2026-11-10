@@ -140,6 +140,8 @@ def assess_risk(
 
     if snapshot.ops is not None:
         factors.append(production_factor(snapshot))
+    if snapshot.deals:
+        factors.append(commitment_factor(snapshot, forecast))
     if snapshot.finance:
         from backend.app.domains.analytics.evm import budget_factor, earned_value
 
@@ -187,4 +189,29 @@ def production_factor(snapshot: ProjectSnapshot) -> RiskFactor:
             if score
             else None
         ),
+    )
+
+
+COMMITMENT_WINDOW_DAYS = 30
+
+
+def commitment_factor(snapshot: ProjectSnapshot, forecast: SprintForecast | None) -> RiskFactor:
+    """Deals closing soon while delivery is not on track put revenue at risk."""
+    deals = snapshot.deals or []
+    soon = [d for d in deals if d.close_date
+            and 0 <= (d.close_date - snapshot.today).days <= COMMITMENT_WINDOW_DAYS]  # fmt: skip
+    slipping = forecast is not None and forecast.status in {"at_risk", "off_track"}
+    score = 3 * len(soon) if slipping else 0
+    evidence = [f"{d.source}: {d.name} ({d.stage}, {d.amount or 0:,.0f}) closes {d.close_date}"
+                for d in soon]  # fmt: skip
+    if soon and not slipping:
+        evidence.append("Delivery is on track, so these commitments are not at risk yet")
+    return RiskFactor(
+        name="Customer commitments",
+        score=_cap(score, 10),
+        max_score=10,
+        evidence=evidence,
+        recommendation="Tell account owners now and agree what ships for these deals"
+        if score
+        else None,
     )

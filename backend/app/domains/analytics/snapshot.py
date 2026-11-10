@@ -144,6 +144,7 @@ class ProjectSnapshot:
     links: dict[str, list[str]] = field(default_factory=dict)
     ops: OpsFacts | None = None  # None when no ops connector covers this project
     finance: list[Any] | None = None  # BudgetLines when a finance connector covers it
+    deals: list[Any] | None = None  # open CRM deals tagged with this project's key
 
     @property
     def sprint_issues(self) -> list[IssueFacts]:
