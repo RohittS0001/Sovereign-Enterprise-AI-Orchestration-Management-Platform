@@ -6,7 +6,7 @@ service implements ``search_work_items`` / ``get_work_item`` / ``list_pull_reque
 """
 
 from typing import Any
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from backend.app.core.config import Settings
 from backend.app.integrations.connectors.base import (
@@ -48,12 +48,15 @@ _LINEAR_FIELDS = (
 class LinearService(ConnectorService):
     source = "linear"
 
-    def __init__(self, client_factory: Any, team_keys: list[str] | None = None) -> None:
+    def __init__(
+        self, client_factory: Any, team_keys: list[str] | None = None, path: str = "/graphql"
+    ) -> None:
         super().__init__(client_factory)
         self.team_keys = team_keys or []
+        self.path = path  # exact endpoint path (no trailing slash)
 
     async def _gql(self, query: str, variables: dict[str, Any] | None = None) -> dict[str, Any]:
-        body = await self.client.post("", {"query": query, "variables": variables or {}})
+        body = await self.client.post(self.path, {"query": query, "variables": variables or {}})
         if body.get("errors"):
             raise ValueError(f"Linear: {body['errors'][0].get('message', 'query failed')}")
         return body.get("data") or {}
@@ -502,9 +505,10 @@ TRACKER_SPECS = (
         optional=("linear_api_url", "linear_team_keys"),
         setup="Linear → Settings → API → Personal API keys; LINEAR_TEAM_KEYS limits teams (e.g. [\"ENG\"])",
         docs_url="https://developers.linear.app/docs/graphql/working-with-the-graphql-api",
-        build=lambda s: LinearService(_client(s, "Linear", s.linear_api_url,
-                                              headers={"Authorization": s.linear_api_key.get_secret_value()}),
-                                      s.linear_team_keys),
+        build=lambda s: LinearService(
+            _client(s, "Linear", "{0.scheme}://{0.netloc}".format(urlsplit(s.linear_api_url)),
+                    headers={"Authorization": s.linear_api_key.get_secret_value()}),
+            s.linear_team_keys, urlsplit(s.linear_api_url).path or "/graphql"),
         demo=_demo("linear"),
     ),
     ConnectorSpec(
