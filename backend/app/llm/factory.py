@@ -11,6 +11,8 @@ def _client(settings: Settings, model: str) -> LLMClient:
         timeout=settings.llm_timeout_seconds,
         temperature=settings.llm_temperature,
         api_key=settings.llm_api_key.get_secret_value(),
+        retries=settings.llm_retries,
+        **({"chat_path": settings.llm_chat_path} if cls is OpenAICompatibleClient else {}),
     )
 
 

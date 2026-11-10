@@ -1,5 +1,6 @@
 """HTTP clients for locally hosted models: Ollama and OpenAI-compatible servers (vLLM)."""
 
+import asyncio
 import time
 from typing import Any
 
@@ -10,6 +11,9 @@ from backend.app.core.observability import LLM_SECONDS, LLM_TOKENS, span
 from backend.app.llm.base import ChatMessage, LLMError, LLMResponse
 
 logger = get_logger(__name__)
+
+
+RETRYABLE_STATUS = {429, 500, 502, 503, 504}
 
 
 class _HttpLLM:
@@ -24,9 +28,15 @@ class _HttpLLM:
         temperature: float = 0.0,
         api_key: str = "",
         transport: httpx.AsyncBaseTransport | None = None,
+        chat_path: str | None = None,
+        retries: int = 2,
+        backoff_seconds: float = 2.0,
     ) -> None:
         self.model = model
         self.temperature = temperature
+        self.chat_path = chat_path
+        self.retries = retries
+        self.backoff_seconds = backoff_seconds
         headers = {"Authorization": f"Bearer {api_key}"} if api_key else {}
         self._client = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
@@ -45,15 +55,29 @@ class _HttpLLM:
             return await self._post_unspanned(path, payload)
 
     async def _post_unspanned(self, path: str, payload: dict[str, Any]) -> dict[str, Any]:
-        try:
-            response = await self._client.post(path, json=payload)
-        except httpx.TimeoutException as exc:
-            raise LLMError(f"{self.provider} request timed out (model {self.model})") from exc
-        except httpx.RequestError as exc:
-            raise LLMError(
-                f"Could not reach {self.provider} at {self._client.base_url}: "
-                f"{exc.__class__.__name__}"
-            ) from exc
+        # Hosted and free-tier models return 429/5xx under load; retry those with backoff.
+        for attempt in range(self.retries + 1):
+            last = attempt == self.retries
+            try:
+                response = await self._client.post(path, json=payload)
+            except httpx.TimeoutException as exc:
+                if not last:
+                    await asyncio.sleep(self.backoff_seconds * (attempt + 1))
+                    continue
+                raise LLMError(f"{self.provider} request timed out (model {self.model})") from exc
+            except httpx.RequestError as exc:
+                raise LLMError(
+                    f"Could not reach {self.provider} at {self._client.base_url}: "
+                    f"{exc.__class__.__name__}"
+                ) from exc
+            if response.status_code in RETRYABLE_STATUS and not last:
+                logger.info(
+                    "LLM busy; retrying",
+                    extra={"provider": self.provider, "upstream_status": response.status_code},
+                )
+                await asyncio.sleep(self.backoff_seconds * (attempt + 1))
+                continue
+            break
 
         if response.is_error:
             logger.warning(
@@ -144,7 +168,7 @@ class OpenAICompatibleClient(_HttpLLM):
             }
 
         started = time.perf_counter()
-        body = await self._post("/v1/chat/completions", payload)
+        body = await self._post(self.chat_path or "/v1/chat/completions", payload)
         try:
             content = body["choices"][0]["message"]["content"] or ""
         except (KeyError, IndexError, TypeError) as exc:

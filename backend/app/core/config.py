@@ -50,6 +50,10 @@ class Settings(ConnectorSettings):
     llm_provider: Literal["ollama", "openai_compatible"] = "ollama"
     llm_base_url: str = "http://localhost:11434"
     llm_api_key: SecretStr = SecretStr("")
+    # Path of the chat endpoint for openai_compatible servers. Gemini's OpenAI-compatible API
+    # is https://generativelanguage.googleapis.com/v1beta/openai + /chat/completions.
+    llm_chat_path: str = "/v1/chat/completions"
+    llm_retries: int = Field(default=2, ge=0, le=5)  # on 429/5xx/timeouts, with backoff
     llm_timeout_seconds: float = Field(default=120.0, gt=0)
     llm_temperature: float = Field(default=0.0, ge=0, le=2)
     # LLM 1 plans and calls tools; LLM 2 writes answers and reports (falls back to LLM 1).
@@ -189,6 +193,14 @@ class Settings(ConnectorSettings):
     def _resolve_from_project_root(cls, value: Path) -> Path:
         # Relative paths in .env are relative to the project, not the working directory.
         return value if value.is_absolute() else PROJECT_ROOT / value
+
+    @field_validator("llm_chat_path")
+    @classmethod
+    def _chat_path(cls, value: str) -> str:
+        # Catches e.g. Git Bash rewriting "/chat/completions" into "C:/Program Files/Git/...".
+        if not value.startswith("/") or ":" in value or " " in value:
+            raise ValueError("LLM_CHAT_PATH must be a URL path such as /v1/chat/completions")
+        return value
 
     @field_validator("google_service_account_file")
     @classmethod

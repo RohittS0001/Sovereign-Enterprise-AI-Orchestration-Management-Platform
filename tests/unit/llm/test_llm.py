@@ -21,6 +21,7 @@ def ollama(handler) -> OllamaClient:
         model="qwen3:8b",
         timeout=5,
         transport=httpx.MockTransport(handler),
+        backoff_seconds=0,
     )
 
 
@@ -161,3 +162,51 @@ async def test_generate_structured_retries_with_feedback() -> None:
 async def test_generate_structured_gives_up() -> None:
     with pytest.raises(LLMOutputError, match="Answer"):
         await generate_structured(FakeLLM(["nope", "still nope"]), MESSAGES, Answer)
+
+
+async def test_busy_hosted_models_are_retried_then_succeed() -> None:
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(request.url.path)
+        if len(calls) < 3:
+            return httpx.Response(503, json={"error": {"message": "high demand"}})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "OK"}}]})
+
+    client = OpenAICompatibleClient(
+        base_url="https://generativelanguage.googleapis.com/v1beta/openai", model="gemini",
+        timeout=5, api_key="k", transport=httpx.MockTransport(handler),
+        chat_path="/chat/completions", retries=2, backoff_seconds=0,
+    )  # fmt: skip
+
+    response = await client.chat(MESSAGES)
+
+    assert response.content == "OK"
+    assert calls == ["/v1beta/openai/chat/completions"] * 3  # Gemini's path, no extra /v1
+
+
+async def test_retries_are_bounded() -> None:
+    calls = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        calls.append(1)
+        return httpx.Response(429, text="quota")
+
+    client = OpenAICompatibleClient(base_url="http://x", model="m", timeout=5, retries=1,
+                                    backoff_seconds=0, transport=httpx.MockTransport(handler))  # fmt: skip
+    with pytest.raises(LLMError, match="429"):
+        await client.chat(MESSAGES)
+    assert len(calls) == 2
+
+
+def test_factory_passes_the_chat_path_and_retries() -> None:
+    from backend.app.core.config import Settings
+    from backend.app.llm.factory import build_agent_models
+
+    settings = Settings(
+        _env_file=None, environment="test", llm_provider="openai_compatible",
+        llm_base_url="https://generativelanguage.googleapis.com/v1beta/openai",
+        llm_chat_path="/chat/completions", llm1_model_name="gemini-3.8-flash", llm_retries=3,
+    )  # fmt: skip
+    models = build_agent_models(settings)
+    assert models.operations.chat_path == "/chat/completions" and models.operations.retries == 3

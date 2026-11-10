@@ -87,3 +87,18 @@ def test_gmail_configured_from_env_or_token_file(tmp_path: Path) -> None:
         "gmail_refresh_token": "r",
     }
     assert make(**env_based).gmail_configured is True
+
+
+def test_llm_chat_path_must_be_a_url_path() -> None:
+    import pytest
+    from pydantic import ValidationError
+
+    from backend.app.core.config import Settings
+
+    assert (
+        Settings(_env_file=None, llm_chat_path="/chat/completions").llm_chat_path
+        == "/chat/completions"
+    )
+    # Git Bash rewrites a leading "/" into a Windows path; fail loudly instead of 404ing.
+    with pytest.raises(ValidationError, match="LLM_CHAT_PATH"):
+        Settings(_env_file=None, llm_chat_path="C:/Program Files/Git/chat/completions")
