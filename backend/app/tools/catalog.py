@@ -322,6 +322,15 @@ def build_tool_registry(
             permission=Permission.ANALYTICS_READ,
         )
         registry.register(
+            "analytics.predict_slip",
+            analytics_tools.predict_slip,
+            input_model=ProjectHealthInput,
+            operation=READ,
+            permission=Permission.ANALYTICS_READ,
+            description="Chance the current sprint slips, from a model trained on this "
+            "organization's own sprint history, with the signals driving it.",
+        )
+        registry.register(
             "graph.who_knows", analytics_tools.who_knows, input_model=WhoKnowsInput,
             operation=READ, permission=Permission.PEOPLE_READ,
             description="Who knows a topic (service, feature, area): people ranked by delivered "

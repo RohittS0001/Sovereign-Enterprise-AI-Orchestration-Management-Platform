@@ -144,3 +144,17 @@ class AnalyticsTools:
             status=ToolStatus.SUCCESS,
             data=impact_of_absence(await self._graph(), i.person).model_dump(),
         )
+
+    async def predict_slip(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.domains.analytics.predictive import predict_slip
+
+        try:
+            i = ProjectHealthInput.model_validate(payload)
+            async with self.database.session() as session:
+                health = await project_health(session, self.collector, i.project_key)
+                prediction = await predict_slip(session, health)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        except AppException as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=exc.message)
+        return ToolResult(status=ToolStatus.SUCCESS, data=prediction.model_dump(mode="json"))

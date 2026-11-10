@@ -31,6 +31,7 @@ async def project_health(
     *,
     today: date | None = None,
     fresh: bool = False,
+    record: bool = True,
 ) -> ProjectHealth:
     project = await get_project(session, key)
     snapshot = await collector.collect(project, today=today, fresh=fresh)
@@ -41,7 +42,7 @@ async def project_health(
     risk = assess_risk(snapshot, forecast, workload, contradictions)
     scope = snapshot.sprint_issues or snapshot.issues
 
-    return ProjectHealth(
+    health = ProjectHealth(
         project=project.key,
         name=project.name,
         as_of=snapshot.today,
@@ -59,3 +60,8 @@ async def project_health(
         commitments=[d.model_dump(mode="json", exclude_none=True) for d in snapshot.deals]
         if snapshot.deals is not None else None,
     )  # fmt: skip
+    if record:
+        from backend.app.domains.analytics.predictive import record_signal
+
+        await record_signal(session, health)  # training data for the slip model
+    return health

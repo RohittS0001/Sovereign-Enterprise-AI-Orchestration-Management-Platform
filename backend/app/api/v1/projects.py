@@ -107,3 +107,14 @@ async def negotiate_project(
     snapshot = await request.app.state.analytics_collector.collect(project)
     models = request.app.state.agent_models
     return await negotiate(snapshot, body.target_date, model=models.reporting if models else None)
+
+
+@router.get("/{key}/slip-risk")
+async def slip_risk(
+    key: KeyPath, principal: Analyst, session: SessionDep, request: Request
+) -> dict:
+    """Chance this sprint slips, from a model trained on the organization's own history."""
+    from backend.app.domains.analytics.predictive import predict_slip
+
+    health = await project_health(session, request.app.state.analytics_collector, key)
+    return (await predict_slip(session, health)).model_dump(mode="json")

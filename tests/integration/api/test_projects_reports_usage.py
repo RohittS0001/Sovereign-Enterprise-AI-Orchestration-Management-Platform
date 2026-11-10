@@ -427,3 +427,18 @@ async def test_compliance_evidence_pack(demo_settings, database, staff) -> None:
         markdown.text.startswith("# Compliance evidence pack") and "SOC 2: CC6.1" in markdown.text
     )
     assert denied.status_code == 403  # audit:read
+
+
+async def test_slip_risk_endpoint_records_signals(demo_settings, database, staff) -> None:
+    from backend.app.db.models import ProjectSignal
+
+    _, h = staff
+    async with serve(create_app(demo_settings, database)) as client:
+        await configure_phx(client, h[Role.ADMIN])
+        risk = (
+            await client.get("/api/v1/projects/PHX/slip-risk", headers=h[Role.TEAM_LEAD])
+        ).json()
+
+    assert risk["method"] == "forecast" and 0 <= risk["slip_probability"] <= 1
+    async with database.session() as session:
+        assert await session.scalar(select(ProjectSignal.project_key)) == "PHX"
