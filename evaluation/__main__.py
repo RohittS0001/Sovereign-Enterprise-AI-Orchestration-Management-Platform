@@ -20,6 +20,7 @@ from evaluation.core import SuiteResult, to_markdown, write_reports
 OFFLINE = [
     "retrieval",
     "rag",
+    "platform_search",
     "guardrails",
     "analytics",
     "delivery",
@@ -40,6 +41,7 @@ async def run_suites(
         delivery,
         guardrails,
         planning,
+        platform_search,
         rag,
         redteam,
         retrieval,
@@ -53,6 +55,7 @@ async def run_suites(
         "codemode": codemode.run,
         "rag": lambda: rag.run(judge=judge),
         "delivery": delivery.run,
+        "platform_search": platform_search.run,
         "planning": planning.run,
         "agent": lambda: agent.run(judge=judge, real_embeddings=real_embeddings),
     }

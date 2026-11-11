@@ -13,6 +13,8 @@ LINK_KEYS = {
     "sentry_projects": "Sentry project slugs", "jenkins_jobs": "Jenkins job names",
     "argocd_apps": "Argo CD application names", "sonarqube_projects": "SonarQube project keys",
     "cost_centers": "Finance project / cost-centre names (budget vs actuals)",
+    "slack_channels": "Slack channel ids indexed for this project (C0123…)",
+    "teams_channels": "Teams channels indexed for this project (<team-id>/<channel-id>)",
 }  # fmt: skip
 
 

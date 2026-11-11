@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -44,6 +45,9 @@ class Document(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     chunk_count: Mapped[int] = mapped_column(default=0)
     embedding_model: Mapped[str | None] = mapped_column(String(200))
     extra: Mapped[dict[str, Any]] = mapped_column(default=dict)
+    # Filters for search over indexed platform data (Jira, chat, e-mail, …).
+    project_key: Mapped[str | None] = mapped_column(String(32), index=True)
+    occurred_at: Mapped[datetime | None] = mapped_column(index=True)
 
     @property
     def allowed_roles(self) -> list[str]:

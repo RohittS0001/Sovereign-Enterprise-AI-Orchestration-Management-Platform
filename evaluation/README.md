@@ -24,8 +24,9 @@ in `judges.py`, Ragas/DeepEval export in `frameworks.py`.
 
 | Suite | Needs a model | What it checks | Gated metrics (threshold) |
 |---|---|---|---|
-| `retrieval` | no | Knowledge search per role; keyword/semantic/hybrid ablation | hit@1 (≥0.7), hit@3 (≥0.85), recall@3 (≥0.8), MRR (≥0.75), graded nDCG@3 (≥0.7), context precision@3 (≥0.7), p95 latency (≤500 ms), **leak rate (=0)** |
+| `retrieval` | no | Knowledge search per role; keyword/semantic/hybrid ablation | hit@1 (≥0.7), hit@3 (≥0.85), recall@3 (≥0.8), MRR (≥0.75), graded nDCG@3 (≥0.7), context precision@3 (≥0.7), p95 latency (≤500 ms), **fusion gain ≥ best single retriever**, **leak rate (=0)**; RRF k/weight sweep |
 | `rag` | no (`--judge` adds LLM metrics) | Answers through the real agent pipeline (extractive responder) and knowledge sync | context recall (≥0.85), context precision@4 (≥0.7), faithfulness (≥0.9), answer relevance, semantic similarity (≥0.5), factual-correctness F1 (≥0.6), citation validity (=1), **sync leak rate (=0)** |
+| `platform_search` | no | Hybrid search over everything indexed from 10 connected sources for PHX, plus filters and role-based leak probes | hit@1 (≥0.7), hit@3 (≥0.9), MRR (≥0.75), filter precision (=1), **leak rate (=0)**, re-index changes (=0) |
 | `guardrails` | no | Prompt-injection detector and redaction | injection recall (≥0.85) / precision (≥0.9) / F1 / false alarms, redaction recall (=1), false positives (=0) |
 | `analytics` | no | Forecast, workload, contradictions, risk, critical path, DORA, delay attribution on PHX at a fixed date | accuracy vs golden values (=1) |
 | `delivery` | no | "Why is it late?" on 140 synthetic sprints with planted causes (35 hard) + 60 claims of known truth | top-cause accuracy (≥0.85), hard tier (≥0.5), macro-F1 (≥0.85), vendor recall (≥0.95), claim accuracy (≥0.95), **false contradictions (≤0.02)** |

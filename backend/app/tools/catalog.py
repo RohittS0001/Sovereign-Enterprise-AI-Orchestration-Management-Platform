@@ -309,8 +309,12 @@ def build_tool_registry(
             "knowledge.search",
             knowledge_tools.search,
             description=(
-                "Search the organization's internal documents (policies, runbooks, specs, "
-                "meeting notes) the user is allowed to read. Returns cited passages."
+                "Hybrid (keyword + semantic) search over everything indexed that the user may "
+                "read: policies and runbooks, plus each project's Jira issues with history and "
+                "comments, pull requests and CI, Slack/Teams channel discussions, project e-mails, "
+                "incidents, meeting transcripts, leave, budget and deals. Filter with sources, "
+                "project_key, since. Use it to find what people said or decided. Returns cited "
+                "passages."
             ),
             input_model=SearchKnowledgeInput,
             operation=READ,

@@ -76,6 +76,17 @@ class Settings(ConnectorSettings):
     rag_candidate_k: int = Field(default=40, ge=5, le=500)
     rag_max_chunks_per_document: int = Field(default=3, ge=1, le=50)
     rag_max_upload_mb: int = Field(default=10, ge=1, le=200)
+    # Hybrid search: keyword (BM25 / full-text) and semantic (vector) rankings fused with
+    # weighted reciprocal rank fusion, score = Σ weight / (k + rank).
+    # None = automatic, tuned with the retrieval evaluation: a real embedding model gets the
+    # standard k=60 and equal weights; the offline hashing embedder (word overlap only, no
+    # extra signal over BM25) gets k=5 and weight 0.1, so it only breaks ties and adds
+    # candidates keyword search missed, without reordering good keyword matches.
+    rag_rrf_k: int | None = Field(default=None, ge=1, le=1000)
+    rag_keyword_weight: float = Field(default=1.0, ge=0, le=10)
+    rag_semantic_weight: float | None = Field(default=None, ge=0, le=10)
+    # Drop results whose fused score is below this share of the best one (0 = keep top-k).
+    rag_min_relative_score: float = Field(default=0.0, ge=0, le=1)
     # Optional local reranker speaking the text-embeddings-inference /rerank API.
     reranker_url: str = ""
 

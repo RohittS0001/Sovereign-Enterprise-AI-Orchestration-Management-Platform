@@ -12,6 +12,7 @@ databases (SQLite in tests/dev) permitted chunks are ranked in Python.
 import hashlib
 import uuid
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Any, Literal
 
 from sqlalchemy import ColumnElement, Select, and_, delete, func, literal_column, or_, select, true
@@ -30,7 +31,12 @@ from backend.app.domains.governance.audit import actions
 from backend.app.domains.governance.audit.service import AuditService
 from backend.app.domains.knowledge.chunking import chunk_text
 from backend.app.domains.knowledge.embeddings import Embedder, cosine, tokenize
-from backend.app.domains.knowledge.ranking import bm25_scores, cap_per_group, reciprocal_rank_fusion
+from backend.app.domains.knowledge.ranking import (
+    bm25_scores,
+    cap_per_group,
+    exact_match_first,
+    reciprocal_rank_fusion,
+)
 from backend.app.domains.knowledge.reranker import HttpReranker
 
 logger = get_logger(__name__)
@@ -49,6 +55,9 @@ class SearchHit:
     text: str
     score: float
     matched_by: list[str] = field(default_factory=list)
+    source: str | None = None  # upload | demo | jira | slack | email | …
+    project_key: str | None = None
+    occurred_at: datetime | None = None
 
     @property
     def citation(self) -> str:
@@ -64,8 +73,21 @@ class SearchHit:
             "citation": self.citation,
             "score": round(self.score, 4),
             "matched_by": self.matched_by,
+            "source": self.source,
+            "project": self.project_key,
+            "date": self.occurred_at.date().isoformat() if self.occurred_at else None,
             "text": text,
         }
+
+
+@dataclass(frozen=True)
+class SearchFilters:
+    """Narrow a search before ranking: by source system, project and time window."""
+
+    sources: tuple[str, ...] = ()
+    project: str | None = None
+    since: datetime | None = None
+    until: datetime | None = None
 
 
 def access_filter(principal: Principal) -> ColumnElement[bool]:
@@ -110,6 +132,10 @@ class KnowledgeService:
         visibility: Visibility = Visibility.ORGANIZATION,
         allowed_roles: list[str] | None = None,
         tags: list[str] | None = None,
+        project_key: str | None = None,
+        occurred_at: datetime | None = None,
+        extra: dict[str, Any] | None = None,
+        audit: bool = True,
     ) -> Document:
         if not principal.has(Permission.KNOWLEDGE_MANAGE):
             raise AuthorizationError("You cannot add documents to the knowledge base")
@@ -149,6 +175,9 @@ class KnowledgeService:
             char_count=len(text),
             chunk_count=len(chunks),
             embedding_model=model,
+            project_key=project_key,
+            occurred_at=occurred_at,
+            extra=extra or {},
         )
         document.allowed_roles = allowed_roles or []
         document.chunks = [
@@ -164,6 +193,8 @@ class KnowledgeService:
         ]
         self.session.add(document)
         await self.session.flush()
+        if not audit:  # bulk indexing records one audit event per run instead
+            return document
         await self.audit.record(
             actions.KNOWLEDGE_INGEST,
             status=actions.SUCCESS,
@@ -229,13 +260,41 @@ class KnowledgeService:
 
     # ------------------------------------------------------------------ search
 
-    def _chunk_query(self, principal: Principal) -> Select:
-        return (
-            select(DocumentChunk.id, DocumentChunk.document_id, DocumentChunk.ordinal,
-                   DocumentChunk.heading, DocumentChunk.text, Document.title)
+    def _chunk_query(self, principal: Principal, filters: "SearchFilters | None" = None) -> Select:
+        statement = (
+            select(
+                DocumentChunk.id,
+                DocumentChunk.document_id,
+                DocumentChunk.ordinal,
+                DocumentChunk.heading,
+                DocumentChunk.text,
+                Document.title,
+                Document.source_type,
+                Document.project_key,
+                Document.occurred_at,
+            )
             .join(Document, Document.id == DocumentChunk.document_id)
             .where(access_filter(principal))
-        )  # fmt: skip
+        )
+        if filters is not None:
+            if filters.sources:
+                statement = statement.where(Document.source_type.in_(filters.sources))
+            if filters.project:
+                statement = statement.where(Document.project_key == filters.project.upper())
+            if filters.since:
+                statement = statement.where(Document.occurred_at >= filters.since)
+            if filters.until:
+                statement = statement.where(Document.occurred_at <= filters.until)
+        return statement
+
+    def fusion_params(self) -> tuple[int, float, float]:
+        """(k, keyword weight, semantic weight) for reciprocal rank fusion."""
+        weak = self.embedder is None or self.embedder.model.startswith("hashing")
+        k = self.settings.rag_rrf_k or (5 if weak else 60)
+        semantic = self.settings.rag_semantic_weight
+        if semantic is None:
+            semantic = 0.1 if weak else 1.0
+        return k, self.settings.rag_keyword_weight, semantic
 
     async def search(
         self,
@@ -244,6 +303,9 @@ class KnowledgeService:
         *,
         top_k: int | None = None,
         strategy: Literal["hybrid", "semantic", "keyword"] = "hybrid",
+        filters: "SearchFilters | None" = None,
+        weights: tuple[float, float] | None = None,
+        rrf_k: int | None = None,
     ) -> list[SearchHit]:
         """Hybrid search; ``strategy`` restricts it to one retriever (used for ablations)."""
         if not principal.has(Permission.KNOWLEDGE_READ):
@@ -258,15 +320,29 @@ class KnowledgeService:
             [query_vector] = await self.embedder.embed([query])
 
         if self.session.get_bind().dialect.name == "postgresql":
-            rows, dense, sparse = await self._postgres_candidates(principal, query, query_vector)
+            rows, dense, sparse = await self._postgres_candidates(
+                principal, query, query_vector, filters
+            )
         else:
-            rows, dense, sparse = await self._python_candidates(principal, query, query_vector)
+            rows, dense, sparse = await self._python_candidates(
+                principal, query, query_vector, filters
+            )
 
         if strategy == "semantic":
             sparse = []
         elif strategy == "keyword":
             dense = []
-        fused = reciprocal_rank_fusion([r for r in (dense, sparse) if r])
+        default_k, keyword_weight, semantic_weight = self.fusion_params()
+        if weights is not None:
+            keyword_weight, semantic_weight = weights
+        fused = reciprocal_rank_fusion(
+            [sparse, dense], k=rrf_k or default_k, weights=[keyword_weight, semantic_weight]
+        )
+        floor = self.settings.rag_min_relative_score
+        if floor > 0 and fused:
+            best = fused[0][1]
+            fused = [(chunk_id, score) for chunk_id, score in fused if score >= floor * best]
+        fused = exact_match_first(query, fused, {c: rows[c]["title"] for c in rows})
         ordered = cap_per_group(
             [chunk_id for chunk_id, _ in fused],
             {chunk_id: rows[chunk_id]["document_id"] for chunk_id in rows},
@@ -295,15 +371,22 @@ class KnowledgeService:
                     for name, hits in (("semantic", dense_set), ("keyword", sparse_set))
                     if chunk_id in hits
                 ],
+                source=rows[chunk_id].get("source_type"),
+                project_key=rows[chunk_id].get("project_key"),
+                occurred_at=rows[chunk_id].get("occurred_at"),
             )
             for chunk_id in ordered[:top_k]
         ]
 
     async def _python_candidates(
-        self, principal: Principal, query: str, query_vector: list[float] | None
+        self,
+        principal: Principal,
+        query: str,
+        query_vector: list[float] | None,
+        filters: "SearchFilters | None" = None,
     ) -> tuple[dict, list, list]:
         statement = (
-            self._chunk_query(principal)
+            self._chunk_query(principal, filters)
             .add_columns(DocumentChunk.embedding, DocumentChunk.embedding_model)
             .limit(_MAX_PYTHON_CANDIDATES)
         )
@@ -312,7 +395,15 @@ class KnowledgeService:
         ids = list(rows)
         limit = self.settings.rag_candidate_k
 
-        keyword = bm25_scores(query, [rows[i]["text"] for i in ids])
+        # Field boost: the title (and section) count twice, like a weighted title field.
+        keyword = bm25_scores(
+            query,
+            [
+                f"{rows[i]['title']} {rows[i]['title']} {rows[i].get('heading') or ''} "
+                f"{rows[i]['text']}"
+                for i in ids
+            ],
+        )
         sparse = [
             ids[n] for n in sorted(range(len(ids)), key=lambda n: -keyword[n]) if keyword[n] > 0
         ][:limit]
@@ -329,7 +420,11 @@ class KnowledgeService:
         return rows, dense, sparse
 
     async def _postgres_candidates(
-        self, principal: Principal, query: str, query_vector: list[float] | None
+        self,
+        principal: Principal,
+        query: str,
+        query_vector: list[float] | None,
+        filters: "SearchFilters | None" = None,
     ) -> tuple[dict, list, list]:
         limit = self.settings.rag_candidate_k
         rows: dict = {}
@@ -337,7 +432,7 @@ class KnowledgeService:
 
         if query_vector is not None and self.embedder is not None:
             dense_statement = (
-                self._chunk_query(principal)
+                self._chunk_query(principal, filters)
                 .where(DocumentChunk.embedding_model == self.embedder.model)
                 .order_by(DocumentChunk.embedding.op("<=>")(query_vector))
                 .limit(limit)
@@ -357,10 +452,13 @@ class KnowledgeService:
             config = literal_column("'simple'::regconfig")
             tsvector = func.to_tsvector(config, DocumentChunk.text)
             tsquery = func.to_tsquery(config, " | ".join(terms))
+            # Match on the indexed text vector; rank with the title weighted higher ('A').
+            titled = func.setweight(func.to_tsvector(config, Document.title), literal_column("'A'"))
+            ranked = titled.op("||")(func.setweight(tsvector, literal_column("'D'")))
             sparse_statement = (
-                self._chunk_query(principal)
+                self._chunk_query(principal, filters)
                 .where(tsvector.op("@@")(tsquery))
-                .order_by(func.ts_rank_cd(tsvector, tsquery).desc())
+                .order_by(func.ts_rank_cd(ranked, tsquery).desc())
                 .limit(limit)
             )
             for r in (await self.session.execute(sparse_statement)).all():

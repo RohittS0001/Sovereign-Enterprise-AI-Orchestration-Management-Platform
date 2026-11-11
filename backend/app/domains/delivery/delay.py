@@ -228,6 +228,31 @@ async def collect_delay_facts(
             facts.notes += await asyncio.to_thread(_emails, email, snapshot.key, email_days)
         except Exception as exc:  # noqa: BLE001 - e-mail is optional evidence
             facts.warnings.append(f"E-mail unavailable: {exc}")
+
+    # Project chat channels: where people say how things really are.
+    since = snapshot.today - timedelta(days=email_days)
+    for source, service in (hub.by_category("chat") if hasattr(hub, "by_category") else {}).items():
+        link = "slack_channels" if source == "slack" else "teams_channels"
+        if not callable(getattr(service, "list_messages", None)):
+            continue
+        for channel in snapshot.links.get(link, []):
+            try:
+                messages = await service.list_messages(channel, since)
+            except Exception as exc:  # noqa: BLE001 - chat is optional evidence
+                facts.warnings.append(f"{source} channel {channel} unavailable: {exc}")
+                continue
+            for message in messages:
+                text = redact_text(message.text).text[:1000]
+                facts.notes.append(
+                    Note(
+                        at=message.sent_at.date(),
+                        author=message.author,
+                        text=text,
+                        source=f"{source} message",
+                        ref=f"#{channel}",
+                        issue_keys=sorted(set(ISSUE_KEY.findall(text.upper()))),
+                    )
+                )
     return facts
 
 

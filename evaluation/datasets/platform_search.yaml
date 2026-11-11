@@ -1,0 +1,92 @@
+# Hybrid search over every indexed platform for the demo project PHX (see suites/platform_search.py).
+# relevant: any of these matches counts (source + a phrase from the title or text).
+# filters: the search is narrowed; every result must satisfy the filter.
+# forbidden_sources: this role must never see records from these sources (permission leak test).
+k: 3
+thresholds:
+  hit_at_1: 0.7
+  hit_at_k: 0.9
+  mrr: 0.75
+  filter_precision: 1.0
+  leak_rate: 0.0
+  reindex_changes: 0
+
+queries:
+  - id: jira-why-blocked
+    role: project_manager
+    query: why is PHX-7 blocked
+    relevant: [{source: jira, contains: "PHX-7:"}]
+  - id: email-vendor-eta
+    role: project_manager
+    query: when will the vendor ship the capture timeout fix
+    relevant: [{source: email, contains: "fix is planned for next week"}]
+  - id: slack-leadership
+    role: project_manager
+    query: are we telling leadership the real status
+    relevant: [{source: slack, contains: "on track to leadership"}]
+  - id: slack-cover
+    role: project_manager
+    query: who will cover refund webhooks while Arjun is away
+    relevant:
+      - {source: slack, contains: "Who can cover PHX-5"}
+      - {source: keka, contains: "Arjun M"}
+  - id: linear-load-test
+    role: team_lead
+    query: load test the refunds service before launch
+    relevant: [{source: linear, contains: "PLAT-44"}]
+  - id: meeting-go-no-go
+    role: team_lead
+    query: what did we decide about the launch date in the go/no-go meeting
+    relevant: [{source: meetings, contains: "go/no-go"}]
+  - id: github-fallback
+    role: team_lead
+    query: pull request for the vendor timeout fallback route
+    relevant: [{source: github, contains: "#102"}]
+  - id: incident-latency
+    role: team_lead
+    query: payment capture latency above SLO incident
+    relevant: [{source: incidents, contains: "4211"}]
+  - id: crm-deal
+    role: project_manager
+    query: which customer deal depends on the payments migration
+    relevant: [{source: crm, contains: "Northwind"}]
+  - id: finance-budget
+    role: project_manager
+    query: how much of the Phoenix budget is spent
+    relevant: [{source: finance, contains: "Phoenix Payments Revamp"}]
+  - id: policy-ci
+    role: member
+    query: which CI job must pass before a release
+    relevant: [{source: demo, contains: "integration-tests"}]
+  - id: keka-leave
+    role: project_manager
+    query: Arjun M leave dates
+    relevant: [{source: keka, contains: "Arjun M"}]
+
+filtered:
+  - id: only-email
+    role: project_manager
+    query: vendor
+    filters: {sources: [email]}
+  - id: only-chat
+    role: team_lead
+    query: PHX-7
+    filters: {sources: [slack]}
+  - id: only-project
+    role: project_manager
+    query: refunds
+    filters: {project_key: PHX}
+
+leaks:
+  - id: auditor-no-email
+    role: auditor
+    query: vendor fix planned next week capture timeouts
+    forbidden_sources: [email]
+  - id: member-no-leave
+    role: member
+    query: Arjun M on leave dates
+    forbidden_sources: [keka, bamboohr]
+  - id: member-no-finance
+    role: member
+    query: Phoenix budget actual and Northwind deal
+    forbidden_sources: [finance, crm]

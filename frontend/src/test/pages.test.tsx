@@ -464,3 +464,37 @@ describe("Why is it late?", () => {
     expect(JSON.parse(String(post[1]!.body))).toEqual({ statement: "No blockers" });
   });
 });
+
+describe("Knowledge search over indexed platforms", () => {
+  it("filters by source, shows where results come from and indexes project data", async () => {
+    const pm = { ...LEAD, permissions: [...LEAD.permissions, "knowledge:read", "knowledge:manage"] };
+    const fetchMock = signedInAs(pm, {
+      "GET /knowledge/documents": () => json({ items: [], total: 0, limit: 50, offset: 0 }),
+      "POST /knowledge/search": () => json({ query: "leadership", results: [{
+        document_id: "d1", title: "slack C0PHX0001 · 2026-11-06", section: null, chunk: 0,
+        citation: "slack C0PHX0001 · 2026-11-06", score: 0.2, matched_by: ["keyword"],
+        source: "slack", project: "PHX", date: "2026-11-06",
+        text: "Priya N: Let's keep reporting Phoenix as on track to leadership until Friday",
+      }] }),
+      "POST /knowledge/index": () => json([{ project: "PHX", sources: [
+        { source: "jira", added: 8, updated: 0, unchanged: 0, removed: 0, error: null },
+        { source: "slack", added: 6, updated: 0, unchanged: 0, removed: 0, error: null },
+        { source: "chat", added: 0, updated: 0, unchanged: 0, removed: 0, error: "Slack is down" },
+      ] }]),
+    });
+    renderApp("/knowledge");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Index project data" }));
+    expect(await screen.findByText(/PHX: 14 new or updated, 0 unchanged across 2 sources \(chat unavailable\)/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Chat" }));
+    await userEvent.type(screen.getByLabelText("Search documents"), "leadership");
+    await userEvent.click(screen.getByRole("button", { name: "Search" }));
+    expect(await screen.findByText(/on track to leadership/)).toBeInTheDocument();
+    expect(screen.getByText("Slack")).toBeInTheDocument();
+    expect(screen.getByText(/PHX · 2026-11-06/)).toBeInTheDocument();
+
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes("/knowledge/search"))!;
+    expect(JSON.parse(String(call[1]!.body)).sources).toEqual(["slack", "teams_chat"]);
+  });
+});

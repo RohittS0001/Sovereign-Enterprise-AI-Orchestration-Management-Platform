@@ -7,12 +7,13 @@
 k: 3
 thresholds:
   hit_at_1: 0.7
-  hit_at_k: 0.85
+  hit_at_k: 0.9
   recall_at_k: 0.8
   mrr: 0.75
   ndcg_at_k: 0.7
   context_precision_at_k: 0.7
   latency_p95_ms: 500
+  fusion_gain_mrr: -0.01   # hybrid may never trail the best single retriever
   leak_rate: 0.0
 
 queries:

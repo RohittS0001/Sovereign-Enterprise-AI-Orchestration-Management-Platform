@@ -32,9 +32,11 @@ def test_parse_dt_handles_google_and_graph_formats() -> None:
 
 
 def test_free_slots_skip_busy_time_weekends_and_short_gaps() -> None:
-    busy = [BusySlot(person="a", start=MON.replace(hour=9), end=MON.replace(hour=11)),
-            BusySlot(person="b", start=MON.replace(hour=10), end=MON.replace(hour=13)),
-            BusySlot(person="a", start=MON.replace(hour=13, minute=20), end=MON.replace(hour=18))]  # fmt: skip
+    busy = [
+        BusySlot(person="a", start=MON.replace(hour=9), end=MON.replace(hour=11)),
+        BusySlot(person="b", start=MON.replace(hour=10), end=MON.replace(hour=13)),
+        BusySlot(person="a", start=MON.replace(hour=13, minute=20), end=MON.replace(hour=18)),
+    ]
     slots = free_slots(busy, MON, MON.replace(day=11), 30)
 
     # Monday's only gap (13:00-13:20) is shorter than 30 minutes, so the first slot is Tuesday.
@@ -47,13 +49,28 @@ def test_free_slots_skip_busy_time_weekends_and_short_gaps() -> None:
 
 
 async def test_google_free_busy_and_events() -> None:
-    api = MockApi({
-        "POST /calendar/v3/freeBusy": {"calendars": {"a@example.com": {"busy": [
-            {"start": "2026-11-09T09:00:00Z", "end": "2026-11-09T10:00:00Z"}]}}},
-        "GET /calendar/v3/calendars/primary/events": {"items": [
-            {"id": "e1", "summary": "Review", "start": {"dateTime": "2026-11-09T09:00:00Z"},
-             "end": {"dateTime": "2026-11-09T10:00:00Z"}, "attendees": [{}, {}]}]},
-    })  # fmt: skip
+    api = MockApi(
+        {
+            "POST /calendar/v3/freeBusy": {
+                "calendars": {
+                    "a@example.com": {
+                        "busy": [{"start": "2026-11-09T09:00:00Z", "end": "2026-11-09T10:00:00Z"}]
+                    }
+                }
+            },
+            "GET /calendar/v3/calendars/primary/events": {
+                "items": [
+                    {
+                        "id": "e1",
+                        "summary": "Review",
+                        "start": {"dateTime": "2026-11-09T09:00:00Z"},
+                        "end": {"dateTime": "2026-11-09T10:00:00Z"},
+                        "attendees": [{}, {}],
+                    }
+                ]
+            },
+        }
+    )
     svc = GoogleCalendarService(api.factory("Google Calendar", "https://www.googleapis.com"))
 
     [slot] = await svc.free_busy(["a@example.com"], MON, MON.replace(hour=23))
@@ -65,10 +82,27 @@ async def test_google_free_busy_and_events() -> None:
 
 
 async def test_outlook_get_schedule_counts_busy_tentative_and_oof() -> None:
-    item = lambda status, h: {"status": status, "start": {"dateTime": f"2026-11-09T{h}:00:00.0000000"},  # noqa: E731
-                              "end": {"dateTime": f"2026-11-09T{h}:30:00.0000000"}}  # fmt: skip
-    api = MockApi({"POST /v1.0/users/pm@example.com/calendar/getSchedule": {"value": [
-        {"scheduleId": "a@example.com", "scheduleItems": [item("busy", "09"), item("free", "10"), item("oof", "11")]}]}})  # fmt: skip
+    item = lambda status, h: {
+        "status": status,
+        "start": {"dateTime": f"2026-11-09T{h}:00:00.0000000"},  # noqa: E731
+        "end": {"dateTime": f"2026-11-09T{h}:30:00.0000000"},
+    }
+    api = MockApi(
+        {
+            "POST /v1.0/users/pm@example.com/calendar/getSchedule": {
+                "value": [
+                    {
+                        "scheduleId": "a@example.com",
+                        "scheduleItems": [
+                            item("busy", "09"),
+                            item("free", "10"),
+                            item("oof", "11"),
+                        ],
+                    }
+                ]
+            }
+        }
+    )
     svc = OutlookCalendarService(
         api.factory("Outlook", "https://graph.microsoft.com/v1.0"), "pm@example.com"
     )
@@ -86,12 +120,21 @@ def test_vtt_to_text() -> None:
 
 async def test_zoom_downloads_transcripts_only_from_zoom_hosts() -> None:
     files = lambda url: [{"file_type": "MP4"}, {"file_type": "TRANSCRIPT", "download_url": url}]  # noqa: E731
-    api = MockApi({
-        "GET /v2/users/me/recordings": {"meetings": [
-            {"uuid": "u1", "topic": "Go/no-go", "start_time": "2026-11-08T10:00:00Z",
-             "recording_files": files("https://us06web.zoom.us/rec/download/t1")}]},
-        "GET /rec/download/t1": "WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.000\nPriya: Ship it",
-    })  # fmt: skip
+    api = MockApi(
+        {
+            "GET /v2/users/me/recordings": {
+                "meetings": [
+                    {
+                        "uuid": "u1",
+                        "topic": "Go/no-go",
+                        "start_time": "2026-11-08T10:00:00Z",
+                        "recording_files": files("https://us06web.zoom.us/rec/download/t1"),
+                    }
+                ]
+            },
+            "GET /rec/download/t1": "WEBVTT\n\n1\n00:00:01.000 --> 00:00:02.000\nPriya: Ship it",
+        }
+    )
     svc = ZoomService(api.factory("Zoom", "https://api.zoom.us"))
 
     [t] = await svc.list_transcripts(date(2026, 11, 1), date(2026, 11, 9))
@@ -105,27 +148,46 @@ async def test_zoom_downloads_transcripts_only_from_zoom_hosts() -> None:
 
 
 async def test_teams_transcripts_and_meet_entries() -> None:
-    teams = MockApi({
-        "GET /v1.0/users/org%40example.com/onlineMeetings/getAllTranscripts(meetingOrganizerUserId='org%40example.com')":
-            {"value": [{"id": "t1", "meetingId": "m1", "createdDateTime": "2026-11-08T10:00:00Z",
-                        "transcriptContentUrl": "https://graph.microsoft.com/v1.0/x/transcripts/t1/content"}]},
-        "GET /v1.0/users/org%40example.com/onlineMeetings/m1": {"subject": "Sprint review"},
-        "GET /v1.0/x/transcripts/t1/content": "WEBVTT\n\n<v Sara>Risk: load test slips</v>",
-    })  # fmt: skip
+    teams = MockApi(
+        {
+            "GET /v1.0/users/org%40example.com/onlineMeetings/getAllTranscripts(meetingOrganizerUserId='org%40example.com')": {
+                "value": [
+                    {
+                        "id": "t1",
+                        "meetingId": "m1",
+                        "createdDateTime": "2026-11-08T10:00:00Z",
+                        "transcriptContentUrl": "https://graph.microsoft.com/v1.0/x/transcripts/t1/content",
+                    }
+                ]
+            },
+            "GET /v1.0/users/org%40example.com/onlineMeetings/m1": {"subject": "Sprint review"},
+            "GET /v1.0/x/transcripts/t1/content": "WEBVTT\n\n<v Sara>Risk: load test slips</v>",
+        }
+    )
     t_svc = TeamsMeetingsService(
         teams.factory("Teams", "https://graph.microsoft.com/v1.0"), "org@example.com"
     )
     [t] = await t_svc.list_transcripts(date(2026, 11, 1), date(2026, 11, 9))
     assert (t.title, t.text) == ("Sprint review", "Sara: Risk: load test slips")
 
-    meet = MockApi({
-        "GET /v2/conferenceRecords": {"conferenceRecords": [{"name": "conferenceRecords/abc",
-                                                             "startTime": "2026-11-08T10:00:00Z"}]},
-        "GET /v2/conferenceRecords/abc/transcripts": {"transcripts": [{"name": "conferenceRecords/abc/transcripts/t9"}]},
-        "GET /v2/conferenceRecords/abc/transcripts/t9/entries": {"transcriptEntries": [{"text": "Hello"}, {"text": "Bye"}]},
-    })  # fmt: skip
-    [m] = await GoogleMeetService(meet.factory("Meet", "https://meet.googleapis.com")).list_transcripts(
-        date(2026, 11, 1), date(2026, 11, 9))  # fmt: skip
+    meet = MockApi(
+        {
+            "GET /v2/conferenceRecords": {
+                "conferenceRecords": [
+                    {"name": "conferenceRecords/abc", "startTime": "2026-11-08T10:00:00Z"}
+                ]
+            },
+            "GET /v2/conferenceRecords/abc/transcripts": {
+                "transcripts": [{"name": "conferenceRecords/abc/transcripts/t9"}]
+            },
+            "GET /v2/conferenceRecords/abc/transcripts/t9/entries": {
+                "transcriptEntries": [{"text": "Hello"}, {"text": "Bye"}]
+            },
+        }
+    )
+    [m] = await GoogleMeetService(
+        meet.factory("Meet", "https://meet.googleapis.com")
+    ).list_transcripts(date(2026, 11, 1), date(2026, 11, 9))
     assert (
         m.text == "Hello\nBye"
         and 'start_time>="2026-11-01T00:00:00Z"' in meet.requests[0].url.params["filter"]
@@ -147,9 +209,14 @@ async def test_heuristic_extraction_finds_decisions_actions_and_risks() -> None:
 
 
 async def test_model_extraction_wraps_untrusted_text_and_flags_injection() -> None:
-    reply = {"summary": "Launch kept.", "decisions": ["Keep the 14th"],
-             "action_items": [{"task": "Draft vendor escalation", "owner": "Arjun M", "due": "tomorrow"}],
-             "risks": ["Capture timeout"]}  # fmt: skip
+    reply = {
+        "summary": "Launch kept.",
+        "decisions": ["Keep the 14th"],
+        "action_items": [
+            {"task": "Draft vendor escalation", "owner": "Arjun M", "due": "tomorrow"}
+        ],
+        "risks": ["Capture timeout"],
+    }
     model = FakeLLM([reply])
     outcome = await extract_outcome(TRANSCRIPT + "\nCard 4111 1111 1111 1111", model)
 
@@ -162,10 +229,12 @@ async def test_model_extraction_wraps_untrusted_text_and_flags_injection() -> No
 async def test_slack_client_checks_ok_and_channels() -> None:
     from backend.app.integrations.connectors.chat import SlackService
 
-    api = MockApi({
-        "GET /api/users.info": {"ok": True, "user": {"profile": {"email": "pm@example.com"}}},
-        "POST /api/chat.postMessage": {"ok": False, "error": "not_in_channel"},
-    })  # fmt: skip
+    api = MockApi(
+        {
+            "GET /api/users.info": {"ok": True, "user": {"profile": {"email": "pm@example.com"}}},
+            "POST /api/chat.postMessage": {"ok": False, "error": "not_in_channel"},
+        }
+    )
     svc = SlackService(api.factory("Slack", "https://slack.com/api"), default_channel="#payments")
 
     assert await svc.email_of("U123") == "pm@example.com"
@@ -190,3 +259,41 @@ async def test_teams_chat_posts_an_adaptive_card() -> None:
     assert card["contentType"] == "application/vnd.microsoft.card.adaptive"
     assert card["content"]["body"][0]["text"] == "Status: on track"
     assert await svc.email_of("aad-1") is None  # no Graph credentials configured
+
+
+async def test_slack_reads_channel_history_for_indexing() -> None:
+    from datetime import date
+
+    from backend.app.integrations.connectors.chat import SlackService
+
+    api = MockApi(
+        {
+            "GET /api/conversations.history": {
+                "ok": True,
+                "messages": [
+                    {
+                        "type": "message",
+                        "ts": "1793952000.000100",
+                        "user": "U1",
+                        "text": "PHX-7 still blocked",
+                    },
+                    {
+                        "type": "message",
+                        "subtype": "channel_join",
+                        "ts": "1793952001.0",
+                        "text": "joined",
+                    },
+                    {"type": "message", "ts": "1793952002.0", "user": "U2", "text": ""},
+                ],
+            },
+        }
+    )
+    svc = SlackService(api.factory("Slack", "https://slack.com/api"))
+
+    messages = await svc.list_messages("C0PHX0001", date(2026, 11, 1))
+
+    assert [(m.author, m.text) for m in messages] == [("U1", "PHX-7 still blocked")]
+    assert api.last.url.params["channel"] == "C0PHX0001"
+    assert int(api.last.url.params["oldest"]) == 1793491200  # 2026-11-01T00:00Z
+    with pytest.raises(ValueError):
+        await svc.list_messages("C0../../admin", date(2026, 11, 1))

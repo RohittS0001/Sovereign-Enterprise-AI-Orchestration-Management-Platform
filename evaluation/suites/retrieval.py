@@ -17,6 +17,8 @@ from evaluation.core import CaseResult, Metric, SuiteResult, Timer, load_dataset
 from evaluation.environment import environment
 
 STRATEGIES = ("hybrid", "keyword", "semantic")
+# RRF settings swept for the report: (k, semantic weight), keyword weight fixed at 1.
+FUSION_GRID = ((5, 0.1), (5, 0.5), (60, 0.1), (60, 1.0))
 
 
 def _gain(hit: dict, relevant: list[dict]) -> float:
@@ -84,13 +86,35 @@ async def run(*, real_embeddings: bool = False) -> SuiteResult:
                             )
                         )
 
+        # Sweep the fusion settings on the same queries (informational, shows the tuning).
+        grid: dict[tuple[int, float], list[float]] = {}
+        async with environment(real_embeddings=real_embeddings) as env:
+            for rrf_k, weight in FUSION_GRID:
+                for case in data["queries"]:
+                    if "forbidden" in case:
+                        continue
+                    async with env.database.session() as session:
+                        found = await env.knowledge(session).search(
+                            env.principals[Role(case["role"])],
+                            case["query"],
+                            top_k=5,
+                            weights=(1.0, weight),
+                            rrf_k=rrf_k,
+                        )
+                    exact = [
+                        1.0 if _gain(h.as_dict(), case["relevant"]) == 2 else 0.0 for h in found
+                    ]
+                    grid.setdefault((rrf_k, weight), []).append(M.reciprocal_rank(exact))
+
     t = data["thresholds"]
     hybrid = per["hybrid"]
+    best_single = max(M.mean(per["keyword"].get("mrr", [])), M.mean(per["semantic"].get("mrr", [])))
 
     def metric(name: str, threshold: float | None, description: str) -> Metric:
         values = hybrid.get(name, [])
-        return Metric(name, M.mean(values), threshold, description=description,
-                      ci=M.bootstrap_ci(values))  # fmt: skip
+        return Metric(
+            name, M.mean(values), threshold, description=description, ci=M.bootstrap_ci(values)
+        )
 
     result.metrics = [
         metric("hit_at_1", t["hit_at_1"], "Exact passage ranked first"),
@@ -99,15 +123,51 @@ async def run(*, real_embeddings: bool = False) -> SuiteResult:
         metric("recall_at_k", t.get("recall_at_k"), f"Relevant passages found in the top {k}"),
         metric("mrr", t["mrr"], "Mean reciprocal rank of the exact passage"),
         metric("ndcg_at_k", t.get("ndcg_at_k"), f"Graded nDCG@{k} (section 2, document 1)"),
-        metric("context_precision_at_k", t.get("context_precision_at_k"),
-               "Rank-aware context precision (Ragas)"),
-        Metric("latency_p50_ms", round(M.percentile(latencies, 50), 1), None,
-               higher_is_better=False, description="Search latency, median"),
-        Metric("latency_p95_ms", round(M.percentile(latencies, 95), 1), t.get("latency_p95_ms"),
-               higher_is_better=False, description="Search latency, 95th percentile"),
-        Metric("leak_rate", ratio(leaks, leak_checks), t["leak_rate"], higher_is_better=False,
-               description="Restricted documents returned to unauthorized roles"),
-    ]  # fmt: skip
+        metric(
+            "context_precision_at_k",
+            t.get("context_precision_at_k"),
+            "Rank-aware context precision (Ragas)",
+        ),
+        Metric(
+            "latency_p50_ms",
+            round(M.percentile(latencies, 50), 1),
+            None,
+            higher_is_better=False,
+            description="Search latency, median",
+        ),
+        Metric(
+            "latency_p95_ms",
+            round(M.percentile(latencies, 95), 1),
+            t.get("latency_p95_ms"),
+            higher_is_better=False,
+            description="Search latency, 95th percentile",
+        ),
+        Metric(
+            "leak_rate",
+            ratio(leaks, leak_checks),
+            t["leak_rate"],
+            higher_is_better=False,
+            description="Restricted documents returned to unauthorized roles",
+        ),
+    ]
+    # Fusion must never do worse than the best single retriever on these queries.
+    result.metrics.append(
+        Metric(
+            "fusion_gain_mrr",
+            round(M.mean(hybrid.get("mrr", [])) - best_single, 4),
+            t.get("fusion_gain_mrr"),
+            description="Hybrid MRR minus the best single retriever's MRR",
+        )
+    )
+    for (rrf_k, weight), values in grid.items():
+        result.metrics.append(
+            Metric(
+                f"rrf_k{rrf_k}_wsem{weight:g}_mrr",
+                M.mean(values),
+                None,
+                description="Fusion sweep (keyword weight 1)",
+            )
+        )
     # Ablation: what each retriever achieves alone (informational, no thresholds).
     for strategy in ("keyword", "semantic"):
         for name in ("hit_at_1", "mrr", "ndcg_at_k"):
@@ -117,7 +177,7 @@ async def run(*, real_embeddings: bool = False) -> SuiteResult:
                     M.mean(per[strategy].get(name, [])),
                     None,
                     description=f"Ablation: {strategy} retrieval alone",
-                )  # fmt: skip
+                )
             )
     result.seconds = timer.seconds
     return result

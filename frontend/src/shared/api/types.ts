@@ -189,6 +189,9 @@ export interface SearchResult {
   citation: string;
   score: number;
   matched_by: string[];
+  source?: string | null;
+  project?: string | null;
+  date?: string | null;
   text: string;
 }
 

@@ -285,3 +285,27 @@ async def test_ragas_and_deepeval_exports() -> None:
     assert set(ragas[0]) == {"user_input", "retrieved_contexts", "response", "reference"}
     assert set(deepeval[0]) == {"input", "actual_output", "expected_output", "retrieval_context"}
     assert len(ragas) == len(deepeval) == len(samples) >= 10
+
+
+# ------------------------------------------------------------------ platform search
+
+
+async def test_platform_search_gate() -> None:
+    from evaluation.suites import platform_search
+
+    result = await platform_search.run()
+    assert_passed(result)
+    assert result.metric("sources_indexed").value >= 8
+
+
+async def test_platform_search_detects_permission_leaks(monkeypatch) -> None:
+    from backend.app.core.security.permissions import Role
+    from backend.app.domains.knowledge import indexing
+    from evaluation.suites import platform_search
+
+    # Regression: indexing everything as readable by every role would leak e-mail and HR data.
+    monkeypatch.setattr(indexing, "roles_with", lambda permission: [r.value for r in Role])
+
+    result = await platform_search.run()
+
+    assert not result.passed and result.metric("leak_rate").value > 0

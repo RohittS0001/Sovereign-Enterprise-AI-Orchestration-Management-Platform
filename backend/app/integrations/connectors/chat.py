@@ -9,11 +9,17 @@ import base64
 import hashlib
 import hmac
 import re
+from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
 
 from backend.app.core.config import Settings
 from backend.app.integrations.connectors.auth import microsoft_token
-from backend.app.integrations.connectors.base import ConnectorClient, ConnectorService, safe_id
+from backend.app.integrations.connectors.base import (
+    ChannelMessage,
+    ConnectorClient,
+    ConnectorService,
+    safe_id,
+)
 from backend.app.integrations.connectors.spec import ConnectorSpec
 
 CHANNEL = re.compile(r"^[A-Z0-9]{8,12}$|^#[a-z0-9._-]{1,80}$")
@@ -50,6 +56,22 @@ class SlackService(ConnectorService):
             payload["blocks"] = blocks
         body = await self._call("chat.postMessage", payload)
         return {"channel": body.get("channel"), "ts": body.get("ts")}
+
+    async def list_messages(
+        self, channel: str, since: date, limit: int = 200
+    ) -> list[ChannelMessage]:
+        """Channel history since a date (needs the channels:history / groups:history scope)."""
+        channel_id = safe_id(channel, "Slack channel id")
+        oldest = datetime.combine(since, time(0), UTC).timestamp()
+        body = await self._call("conversations.history",
+                                params={"channel": channel_id, "oldest": f"{oldest:.0f}", "limit": min(limit, 200)})  # fmt: skip
+        return [
+            ChannelMessage(source=self.source, channel=channel_id, id=m["ts"], author=m.get("user"),
+                           text=m.get("text", ""), sent_at=datetime.fromtimestamp(float(m["ts"]), UTC),
+                           thread_id=m.get("thread_ts"))
+            for m in body.get("messages") or []
+            if m.get("type", "message") == "message" and m.get("text") and not m.get("subtype")
+        ]  # fmt: skip
 
     async def health_check(self) -> dict[str, Any]:
         body = await self._call("auth.test", payload={})
@@ -98,6 +120,34 @@ class TeamsChatService(ConnectorService):
                                      {"$select": "mail,userPrincipalName"})  # fmt: skip
         return user.get("mail") or user.get("userPrincipalName")
 
+    async def list_messages(
+        self, channel: str, since: date, limit: int = 50
+    ) -> list[ChannelMessage]:
+        """Messages of a Teams channel given as "<team-id>/<channel-id>" (Graph, needs
+        ChannelMessage.Read.All)."""
+        if self._graph_factory is None:
+            raise ValueError(
+                "Reading Teams channels needs MS_TENANT_ID/MS_CLIENT_ID/MS_CLIENT_SECRET"
+            )
+        team, _, channel_id = channel.partition("/")
+        team, channel_id = safe_id(team, "Teams team id"), safe_id(channel_id, "Teams channel id")
+        if self._graph is None:
+            self._graph = self._graph_factory()
+        body = await self._graph.get(
+            f"/teams/{team}/channels/{channel_id}/messages", {"$top": min(limit, 50)}
+        )
+        messages = []
+        for m in body.get("value") or []:
+            sent = datetime.fromisoformat(m["createdDateTime"].replace("Z", "+00:00"))
+            if sent.date() < since or m.get("messageType") != "message":
+                continue
+            content = re.sub(r"<[^>]+>", " ", (m.get("body") or {}).get("content") or "")
+            author = ((m.get("from") or {}).get("user") or {}).get("displayName")
+            messages.append(ChannelMessage(source=self.source, channel=channel, id=m["id"],
+                                           author=author, text=" ".join(content.split()),
+                                           sent_at=sent, url=m.get("webUrl")))  # fmt: skip
+        return messages
+
     async def close(self) -> None:
         await super().close()
         if self._graph is not None:
@@ -108,9 +158,24 @@ class TeamsChatService(ConnectorService):
 
 
 class DemoChat:
-    def __init__(self, source: str) -> None:
+    def __init__(self, source: str, data: dict[str, Any] | None = None,
+                 today: date | None = None) -> None:  # fmt: skip
         self.source = source
         self.sent: list[dict[str, Any]] = []
+        base = datetime.combine(today or date.today(), time(9), UTC)
+        self.messages = [
+            ChannelMessage(source=source, channel=m["channel"], id=str(i), author=m.get("author"),
+                           text=m["text"], thread_id=m.get("thread"),
+                           sent_at=base + timedelta(days=int(m.get("day", 0)), minutes=int(m.get("minute", 0))))
+            for i, m in enumerate((data or {}).get("messages", []), start=1)
+        ]  # fmt: skip
+
+    async def list_messages(
+        self, channel: str, since: date, limit: int = 200
+    ) -> list[ChannelMessage]:
+        return [m for m in self.messages if m.channel == channel and m.sent_at.date() >= since][
+            :limit
+        ]
 
     async def post_message(self, channel: str | None, text: str, **kwargs: Any) -> dict[str, Any]:
         self.sent.append({"channel": channel, "text": text, **kwargs})
@@ -149,6 +214,8 @@ CHAT_SPECS = (
         "slack", "Slack", "chat", required=("slack_bot_token", "slack_signing_secret"),
         optional=("slack_digest_channel",),
         setup="api.slack.com/apps → bot scopes app_mentions:read, chat:write, im:history, users:read, "
+              "channels:history, groups:history (to index project channels listed in a project's "
+              "slack_channels link), "
               "users:read.email; Event Subscriptions → https://<host>/api/v1/chat/slack/events "
               "(app_mention, message.im); Interactivity → https://<host>/api/v1/chat/slack/interactions",
         docs_url="https://api.slack.com/apis/events-api",
@@ -156,7 +223,7 @@ CHAT_SPECS = (
             lambda: ConnectorClient("Slack", base_url="https://slack.com/api", timeout=s.connector_timeout_seconds,
                                     headers={"Authorization": f"Bearer {s.slack_bot_token.get_secret_value()}"}),
             s.slack_digest_channel),
-        demo=lambda data, today: DemoChat("slack"),
+        demo=lambda data, today: DemoChat("slack", (data.get("chat") or {}).get("slack"), today),
     ),
     ConnectorSpec(
         "teams_chat", "Microsoft Teams chat", "chat",

@@ -334,6 +334,19 @@
       ]
     }
   },
+  "chat": {
+    "slack": {
+      "messages": [
+        {"channel": "C0PHX0001", "day": -5, "author": "Arjun M", "text": "Vendor confirmed the capture timeout is a regression on their side. PHX-7 is blocked until they ship a fix."},
+        {"channel": "C0PHX0001", "day": -4, "author": "Sara K", "text": "My PR for PHX-3 is ready but I can't merge it until PHX-7 is resolved."},
+        {"channel": "C0PHX0001", "day": -3, "author": "Priya N", "text": "Let's keep reporting Phoenix as on track to leadership until Friday, we may still make it."},
+        {"channel": "C0PHX0001", "day": -2, "author": "Meera S", "text": "PHX-2 refunds endpoint needs two more days, the idempotency tests are flaky."},
+        {"channel": "C0PHX0001", "day": -1, "author": "Dev R", "text": "Load test harness is merged (PR #99) but I haven't moved PHX-4 in Jira yet."},
+        {"channel": "C0PHX0001", "day": 0, "author": "Arjun M", "text": "Heads up: I'm on leave from tomorrow for four days. Who can cover PHX-5 refund webhooks?"},
+        {"channel": "C0LEDGER01", "day": -1, "author": "Kiran P", "text": "Ledger reconciliation job is green again after the hotfix."}
+      ]
+    }
+  },
   "meetings": {
     "zoom": {
       "transcripts": [

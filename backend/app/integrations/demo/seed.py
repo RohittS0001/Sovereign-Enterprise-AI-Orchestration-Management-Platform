@@ -16,6 +16,7 @@ PHX_CONFIG = {
         "sonarqube_projects": ["acme_payments"],
         "jenkins_jobs": ["payments/release"],
         "cost_centers": ["Phoenix Payments Revamp"],
+        "slack_channels": ["C0PHX0001"],
     },
     "members": [
         {

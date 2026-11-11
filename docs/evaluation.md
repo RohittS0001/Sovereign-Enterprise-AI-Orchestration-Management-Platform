@@ -19,6 +19,7 @@ python -m evaluation frameworks --ragas           # grade them in Ragas (optiona
 | Layer | Suite | What is measured | Method | Data |
 |---|---|---|---|---|
 | Retrieval | `retrieval` | Hit rate@1/@k, Precision@k, Recall@k, MRR, graded nDCG@k, context precision@k, p50/p95 latency, leak rate, ablation | Ranked results judged against labelled passages (gain 2 = exact section, 1 = right document) | 22 graded queries (verbatim, paraphrase, multi-part) + 3 access-control probes |
+| Platform search | `platform_search` | Hit@1/@k, MRR on questions whose answer lives in one system (Slack, email, Jira, Linear, meetings, incidents, CRM, finance, Keka), filter precision, permission leak rate, re-index no-op | PHX indexed from 10 sources next to the policy documents; role-based leak probes | 12 cross-source questions, 3 filtered searches, 3 leak probes |
 | RAG generation | `rag` | Context recall, context precision@k, faithfulness, answer relevance, semantic similarity, factual-correctness F1, citation validity, sync leak rate | Real agent pipeline; offline extractive responder; LLM judge with `--judge` | 12 questions with hand-written reference answers |
 | Agent | `agent` | Completion, tool-selection recall/precision/F1, trajectory (in order), argument accuracy, fact coverage, citation validity, approval compliance, negative rejection, faithfulness (judge), latency p50/p95, tokens and steps per question | Real model on the demo company; recording wrappers capture planned calls and the exact evidence the responder saw | 13 questions incl. writes and unanswerable questions |
 | Delay analysis | `delivery` | Top-cause accuracy, macro-F1 over causes, hard-tier accuracy, vendor root-cause recall, claim-verdict accuracy, **false-contradiction rate** | Synthetic sprints with a planted dominant cause, a competing smaller cause and noise; claims with known truth | 140 seeded scenarios (35 "hard") + 60 claims |
@@ -72,7 +73,8 @@ worse than missing a problem.
 
 | Suite | Headline results (95% CI) |
 |---|---|
-| retrieval | Hit@1 0.77 (0.59–0.95) · Hit@3 0.95 · MRR 0.86 · nDCG@3 0.72 · context precision@3 0.89 · p95 3 ms · leak 0 |
+| retrieval | Hit@1 0.86 (0.73–1.0) · Hit@3 1.0 · MRR 0.93 · nDCG@3 0.78 · context precision@3 0.94 · p95 3 ms · leak 0 · fusion gain ≥ 0 |
+| platform_search | Hit@1 0.92 · MRR 0.93 · 10 sources · filter precision 1.0 · leak 0 · re-index changes 0 |
 | rag | context recall 0.92 · context precision 0.87 · faithfulness 1.0 · semantic similarity 0.74 · factual-correctness F1 0.67 (0.42–0.92) · citations 1.0 · leak 0 |
 | delivery | top cause 0.91 (0.86–0.96) · hard tier 0.66 · macro-F1 0.91 · vendor recall 1.0 (0.75 incl. hard wording) · claims 1.0 · false contradictions 0 |
 | planning | P80 coverage 0.88 · Brier 0.018 · slip AUC 0.95 |
@@ -87,11 +89,16 @@ worse than missing a problem.
    metrics (factual correctness, answer relevance with an echo guard) exposed it. The
    responder now reads only passage text, and a CI test makes sure an echoing responder
    fails. Lesson: a single metric can be satisfied trivially; use complementary ones.
-2. **Hybrid search is not automatically better.** The ablation shows keyword-only BM25
-   (MRR 0.90) beating hybrid (0.86) offline, because the offline embedder is a lexical
-   hash, so "semantic" search adds noise. With a real embedding model
-   (`--real-embeddings`) the paraphrase queries are where hybrid should win. The ablation
-   makes that claim testable instead of assumed.
+2. **Hybrid search is not automatically better, so it is tuned and gated.** The first ablation
+   showed keyword-only BM25 (MRR 0.89) beating hybrid (0.86): the offline embedder is a lexical
+   hash, so the "semantic" list mostly adds noise, and standard RRF (k=60) lets that noise
+   reorder good keyword hits. A sweep over RRF k and weights found that with this embedder the
+   semantic list should only break ties (k=5, weight 0.1); with a real embedding model the
+   standard k=60 and equal weights apply. Fusion parameters now follow the embedder, a CI gate
+   requires hybrid ≥ the best single retriever, and identifier-aware terms, title boosting and
+   plural folding lifted MRR to 0.93. One cross-source question still misses (a pure paraphrase,
+   "when will they ship the fix" vs "a fix is planned for next week"): exactly the case a real
+   embedding model fixes, kept in the dataset rather than tuned away.
 3. **The delay benchmark started too easy.** The first version scored 100%, which proved
    only the arithmetic. Competing causes and a hard tier (vendor problems worded without
    keywords, internal blocks that mention "client") brought accuracy to a realistic 91% and

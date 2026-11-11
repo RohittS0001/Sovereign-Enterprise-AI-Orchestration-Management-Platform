@@ -310,3 +310,51 @@ async def test_seed_script_loads_demo_documents(tmp_path, monkeypatch, make_user
 
     assert [o.split(":")[0] for o in first] == ["added"] * 3
     assert [o.split(":")[0] for o in second] == ["exists"] * 3
+
+
+async def test_index_projects_then_filter_search(
+    test_settings, database, make_user, auth_headers
+) -> None:
+    from backend.app.core.security.permissions import Role
+    from backend.app.main import create_app
+    from tests.conftest import serve
+    from tests.support.analytics import PHX_CONFIG
+
+    settings = test_settings.model_copy(update={"demo_mode": True})
+    admin = await make_user(role=Role.ADMIN)
+    pm = await make_user(role=Role.PROJECT_MANAGER)
+    auditor = await make_user(role=Role.AUDITOR)
+    async with serve(create_app(settings, database)) as client:
+        await client.put("/api/v1/projects/PHX", json=PHX_CONFIG, headers=auth_headers(admin))
+        indexed = await client.post("/api/v1/knowledge/index", json={}, headers=auth_headers(admin))
+        denied = await client.post(
+            "/api/v1/knowledge/index", json={}, headers=auth_headers(auditor)
+        )
+        missing = await client.post(
+            "/api/v1/knowledge/index", json={"project_key": "NOPE"}, headers=auth_headers(admin)
+        )
+        chat = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "on track to leadership", "sources": ["slack"], "project_key": "PHX"},
+            headers=auth_headers(pm),
+        )
+        hidden = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "vendor fix next week", "sources": ["email"]},
+            headers=auth_headers(auditor),
+        )
+        bad = await client.post(
+            "/api/v1/knowledge/search",
+            json={"query": "x y", "sources": ["DROP TABLE"]},
+            headers=auth_headers(pm),
+        )
+
+    assert indexed.status_code == 200, indexed.text
+    sources = {s["source"] for s in indexed.json()[0]["sources"] if s["added"]}
+    assert {"jira", "slack", "email", "github"} <= sources
+    assert denied.status_code == 403 and missing.status_code == 404
+    results = chat.json()["results"]
+    assert results and all(r["source"] == "slack" and r["project"] == "PHX" for r in results)
+    assert "leadership" in results[0]["text"]
+    assert hidden.status_code == 200 and hidden.json()["results"] == []
+    assert bad.status_code == 422

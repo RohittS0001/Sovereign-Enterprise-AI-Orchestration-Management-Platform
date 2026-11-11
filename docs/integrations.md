@@ -299,7 +299,7 @@ Service account with domain-wide delegation (scope meetings.space.readonly) impe
 
 ### Slack (`slack`)
 
-api.slack.com/apps → bot scopes app_mentions:read, chat:write, im:history, users:read, users:read.email; Event Subscriptions → https://<host>/api/v1/chat/slack/events (app_mention, message.im); Interactivity → https://<host>/api/v1/chat/slack/interactions.
+api.slack.com/apps → bot scopes app_mentions:read, chat:write, im:history, users:read, channels:history, groups:history (to index project channels listed in a project's slack_channels link), users:read.email; Event Subscriptions → https://<host>/api/v1/chat/slack/events (app_mention, message.im); Interactivity → https://<host>/api/v1/chat/slack/interactions.
 
 - Required: `SLACK_BOT_TOKEN`, `SLACK_SIGNING_SECRET`
 - Optional: `SLACK_DIGEST_CHANNEL`

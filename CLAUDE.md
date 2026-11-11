@@ -121,9 +121,18 @@ optional) and heuristic `scan_for_injection`.
 
 **Knowledge** (`domains/knowledge/`, agent tool `knowledge.search`). `parsers.py` → `chunking.py` →
 `embeddings.py` (Ollama/OpenAI-compatible or offline `HashingEmbedder`) → `Document`/`DocumentChunk`
-(SHA-256 dedup). Search: dense + BM25/full-text → `ranking.py` RRF → per-document cap → optional
-`reranker.py`. **Access control is the SQL `access_filter`, applied before ranking** (roles stored as
-`",role,"` for a portable LIKE). PostgreSQL path (pgvector `<=>`, `ts_rank_cd`) not yet run on live PG.
+(SHA-256 dedup). Search: dense + BM25/full-text (title field-boosted; `search_terms` keeps identifiers
+like `PHX-7`/`#103` whole and folds plurals) → `ranking.py` **weighted RRF** (`fusion_params`: auto k=60/
+weights 1:1 with a real embedder, k=5/semantic 0.1 with the hashing embedder — tuned with the retrieval
+eval; `RAG_RRF_K`, `RAG_*_WEIGHT` override) → `exact_match_first` (records titled with a queried ID
+first) → per-document cap → optional `reranker.py`. `SearchFilters` (sources, project, since/until) and
+**access control are SQL `WHERE`s applied before ranking** (roles stored as `",role,"` for a portable
+LIKE). `indexing.py` indexes every connected platform per project (Jira+history+comments, GitHub PRs/CI,
+other trackers, Slack/Teams channels from `Project.links` `slack_channels`/`teams_channels`, e-mail,
+incidents/errors/deploys, meetings, leave, finance, CRM) as documents with `project_key`/`occurred_at`;
+each item's permission (`roles_with`) becomes its role list; incremental by checksum; a failing source
+keeps its documents. `POST /api/v1/knowledge/index`, `scripts.sync_documents --projects`. PostgreSQL
+path (pgvector `<=>`, `ts_rank_cd` with a weighted title) not yet run on live PG.
 
 **Analytics & reporting** (`domains/analytics/`, `domains/reporting/`, `/api/v1/projects/{key}/health`).
 `Project` links a Jira key to repos, active sprint and members (Jira ↔ Keka ids, capacity).
@@ -138,7 +147,8 @@ instance (in-memory DB, demo integrations, a user per role, demo docs, PHX from
 `integrations/demo/seed.py` — the single source of demo seed data). Formulas in `evaluation/metrics.py`
 (+ `judges.py` LLM-as-judge, `frameworks.py` Ragas/DeepEval export); guide in `docs/evaluation.md`. Suites in `evaluation/suites/`
 read `evaluation/datasets/*.yaml` (data + thresholds): retrieval (incl. leak rate), guardrails,
-analytics (golden values at a fixed date), delivery (synthetic sprints with planted delay causes), redteam (scripted hostile planner through the real
+analytics (golden values at a fixed date), delivery (synthetic sprints with planted delay causes),
+platform_search (hybrid search over all indexed sources, filters, permission leaks), redteam (scripted hostile planner through the real
 `AgentService`/gateway), agent (real model; optional LLM-2 judge fed the exact responder prompt via a
 recording wrapper). `tests/evaluation/test_quality_gates.py` enforces the offline suites in CI and
 proves they fail when approvals, access control or redaction are broken — keep that property when

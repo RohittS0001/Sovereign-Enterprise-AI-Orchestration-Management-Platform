@@ -7,6 +7,28 @@ import { Badge, Card, Empty, ErrorNote, Spinner, formatDate } from "../../shared
 
 const ROLES = ["project_manager", "team_lead", "member", "auditor"];
 
+/** Source filters for hybrid search over documents and indexed platform data. */
+const SOURCE_FILTERS: { id: string; label: string; sources: string[] }[] = [
+  { id: "all", label: "Everything", sources: [] },
+  { id: "docs", label: "Documents", sources: ["upload", "text", "demo", "confluence", "notion", "sharepoint", "google_drive"] },
+  { id: "work", label: "Jira & code", sources: ["jira", "github", "linear", "gitlab", "azure_devops", "jira_cloud", "youtrack", "clickup", "asana"] },
+  { id: "chat", label: "Chat", sources: ["slack", "teams_chat"] },
+  { id: "email", label: "Email", sources: ["email"] },
+  { id: "ops", label: "Incidents & meetings", sources: ["incidents", "meetings"] },
+  { id: "people", label: "People & business", sources: ["keka", "bamboohr", "workday", "zoho_people", "finance", "crm"] },
+];
+
+const SOURCE_LABEL: Record<string, string> = {
+  upload: "Document", text: "Document", demo: "Document", jira: "Jira", github: "GitHub", slack: "Slack",
+  teams_chat: "Teams", email: "Email", incidents: "Ops", meetings: "Meeting", keka: "Keka", finance: "Finance",
+  crm: "CRM", linear: "Linear",
+};
+
+interface IndexResult {
+  project: string;
+  sources: { source: string; added: number; updated: number; unchanged: number; removed: number; error: string | null }[];
+}
+
 function UploadForm() {
   const queryClient = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
@@ -77,8 +99,16 @@ export function KnowledgePage() {
   const queryClient = useQueryClient();
   const [query, setQuery] = useState("");
   const documents = useQuery({ queryKey: ["documents"], queryFn: () => api<Page<KnowledgeDocument>>("/knowledge/documents") });
+  const [filter, setFilter] = useState("all");
   const search = useMutation({
-    mutationFn: (q: string) => api<{ results: SearchResult[] }>("/knowledge/search", { body: { query: q, top_k: 8 } }),
+    mutationFn: (q: string) =>
+      api<{ results: SearchResult[] }>("/knowledge/search", {
+        body: { query: q, top_k: 8, sources: SOURCE_FILTERS.find((f) => f.id === filter)?.sources ?? [] },
+      }),
+  });
+  const index = useMutation({
+    mutationFn: () => api<IndexResult[]>("/knowledge/index", { body: {} }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["documents"] }),
   });
   const sync = useMutation({
     mutationFn: () =>
@@ -98,13 +128,31 @@ export function KnowledgePage() {
         <div>
           <div className="eyebrow">Delivery</div>
           <h1>Knowledge</h1>
-          <p>Internal documents the assistant can cite. You only see what you're allowed to read.</p>
+          <p>Documents and everything indexed from your connected tools (Jira, GitHub, Slack, email, incidents, meetings, HR).
+            Hybrid search: keywords and meaning combined. You only see what you're allowed to read.</p>
         </div>
         {can("knowledge:manage") && (
           <div className="stack" style={{ alignItems: "end" }}>
-            <button className="button secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
-              {sync.isPending ? "Syncing…" : "Sync sources"}
-            </button>
+            <div className="row">
+              <button className="button secondary" onClick={() => sync.mutate()} disabled={sync.isPending}>
+                {sync.isPending ? "Syncing…" : "Sync document sources"}
+              </button>
+              <button className="button" onClick={() => index.mutate()} disabled={index.isPending}>
+                {index.isPending ? "Indexing…" : "Index project data"}
+              </button>
+            </div>
+            {index.data && (
+              <span className="small muted" role="status">
+                {index.data.length === 0
+                  ? "No active projects to index."
+                  : index.data
+                      .map((p) => `${p.project}: ${p.sources.reduce((n, s) => n + s.added + s.updated, 0)} new or updated, ` +
+                        `${p.sources.reduce((n, s) => n + s.unchanged, 0)} unchanged across ${p.sources.filter((s) => !s.error).length} sources` +
+                        (p.sources.some((s) => s.error) ? ` (${p.sources.filter((s) => s.error).map((s) => s.source).join(", ")} unavailable)` : ""))
+                      .join(" · ")}
+              </span>
+            )}
+            <ErrorNote error={index.error} />
             {sync.data && (
               <span className="small muted" role="status">
                 {sync.data.length === 0
@@ -126,19 +174,31 @@ export function KnowledgePage() {
             if (query.trim().length >= 2) search.mutate(query.trim());
           }}
         >
-          <input style={{ flex: 1 }} aria-label="Search documents" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. vendor escalation" />
+          <input style={{ flex: 1 }} aria-label="Search documents" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="e.g. why is PHX-7 blocked, vendor escalation policy" />
           <button className="button" type="submit" disabled={search.isPending}>
             Search
           </button>
         </form>
+        <div className="segmented" role="group" aria-label="Search in" style={{ marginTop: 12 }}>
+          {SOURCE_FILTERS.map((f) => (
+            <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
+              {f.label}
+            </button>
+          ))}
+        </div>
         <ErrorNote error={search.error} />
-        {search.data && search.data.results.length === 0 && <Empty>No accessible documents matched.</Empty>}
+        {search.data && search.data.results.length === 0 && <Empty>Nothing you can access matched.</Empty>}
         <div className="stack" style={{ marginTop: 12 }}>
           {search.data?.results.map((r) => (
             <div key={`${r.document_id}-${r.citation}`} className="card" style={{ marginBottom: 0 }}>
               <div className="row" style={{ justifyContent: "space-between" }}>
-                <strong>{r.citation}</strong>
-                <span className="small muted">{r.matched_by.join(" + ")}</span>
+                <span className="row">
+                  {r.source && <Badge value="info" label={SOURCE_LABEL[r.source] ?? r.source} />}
+                  <strong>{r.citation}</strong>
+                </span>
+                <span className="small muted">
+                  {[r.project, r.date, r.matched_by.join(" + ")].filter(Boolean).join(" · ")}
+                </span>
               </div>
               <p className="small" style={{ whiteSpace: "pre-wrap" }}>{r.text}</p>
             </div>

@@ -272,6 +272,19 @@ class Transcript(BaseModel):
     text: str = ""
 
 
+class ChannelMessage(BaseModel):
+    """A message in a team chat channel (Slack, Teams)."""
+
+    source: str
+    channel: str
+    id: str
+    author: str | None = None
+    text: str
+    sent_at: datetime
+    thread_id: str | None = None
+    url: str | None = None
+
+
 class SourceDocument(BaseModel):
     source: str
     id: str

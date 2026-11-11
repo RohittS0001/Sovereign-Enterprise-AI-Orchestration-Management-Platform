@@ -78,8 +78,11 @@ async def upload_document(
         roles = [Role(r).value for r in json.loads(allowed_roles)]
         tag_list = [str(t)[:50] for t in json.loads(tags)][:20]
     except (ValueError, TypeError) as exc:
-        raise AppException("allowed_roles and tags must be JSON lists of valid values", 422,
-                           code="validation_error") from exc  # fmt: skip
+        raise AppException(
+            "allowed_roles and tags must be JSON lists of valid values",
+            422,
+            code="validation_error",
+        ) from exc
 
     filename = file.filename or "upload.txt"
     text = extract_text(filename, data)
@@ -146,7 +149,7 @@ async def search(
     settings: SettingsDep,
 ) -> SearchResponse:
     hits = await _service(request, session, settings).search(
-        principal, body.query, top_k=body.top_k
+        principal, body.query, top_k=body.top_k, filters=body.filters()
     )
     return SearchResponse(query=body.query, results=[SearchResult(**hit.as_dict()) for hit in hits])
 
@@ -172,13 +175,62 @@ async def sync_sources(
     sources = request.app.state.integrations.by_category("docs")
     if body.source:
         if body.source not in sources:
-            raise NotFoundError(f"Document source {body.source!r} is not configured",
-                                details={"available": sorted(sources)})  # fmt: skip
+            raise NotFoundError(
+                f"Document source {body.source!r} is not configured",
+                details={"available": sorted(sources)},
+            )
         sources = {body.source: sources[body.source]}
     results = []
     for name, service in sources.items():
         result = await sync_source(
             session, settings, request.app.state.embedder, principal, name, service
+        )
+        results.append(asdict(result))
+    return results
+
+
+class IndexRequest(BaseModel):
+    project_key: str | None = Field(
+        default=None, pattern=r"^[A-Z][A-Z0-9_]{0,31}$", description="Default: every active project"
+    )
+
+
+@router.post("/index")
+async def index_projects(
+    body: IndexRequest,
+    principal: Manager,
+    session: SessionDep,
+    settings: SettingsDep,
+    request: Request,
+) -> list[dict]:
+    """Index every connected platform (Jira, GitHub, Slack/Teams, e-mail, incidents, trackers,
+    meetings, HR, finance, CRM) for hybrid search, per project. Incremental and access-aware."""
+    from dataclasses import asdict
+
+    from sqlalchemy import select
+
+    from backend.app.core.errors import NotFoundError
+    from backend.app.db.models import Project
+    from backend.app.domains.knowledge.indexing import index_project
+
+    statement = select(Project).where(Project.is_active.is_(True)).order_by(Project.key)
+    if body.project_key:
+        statement = select(Project).where(Project.key == body.project_key)
+    projects = list(await session.scalars(statement))
+    if body.project_key and not projects:
+        raise NotFoundError(f"Project {body.project_key} is not configured")
+    collector = request.app.state.analytics_collector
+    results = []
+    for project in projects:
+        snapshot = await collector.collect(project, fresh=True)
+        result = await index_project(
+            session,
+            settings,
+            request.app.state.embedder,
+            principal,
+            collector.hub,
+            project,
+            snapshot,
         )
         results.append(asdict(result))
     return results

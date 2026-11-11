@@ -29,4 +29,5 @@ expected:
     main_cause: blocked_external
     main_cause_issues: [PHX-3, PHX-7]
     slip_days: 3
-    contradicted_claims_by: [priya.n@acme.example, priya.n@acme.example]
+    # her e-mail ("on track", "no blockers") and her Slack message ("keep reporting on track")
+    contradicted_claims_by: [Priya N, priya.n@acme.example, priya.n@acme.example]
