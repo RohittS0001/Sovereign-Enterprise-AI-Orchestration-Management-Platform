@@ -38,6 +38,17 @@ def test_connection_guide_is_up_to_date() -> None:
     assert doc == markdown(), "run: python -m scripts.connections --markdown"
 
 
+def test_connections_template_is_up_to_date_and_complete() -> None:
+    from scripts.connections import env_template
+
+    template = (ROOT / "connections.env.example").read_text(encoding="utf-8")
+    assert template == env_template(), "run: python -m scripts.connections --markdown"
+    for item in CONNECTOR_SPECS:
+        for field in item.required:
+            assert f"{field.upper()}=" in template, field
+    assert "SECRET=" in template and "secret_value" not in template
+
+
 def test_live_connectors_build_without_network() -> None:
     # Every connector with a live implementation builds lazily from settings alone.
     for item in CONNECTOR_SPECS:

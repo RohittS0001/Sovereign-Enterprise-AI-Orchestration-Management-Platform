@@ -424,6 +424,24 @@ def build_tool_registry(
                 "against the project data; returns contradicted/supported/unverifiable with proof.",
             ),
             (
+                "cloud.project_overview",
+                analytics_tools.cloud_overview,
+                ProjectHealthInput,
+                "A project's cloud footprint on AWS/Azure: every tagged resource with where it "
+                "runs (region, environment), why (purpose tag), owner, size, state and health; "
+                "storage used; cost this month, forecast and cost by service; firing alarms; "
+                "security findings (admins/auditors). Use for 'what does PHX run', 'what does it "
+                "cost', 'is it healthy', 'how much storage'.",
+            ),
+            (
+                "cloud.portfolio",
+                analytics_tools.cloud_portfolio,
+                ListProjectsInput,
+                "All active projects side by side: team members, cloud resources, unhealthy "
+                "resources, storage, cost this month and forecast, alarms, and who works on "
+                "which project.",
+            ),
+            (
                 "delivery.estimate_story",
                 analytics_tools.estimate_story,
                 EstimateInput,

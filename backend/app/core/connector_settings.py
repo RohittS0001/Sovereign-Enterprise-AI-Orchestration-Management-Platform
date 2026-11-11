@@ -119,6 +119,24 @@ class ConnectorSettings(BaseSettings):
     zoom_client_id: str = ""
     zoom_client_secret: SecretStr = SecretStr("")
 
+    # ---------------------------------------------------------------- cloud
+    # Resources are attributed to a project by this tag (value = the project key, or the
+    # values listed in the project's cloud_tag_values link).
+    cloud_project_tag_key: str = "project"
+    # AWS: an IAM user/role with read-only access (see docs/integrations.md for the policy).
+    aws_access_key_id: str = ""
+    aws_secret_access_key: SecretStr = SecretStr("")
+    aws_session_token: SecretStr = SecretStr("")  # only for temporary credentials
+    aws_regions: list[str] = Field(default_factory=lambda: ["us-east-1"])
+    # Cost Explorer charges USD 0.01 per request: off by default, cached 12 h when on.
+    aws_cost_explorer_enabled: bool = False
+    # Azure: a service principal with Reader, Cost Management Reader, Monitoring Reader and
+    # Security Reader on the subscription.
+    azure_tenant_id: str = ""
+    azure_client_id: str = ""
+    azure_client_secret: SecretStr = SecretStr("")
+    azure_subscription_id: str = ""
+
     # ---------------------------------------------------------------- chat
     slack_bot_token: SecretStr = SecretStr("")
     slack_signing_secret: SecretStr = SecretStr("")

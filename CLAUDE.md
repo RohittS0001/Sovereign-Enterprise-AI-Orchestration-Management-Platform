@@ -44,8 +44,10 @@ npm --prefix frontend test                        # Vitest + Testing Library
 ```
 
 - Adding/changing an integration's settings: update `.env.example` and run
-  `python -m scripts.connections --markdown` — `tests/unit/integrations/test_connector_registry.py`
-  fails if either is stale.
+  `python -m scripts.connections --markdown` (regenerates `docs/integrations.md` and the
+  `connections.env.example` template) — `tests/unit/integrations/test_connector_registry.py` fails if
+  any is stale. Settings load `.env` then `connections.env` (git-ignored, one file for every
+  integration's links/keys; `--init` creates it).
 - Bash heredocs with quotes/backslashes often break in this Git Bash; write multi-line edits as a
   Python script file (scratchpad) or use the Edit tool. Avoid `# fmt: skip` on long lines (E501).
 
@@ -182,7 +184,11 @@ token-provider auth, `get_bytes`/`get_text`), `ConnectorService` (lazy client), 
 models (WorkItem, PullRequest, Incident, ErrorGroup, Deployment, QualityGate, LeaveRecord, BudgetLine,
 Deal, CalendarEvent, Transcript, SourceDocument). `auth.py`: OAuth client-credentials/refresh tokens,
 Microsoft/Zoho/Google helpers. Category modules: `trackers`, `ops`, `hr_finance`, `crm`, `docs`,
-`calendar_meetings`, `chat`. Hub: `hub.connectors` + `hub.by_category(cat)`; `build_integration_hub(
+`calendar_meetings`, `chat`, `cloud` (AWS via in-house SigV4 in `auth.py:aws_sigv4_headers` — tagging API
+inventory, EC2/EBS/RDS/S3 details, CloudWatch alarms, opt-in cached Cost Explorer, Security Hub; Azure via
+Resource Graph KQL, Cost Management, Alerts; resources belong to a project by the `CLOUD_PROJECT_TAG_KEY`
+tag = key or `links.cloud_tag_values`). `domains/cloud/service.py` (`project_cloud`, `portfolio`;
+security findings only with `audit:read`), `api/v1/cloud.py` (`/projects/{key}/cloud`, `/portfolio`). Hub: `hub.connectors` + `hub.by_category(cat)`; `build_integration_hub(
 settings, demo_today=...)` (pin `demo_today` in tests/evals). Category tools in `tools/connectors.py`
 (`tracker.*`, `ops.*`, `hr.list_leave`, `finance.budget_vs_actual`, `crm.list_deals`, `calendar.*`,
 `meetings.*`, `chat.post_message`) fan out over sources with per-source warnings. Mocked-API tests use

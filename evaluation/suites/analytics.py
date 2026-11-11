@@ -9,6 +9,7 @@ from backend.app.domains.analytics.contradictions import find_contradictions
 from backend.app.domains.analytics.forecast import forecast_sprint
 from backend.app.domains.analytics.risk import assess_risk
 from backend.app.domains.analytics.workload import compute_workload
+from backend.app.domains.cloud.service import project_cloud
 from backend.app.domains.delivery.delay import analyze_delay, collect_delay_facts
 from backend.app.domains.delivery.dora import dora_metrics, incident_history
 from backend.app.domains.delivery.roadmap import build_roadmap
@@ -32,6 +33,8 @@ async def run() -> SuiteResult:
             snap = await env.collector.collect(project, today=as_of)
             incidents = await incident_history(env.collector.hub, snap)
             delay_facts = await collect_delay_facts(env.collector.hub, snap)
+            cloud = await project_cloud(env.collector.hub, project, as_of, include_security=True)
+            hidden = await project_cloud(env.collector.hub, project, as_of, include_security=False)
 
         forecast = forecast_sprint(snap)
         workload = compute_workload(snap)
@@ -65,6 +68,12 @@ async def run() -> SuiteResult:
             "delay_main_cause_issues": (delay.losses[0].issues if delay.losses else [], exp["delay"]["main_cause_issues"]),
             "delay_slip_days": (delay.slip_days, exp["delay"]["slip_days"]),
             "delay_contradicted_claims_by": (contradicted, exp["delay"]["contradicted_claims_by"]),
+            "cloud_resources": (len(cloud.resources), exp["cloud"]["resources"]),
+            "cloud_unhealthy": (sorted(r.name for r in cloud.resources if r.health in {"warning", "impaired"}), exp["cloud"]["unhealthy"]),
+            "cloud_storage_gb": (cloud.storage_gb, exp["cloud"]["storage_gb"]),
+            "cloud_cost_month_to_date": (cloud.cost.month_to_date if cloud.cost else None, exp["cloud"]["cost_month_to_date"]),
+            "cloud_critical_findings": (cloud.findings_by_severity.get("critical", 0), exp["cloud"]["critical_findings"]),
+            "cloud_findings_hidden_without_permission": (hidden.findings is None, True),
             "failing_main_builds": (
                 any(f"{exp['failing_main_builds']} consecutive failing builds" in e for e in pipeline.evidence), True
             ),

@@ -16,13 +16,24 @@ from pydantic import SecretStr
 from backend.app.core.config import Settings
 
 Category = Literal[
-    "core", "tracker", "ops", "hr", "finance", "crm", "docs", "calendar", "meetings", "chat"
+    "core",
+    "tracker",
+    "ops",
+    "cloud",
+    "hr",
+    "finance",
+    "crm",
+    "docs",
+    "calendar",
+    "meetings",
+    "chat",
 ]
 
 CATEGORY_TITLES: dict[str, str] = {
     "core": "Core (Jira, GitHub, Keka, Gmail)",
     "tracker": "Issue trackers & code hosting",
     "ops": "Engineering operations",
+    "cloud": "Cloud (resources, cost, health, security)",
     "hr": "HR systems",
     "finance": "Finance & accounting",
     "crm": "CRM",

@@ -277,3 +277,49 @@ class AnalyticsTools:
             return {"checks": [c.model_dump(mode="json") for c in checks]}
 
         return await self._delivery(StatementInput, payload, compute)
+
+    # ------------------------------------------------------------ cloud monitoring
+
+    async def cloud_overview(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.core.context import principal_var
+        from backend.app.core.security.permissions import Permission
+        from backend.app.domains.cloud.service import project_cloud
+
+        try:
+            inputs = ProjectHealthInput.model_validate(payload)
+            async with self.database.session() as session:
+                project = await get_project(session, inputs.project_key)
+        except ValidationError as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=f"Invalid input: {exc}")
+        except AppException as exc:
+            return ToolResult(status=ToolStatus.ERROR, error=exc.message)
+        principal = principal_var.get(None)
+        cloud = await project_cloud(
+            self.collector.hub,
+            project,
+            date.today(),
+            include_security=bool(principal and principal.has(Permission.AUDIT_READ)),
+        )
+        data = cloud.model_dump(mode="json")
+        for resource in data["resources"]:
+            resource.pop("tags", None)
+            resource.pop("url", None)
+        return ToolResult(status=ToolStatus.SUCCESS, data=data)
+
+    async def cloud_portfolio(self, payload: dict[str, Any]) -> ToolResult:
+        from backend.app.core.context import principal_var
+        from backend.app.core.security.permissions import Permission
+        from backend.app.domains.cloud.service import portfolio
+
+        async with self.database.session() as session:
+            projects = list(
+                await session.scalars(select(Project).where(Project.is_active.is_(True)))
+            )
+        principal = principal_var.get(None)
+        result = await portfolio(
+            self.collector.hub,
+            projects,
+            date.today(),
+            include_security=bool(principal and principal.has(Permission.AUDIT_READ)),
+        )
+        return ToolResult(status=ToolStatus.SUCCESS, data=result.model_dump(mode="json"))

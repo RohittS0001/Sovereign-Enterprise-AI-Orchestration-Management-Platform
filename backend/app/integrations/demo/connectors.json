@@ -334,6 +334,350 @@
       ]
     }
   },
+  "cloud": {
+    "aws": {
+      "resources": [
+        {
+          "id": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60001",
+          "name": "phx-api-1",
+          "kind": "instance",
+          "service": "ec2:instance",
+          "size": "m6i.large",
+          "region": "ap-south-1a",
+          "state": "running",
+          "health": "ok",
+          "health_detail": "2/2 status checks passed",
+          "created": "{today-41}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Payments API (capture + refunds)",
+            "owner": "Arjun M"
+          }
+        },
+        {
+          "id": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60002",
+          "name": "phx-api-2",
+          "kind": "instance",
+          "service": "ec2:instance",
+          "size": "m6i.large",
+          "region": "ap-south-1b",
+          "state": "running",
+          "health": "impaired",
+          "health_detail": "EC2 status check failing (instance reachability)",
+          "created": "{today-41}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Payments API (capture + refunds)",
+            "owner": "Arjun M"
+          }
+        },
+        {
+          "id": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0a1b2c3d4e5f60003",
+          "name": "phx-loadtest",
+          "kind": "instance",
+          "service": "ec2:instance",
+          "size": "c6i.2xlarge",
+          "region": "ap-south-1a",
+          "state": "stopped",
+          "health": "stopped",
+          "created": "{today-6}",
+          "tags": {
+            "project": "PHX",
+            "environment": "test",
+            "purpose": "Load test at 3x peak (PHX-4)",
+            "owner": "Dev R"
+          }
+        },
+        {
+          "id": "arn:aws:rds:ap-south-1:123456789012:db:phx-payments",
+          "name": "phx-payments",
+          "kind": "database",
+          "service": "rds:db",
+          "size": "db.r6g.large postgres",
+          "region": "ap-south-1",
+          "state": "available",
+          "health": "ok",
+          "storage_gb": 200,
+          "created": "{today-120}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Payments ledger database",
+            "owner": "Meera S"
+          }
+        },
+        {
+          "id": "arn:aws:ec2:ap-south-1:123456789012:volume/vol-0phx0001",
+          "name": "phx-api-1-root",
+          "kind": "disk",
+          "service": "ec2:volume",
+          "size": "gp3",
+          "region": "ap-south-1",
+          "state": "in-use",
+          "health": "ok",
+          "storage_gb": 100,
+          "created": "{today-41}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Root disk of phx-api-1"
+          }
+        },
+        {
+          "id": "arn:aws:ec2:ap-south-1:123456789012:volume/vol-0phx0002",
+          "name": "phx-api-2-root",
+          "kind": "disk",
+          "service": "ec2:volume",
+          "size": "gp3",
+          "region": "ap-south-1",
+          "state": "in-use",
+          "health": "ok",
+          "storage_gb": 100,
+          "created": "{today-41}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Root disk of phx-api-2"
+          }
+        },
+        {
+          "id": "arn:aws:s3:::acme-phx-receipts",
+          "name": "acme-phx-receipts",
+          "kind": "bucket",
+          "service": "s3",
+          "region": "ap-south-1",
+          "state": "available",
+          "health": "ok",
+          "storage_gb": 312.4,
+          "created": "{today-200}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Payment receipts and refund evidence",
+            "owner": "Priya N"
+          }
+        },
+        {
+          "id": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0ldg00000000001",
+          "name": "ledger-batch",
+          "kind": "instance",
+          "service": "ec2:instance",
+          "size": "r6i.xlarge",
+          "region": "ap-south-1a",
+          "state": "running",
+          "health": "ok",
+          "health_detail": "2/2 status checks passed",
+          "created": "{today-90}",
+          "tags": {
+            "project": "LDG",
+            "environment": "production",
+            "purpose": "Nightly reconciliation batch",
+            "owner": "Kiran P"
+          }
+        },
+        {
+          "id": "arn:aws:rds:ap-south-1:123456789012:db:ledger",
+          "name": "ledger",
+          "kind": "database",
+          "service": "rds:db",
+          "size": "db.m6g.large postgres",
+          "region": "ap-south-1",
+          "state": "available",
+          "health": "ok",
+          "storage_gb": 500,
+          "created": "{today-400}",
+          "tags": {
+            "project": "LDG",
+            "environment": "production",
+            "purpose": "General ledger",
+            "owner": "Kiran P"
+          }
+        }
+      ],
+      "costs": {
+        "PHX": {
+          "currency": "USD",
+          "forecast": 2268.0,
+          "by_service": {
+            "Amazon EC2": 612.4,
+            "Amazon RDS": 401.25,
+            "Amazon S3": 74.1,
+            "AWS Data Transfer": 38.8
+          }
+        },
+        "LDG": {
+          "currency": "USD",
+          "forecast": 1490.0,
+          "by_service": {
+            "Amazon RDS": 520.0,
+            "Amazon EC2": 214.6,
+            "Amazon S3": 12.3
+          }
+        }
+      },
+      "alerts": [
+        {
+          "id": "arn:aws:cloudwatch:ap-south-1:123456789012:alarm:phx-api-2-status",
+          "title": "phx-api-2-status: StatusCheckFailed >= 1 for 3 datapoints",
+          "severity": "high",
+          "state": "ALARM",
+          "resource": "i-0a1b2c3d4e5f60002",
+          "started": "{today}T05:40:00+00:00",
+          "tags": {
+            "project": "PHX"
+          }
+        },
+        {
+          "id": "arn:aws:cloudwatch:ap-south-1:123456789012:alarm:phx-capture-p99",
+          "title": "phx-capture-p99: p99 latency above 800 ms (SLO)",
+          "severity": "high",
+          "state": "ALARM",
+          "resource": "phx-api",
+          "started": "{today-1}T13:10:00+00:00",
+          "tags": {
+            "project": "PHX"
+          }
+        }
+      ],
+      "findings": [
+        {
+          "id": "aws-sh-0001",
+          "title": "S3 bucket acme-phx-receipts allows public read via bucket policy",
+          "severity": "critical",
+          "status": "NEW",
+          "resource": "arn:aws:s3:::acme-phx-receipts",
+          "created": "{today-3}",
+          "recommendation": "Remove the public principal from the bucket policy and enable Block Public Access.",
+          "tags": {
+            "project": "PHX"
+          }
+        },
+        {
+          "id": "aws-sh-0002",
+          "title": "RDS instance phx-payments is not encrypted with a customer-managed key",
+          "severity": "medium",
+          "status": "NOTIFIED",
+          "resource": "arn:aws:rds:ap-south-1:123456789012:db:phx-payments",
+          "created": "{today-20}",
+          "recommendation": "Use a KMS customer-managed key at the next maintenance window.",
+          "tags": {
+            "project": "PHX"
+          }
+        },
+        {
+          "id": "aws-sh-0101",
+          "title": "Security group sg-ledger allows SSH from 0.0.0.0/0",
+          "severity": "high",
+          "status": "NEW",
+          "resource": "arn:aws:ec2:ap-south-1:123456789012:instance/i-0ldg00000000001",
+          "created": "{today-9}",
+          "recommendation": "Restrict port 22 to the bastion's security group.",
+          "tags": {
+            "project": "LDG"
+          }
+        }
+      ]
+    },
+    "azure": {
+      "resources": [
+        {
+          "id": "/subscriptions/0000/resourceGroups/rg-phx/providers/Microsoft.App/containerApps/phx-checkout-web",
+          "name": "phx-checkout-web",
+          "kind": "container",
+          "service": "Microsoft.App/containerApps",
+          "size": "Consumption",
+          "region": "centralindia",
+          "state": "Running",
+          "health": "ok",
+          "health_detail": "Available",
+          "created": "{today-60}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Checkout web front end",
+            "owner": "Sara K"
+          },
+          "url": "https://portal.azure.com/#resource/subscriptions/0000/resourceGroups/rg-phx/providers/Microsoft.App/containerApps/phx-checkout-web"
+        },
+        {
+          "id": "/subscriptions/0000/resourceGroups/rg-phx/providers/Microsoft.Storage/storageAccounts/phxstatic",
+          "name": "phxstatic",
+          "kind": "bucket",
+          "service": "Microsoft.Storage/storageAccounts",
+          "size": "Standard_LRS",
+          "region": "centralindia",
+          "state": "Succeeded",
+          "health": "ok",
+          "storage_gb": 18.6,
+          "created": "{today-60}",
+          "tags": {
+            "project": "PHX",
+            "environment": "production",
+            "purpose": "Static assets for checkout",
+            "owner": "Sara K"
+          }
+        },
+        {
+          "id": "/subscriptions/0000/resourceGroups/rg-phx-stg/providers/Microsoft.App/containerApps/phx-checkout-staging",
+          "name": "phx-checkout-staging",
+          "kind": "container",
+          "service": "Microsoft.App/containerApps",
+          "size": "Consumption",
+          "region": "centralindia",
+          "state": "Running",
+          "health": "warning",
+          "health_detail": "Degraded: revision failing readiness probe",
+          "created": "{today-14}",
+          "tags": {
+            "project": "PHX",
+            "environment": "staging",
+            "purpose": "Staging for checkout retry UI (PHX-3)",
+            "owner": "Sara K"
+          }
+        }
+      ],
+      "costs": {
+        "PHX": {
+          "currency": "USD",
+          "forecast": 310.0,
+          "by_service": {
+            "Azure Container Apps": 96.2,
+            "Storage": 8.4,
+            "Bandwidth": 21.0
+          }
+        }
+      },
+      "alerts": [
+        {
+          "id": "/subscriptions/0000/providers/Microsoft.AlertsManagement/alerts/a1",
+          "title": "phx-checkout-staging readiness probe failures",
+          "severity": "medium",
+          "state": "Fired",
+          "resource": "/subscriptions/0000/resourceGroups/rg-phx-stg/providers/Microsoft.App/containerApps/phx-checkout-staging",
+          "started": "{today}T03:15:00+00:00",
+          "tags": {
+            "project": "PHX"
+          }
+        }
+      ],
+      "findings": [
+        {
+          "id": "/subscriptions/0000/providers/Microsoft.Security/assessments/f1",
+          "title": "Container apps should only be accessible over HTTPS",
+          "severity": "high",
+          "status": "Unhealthy",
+          "resource": "/subscriptions/0000/resourceGroups/rg-phx-stg/providers/Microsoft.App/containerApps/phx-checkout-staging",
+          "created": "{today-5}",
+          "recommendation": "Set ingress allowInsecure to false.",
+          "tags": {
+            "project": "PHX"
+          }
+        }
+      ]
+    }
+  },
   "chat": {
     "slack": {
       "messages": [

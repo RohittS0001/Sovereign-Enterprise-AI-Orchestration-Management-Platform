@@ -272,6 +272,69 @@ class Transcript(BaseModel):
     text: str = ""
 
 
+CloudHealth = Literal["ok", "warning", "impaired", "stopped", "unknown"]
+
+
+class CloudResource(BaseModel):
+    """Something running (or stored) in a cloud account, attributed to a project by tag."""
+
+    source: str  # aws | azure
+    id: str  # ARN / Azure resource id
+    name: str
+    kind: str  # instance | database | disk | bucket | container | function | network | other
+    service: str  # e.g. ec2, rds, s3, Microsoft.Compute/virtualMachines
+    size: str | None = None  # instance type / SKU
+    region: str | None = None
+    state: str | None = None  # running, stopped, available …
+    health: CloudHealth = "unknown"
+    health_detail: str | None = None
+    storage_gb: float | None = None
+    created: date | None = None
+    environment: str | None = None  # from the environment tag
+    purpose: str | None = None  # why it exists: purpose / description tag
+    owner: str | None = None  # owner tag
+    tags: dict[str, str] = Field(default_factory=dict)
+    url: str | None = None
+
+
+class CostLine(BaseModel):
+    service: str
+    amount: float
+
+
+class CostReport(BaseModel):
+    source: str
+    currency: str = "USD"
+    period_start: date
+    period_end: date
+    total: float
+    forecast_month_end: float | None = None
+    by_service: list[CostLine] = Field(default_factory=list)
+
+
+class CloudAlert(BaseModel):
+    source: str
+    id: str
+    title: str
+    severity: str | None = None
+    state: str  # ALARM / Fired …
+    resource: str | None = None
+    started: datetime | None = None
+    url: str | None = None
+
+
+class SecurityFinding(BaseModel):
+    source: str
+    id: str
+    title: str
+    severity: str  # critical | high | medium | low | informational
+    status: str
+    resource: str | None = None
+    created: date | None = None
+    recommendation: str | None = None
+    url: str | None = None
+
+
 class ChannelMessage(BaseModel):
     """A message in a team chat channel (Slack, Teams)."""
 

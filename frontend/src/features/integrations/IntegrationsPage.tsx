@@ -10,7 +10,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   docs: "Documents", calendar: "Calendars", meetings: "Meetings", chat: "Chat",
 };
 
-/** Every integration: connected or not, its tools, and exactly what to put in .env for the rest. */
+/** Every integration: connected or not, its tools, and exactly what to put in connections.env. */
 export function IntegrationsPage() {
   const [check, setCheck] = useState(false);
   const [category, setCategory] = useState("all");
@@ -36,8 +36,9 @@ export function IntegrationsPage() {
         title="Integrations"
         description={
           <>
-            Every system is configured from <code>.env</code>. Fill in the listed variables and restart to connect
-            more — <code>python -m scripts.connections</code> shows the same status from the terminal.
+            Every link and key lives in one file, <code>connections.env</code> (create it with{" "}
+            <code>python -m scripts.connections --init</code>). Paste the listed values and restart to connect more;{" "}
+            <code>python -m scripts.connections</code> prints the same checklist in the terminal.
           </>
         }
         actions={

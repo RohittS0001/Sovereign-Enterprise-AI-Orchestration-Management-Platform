@@ -4,6 +4,26 @@ from importlib import resources
 
 DEMO_PROJECT_KEY = "PHX"
 
+# A second demo project (cloud, finance and chat data; no Jira sprint) for the portfolio view.
+LDG_CONFIG = {
+    "name": "Ledger Modernisation",
+    "github_repos": [],
+    "default_branch": "main",
+    "active_sprint_id": None,
+    "links": {"cost_centers": ["Ledger Modernisation"], "slack_channels": ["C0LEDGER01"]},
+    "members": [
+        {"name": "Kiran P", "capacity_points": 10},
+        {"name": "Ravi A", "capacity_points": 8},
+        {
+            "name": "Meera S",
+            "jira_account_id": "acc-meera",
+            "keka_employee_id": "e-005",
+            "capacity_points": 4,
+        },
+    ],
+    "report_recipients": [],
+}
+
 PHX_CONFIG = {
     "name": "Phoenix Payments Revamp",
     "github_repos": ["acme/payments", "acme/checkout-web"],

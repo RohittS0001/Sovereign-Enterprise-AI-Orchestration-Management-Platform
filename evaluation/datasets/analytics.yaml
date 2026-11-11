@@ -31,3 +31,10 @@ expected:
     slip_days: 3
     # her e-mail ("on track", "no blockers") and her Slack message ("keep reporting on track")
     contradicted_claims_by: [Priya N, priya.n@acme.example, priya.n@acme.example]
+  # cloud monitoring (AWS + Azure demo twins, resources tagged project=PHX)
+  cloud:
+    resources: 10
+    unhealthy: [phx-api-2, phx-checkout-staging]
+    storage_gb: 731.0
+    cost_month_to_date: 1252.15
+    critical_findings: 1

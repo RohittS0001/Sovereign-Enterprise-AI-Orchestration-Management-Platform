@@ -17,6 +17,8 @@ credentials.json
 token.json
 .env.*
 !.env.example
+# Integration links and keys (generated from connections.env.example)
+connections.env
 
 # Local data
 data/*

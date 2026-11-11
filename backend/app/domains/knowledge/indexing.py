@@ -352,6 +352,74 @@ async def meeting_items(hub: Any, project: Project, today: date) -> list[IndexIt
     return items
 
 
+async def cloud_items(hub: Any, project: Project, today: date) -> list[IndexItem]:
+    from backend.app.domains.cloud.service import project_cloud
+
+    cloud = await project_cloud(hub, project, today, include_security=True)
+    if cloud.warnings and not cloud.resources:
+        raise RuntimeError("; ".join(cloud.warnings))
+    items = []
+    for r in cloud.resources:
+        text = _lines(
+            f"{r.name} ({r.kind}, {r.source} {r.service}) for {project.key}",
+            f"Where: {r.region or '—'} · environment {r.environment or '—'} · size {r.size or '—'}",
+            f"Why: {r.purpose or 'no purpose tag'} · owner {r.owner or '—'} · "
+            f"created {r.created or '—'}",
+            f"State: {r.state or '—'} · health {r.health}"
+            + (f" ({r.health_detail})" if r.health_detail else "")
+            + (f" · storage {r.storage_gb:g} GB" if r.storage_gb else ""),
+        )
+        items.append(
+            IndexItem(
+                "cloud",
+                r.id,
+                f"Cloud: {r.name} ({r.kind})",
+                text,
+                occurred_at=_at(r.created),
+                url=r.url,
+            )
+        )
+    for a in cloud.alerts:
+        items.append(
+            IndexItem(
+                "cloud",
+                a.id,
+                f"Alert: {a.title}",
+                f"Cloud alert ({a.source}) {a.state}, severity {a.severity}: {a.title}. "
+                f"Resource {a.resource or '—'} since {a.started or '—'}.",
+                occurred_at=_at(a.started),
+                url=a.url,
+            )
+        )
+    if cloud.cost:
+        services = ", ".join(f"{c.service} {c.amount:g}" for c in cloud.cost.by_service)
+        items.append(
+            IndexItem(
+                "cloud",
+                f"cost:{project.key}",
+                f"Cloud cost: {project.key}",
+                f"Cloud cost for {project.key} this month: {cloud.cost.month_to_date:g} "
+                f"{cloud.cost.currency} (forecast {cloud.cost.forecast_month_end}). "
+                f"By service: {services}.",
+                permission=Permission.ANALYTICS_READ,
+            )
+        )
+    for f in cloud.findings or []:
+        items.append(
+            IndexItem(
+                "security",
+                f.id,
+                f"Security finding: {f.title}",
+                f"{f.severity.upper()} security finding ({f.source}, {f.status}): {f.title}. "
+                f"Resource {f.resource or '—'}. Fix: {f.recommendation or '—'}",
+                permission=Permission.AUDIT_READ,
+                occurred_at=_at(f.created),
+                url=f.url,
+            )
+        )
+    return items
+
+
 def people_items(snapshot: ProjectSnapshot) -> list[IndexItem]:
     names = {i.lower(): m.name for m in snapshot.members for i in m.ids}
     items = []
@@ -436,6 +504,8 @@ async def collect_items(
     await guarded("incidents", lambda: ops_items(hub, snapshot))
     await guarded("trackers", lambda: tracker_items(hub, project))
     await guarded("meetings", lambda: meeting_items(hub, project, snapshot.today))
+    if hub.by_category("cloud"):
+        await guarded("cloud", lambda: cloud_items(hub, project, snapshot.today))
     for item in people_items(snapshot) + business_items(snapshot):
         items.setdefault(item.source, []).append(item)
     for warning in snapshot.warnings + facts.warnings:

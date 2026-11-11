@@ -11,6 +11,7 @@ from backend.app.api.v1.audit import router as audit_router
 from backend.app.api.v1.auth import router as auth_router
 from backend.app.api.v1.briefing import router as briefing_router
 from backend.app.api.v1.chat import router as chat_router
+from backend.app.api.v1.cloud import router as cloud_router
 from backend.app.api.v1.compliance import router as compliance_router
 from backend.app.api.v1.delivery import router as delivery_router
 from backend.app.api.v1.graph import router as graph_router
@@ -178,6 +179,7 @@ def create_app(
     app.include_router(graph_router)
     app.include_router(compliance_router)
     app.include_router(delivery_router)
+    app.include_router(cloud_router)
 
     return app
 

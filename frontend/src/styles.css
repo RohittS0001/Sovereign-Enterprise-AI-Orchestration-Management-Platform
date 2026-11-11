@@ -460,3 +460,10 @@ td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
 .seg-info { background: var(--info-bg); color: var(--info); }
 .seg-accent { background: var(--accent-soft); color: var(--accent); }
 .seg-muted { background: var(--surface-2); color: var(--text-muted); }
+
+/* ------------------------------------------------------------------ cloud & portfolio */
+.cost-row { display: grid; grid-template-columns: minmax(140px, 1.2fr) 2fr auto; gap: 12px; align-items: center; }
+@media (max-width: 520px) { .cost-row { grid-template-columns: 1fr auto; } .cost-row .loss-bar { grid-column: 1 / -1; grid-row: 2; } }
+.avatar-stack { display: flex; }
+.avatar-stack .avatar { width: 24px; height: 24px; font-size: 0.625rem; border: 2px solid var(--surface); margin-left: -6px; }
+.avatar-stack .avatar:first-child { margin-left: 0; }

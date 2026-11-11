@@ -20,6 +20,7 @@ export const NAV: NavItem[] = [
   { to: "/home", label: "Home", icon: "home", permission: "analytics:read", section: "Workspace" },
   { to: "/assistant", label: "Assistant", icon: "sparkles", permission: "agent:query", section: "Workspace" },
   { to: "/approvals", label: "Approvals", icon: "check", permission: null, section: "Workspace" },
+  { to: "/portfolio", label: "Portfolio", icon: "cloud", permission: "analytics:read", section: "Delivery" },
   { to: "/projects", label: "Projects", icon: "folder", permission: "projects:read", section: "Delivery" },
   { to: "/reports", label: "Reports", icon: "report", permission: "reports:read", section: "Delivery" },
   { to: "/knowledge", label: "Knowledge", icon: "book", permission: "knowledge:read", section: "Delivery" },

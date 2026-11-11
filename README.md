@@ -4,7 +4,7 @@
 from your own data.**
 
 It connects to the tools a delivery organization already uses (Jira, GitHub, Slack/Teams, e-mail,
-Keka and other HR systems, incident tools, meetings, finance, CRM: 36 integrations), indexes them
+Keka and other HR systems, incident tools, AWS and Azure, meetings, finance, CRM: 38 integrations), indexes them
 for hybrid search, and answers questions with evidence: *how many days were lost, to what, and is
 what people reported actually true?* An AI agent works over the same data through governed tools,
 with human approval for every write, role-based access and a tamper-evident audit log. It runs on
@@ -35,12 +35,15 @@ exact IDs such as `PHX-7` first; filters by source, project and date; e-mail, HR
 only for roles allowed to see them, enforced in SQL before ranking.
 
 <details>
-<summary><b>More screens</b>: project health, critical path, DORA metrics, integrations</summary>
+<summary><b>More screens</b>: cloud monitoring, portfolio, project health, critical path, DORA metrics, integrations</summary>
 
 ![Project health: risk score with evidence and the sprint forecast](docs/images/06-project-health.png)
 ![Critical path: dependencies plus each person's queue set the finish date](docs/images/04-critical-path.png)
 ![DORA metrics with bands, evidence and recommendations](docs/images/05-dora-metrics.png)
 ![36 integrations configured from .env, each with a demo twin](docs/images/09-integrations.png)
+![Cloud: cost, resources, storage, alerts and where each project runs](docs/images/10-cloud-overview.png)
+![Cloud resources with purpose, region, size, health, storage and owner](docs/images/11-cloud-resources.png)
+![Portfolio: every project side by side, and who works on what](docs/images/12-portfolio.png)
 ![Home: portfolio KPIs and decisions to take](docs/images/08-home.png)
 
 </details>
@@ -62,6 +65,7 @@ limitations: [docs/evaluation.md](docs/evaluation.md).
 | **Integrations** | **36 systems**, all configured from `.env` ([docs/integrations.md](docs/integrations.md)): Jira, GitHub, Keka, Gmail; Linear, GitLab, Azure DevOps, Asana, ClickUp, Bitbucket; PagerDuty, Opsgenie, Sentry, Jenkins, Argo CD, SonarQube; BambooHR, Zoho People, Darwinbox, Workday; Zoho Books, Tally, SAP; Salesforce, HubSpot; Confluence, Notion, SharePoint, Google Drive; Google Calendar, Outlook; Zoom, Teams and Meet transcripts; Slack and Teams chat. Each has a **demo twin**, so everything works without credentials |
 | **MCP server** | Claude Desktop, IDEs and other agents use the governed tools in **code mode** (`search_tools` + sandboxed `execute_code`) with personal access tokens; see [docs/mcp.md](docs/mcp.md) |
 | **Planning intelligence** | Monte Carlo **digital twin** (chance to hit a date, P50/P80/P95, what-ifs), **negotiation assistant**, **predictive slip model** trained on your own history, **earned value** (CPI, EAC), production health, customer commitments |
+| **Cloud monitoring** | AWS and Azure, read-only: every resource tagged with a project — **where it runs** (region, environment), **why** (purpose tag), owner, size, state and **health checks**; **storage** used by kind; **cost this month, forecast and cost by service**; firing alarms; security findings (Security Hub, Defender for Cloud; admins and auditors only). A **Portfolio** page compares every project side by side, with who works on what. AWS requests are SigV4-signed without an SDK; Cost Explorer is opt-in and cached because AWS bills it per request |
 | **Why is it late?** | From Jira history, comments, pull requests, leave, incidents and e-mail: **person-days lost per cause** (following dependencies to the root cause, e.g. a vendor), issue timelines, and **status claims checked against the data** on the day they were made — the real reason, not the status report |
 | **Delivery lifecycle** | **Critical-path roadmap** (dependencies + one task per person, slack, late items), **DORA metrics** with bands and evidence, **release notes** and **retrospectives** from Jira/GitHub/CI facts, **requirements → Jira backlog** with history-based estimates, sent only through approvals |
 | **Org intelligence** | **Knowledge graph** (who knows what, impact of someone's absence, bus factor), **AI chief of staff** (weekly decisions, drafted escalations, spoken briefing), **multi-agent** mode (supervisor + specialist agents), **compliance autopilot** (SOC 2 / ISO 27001 evidence pack) |
@@ -143,21 +147,23 @@ helm install sovereign deploy/helm/sovereign \
 
 Migrations run as a pre-install/pre-upgrade hook. See [values.yaml](deploy/helm/sovereign/values.yaml).
 
-## Connecting your systems
+## Connecting your systems (one file)
 
-Every integration is switched on by filling in its variables in `.env` (all of them are listed in
-[.env.example](.env.example)) and restarting. Nothing else changes.
+Every link and key lives in **one file, `connections.env`**: every platform grouped by category,
+with where to get each value and a link to its docs. It is git-ignored and overrides `.env`.
 
 ```bash
-python -m scripts.connections            # what is connected, and which variables the rest need
+python -m scripts.connections --init     # create connections.env (from connections.env.example)
+# paste the values for the platforms you use (Jira, GitHub, AWS, Azure, Slack, Keka, …)
+python -m scripts.connections            # checklist: [x] connected, [~] started, [ ] not set up
 python -m scripts.connections --check    # call each configured service
-python -m scripts.sync_documents --as admin@company.com   # pull Confluence/Notion/SharePoint/Drive
-python -m scripts.mcp_stdio              # MCP over stdio (SOVEREIGN_MCP_TOKEN=sov_pat_...)
+python -m scripts.sync_documents --as admin@company.com --projects   # index everything for search
 ```
 
-Admins see the same status, with setup hints and API links, under **Admin → Integrations**. Each
-project's `links` (in its configuration) tie it to its PagerDuty services, Sentry projects,
-SonarQube keys, cost centres and so on.
+Admins see the same status, with setup hints and API links, under **Platform → Integrations**.
+Each project's `links` tie it to its records elsewhere: Slack channels, PagerDuty services, Sentry
+projects, cost centres, and `cloud_tag_values` (by default the project key) for the AWS/Azure
+`project` tag.
 
 ## Configuration
 

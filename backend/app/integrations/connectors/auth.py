@@ -62,8 +62,10 @@ class OAuthToken:
         async with self._lock:
             if self._token and self.clock() < self._expires_at:
                 return self._token
-            form = {"grant_type": "refresh_token" if self.refresh_token else "client_credentials",
-                    **self.extra}  # fmt: skip
+            form = {
+                "grant_type": "refresh_token" if self.refresh_token else "client_credentials",
+                **self.extra,
+            }
             if self.refresh_token:
                 form["refresh_token"] = self.refresh_token
             if self.scope:
@@ -79,18 +81,21 @@ class OAuthToken:
                 ) as client:
                     response = await client.post(self.token_url, data=form, auth=auth)
             except httpx.HTTPError as exc:
-                raise IntegrationError(f"Could not reach the {self.name} token endpoint",
-                                       integration=self.name) from exc  # fmt: skip
+                raise IntegrationError(
+                    f"Could not reach the {self.name} token endpoint", integration=self.name
+                ) from exc
             if response.is_error:
                 raise IntegrationError(
                     f"{self.name} token request failed ({response.status_code})",
-                    integration=self.name, upstream_status=response.status_code,
-                )  # fmt: skip
+                    integration=self.name,
+                    upstream_status=response.status_code,
+                )
             body = response.json()
             token = body.get("access_token")
             if not token:
-                raise IntegrationError(f"{self.name} token response had no access_token",
-                                       integration=self.name)  # fmt: skip
+                raise IntegrationError(
+                    f"{self.name} token response had no access_token", integration=self.name
+                )
             self.response = body
             self._token = token
             self._expires_at = (
@@ -151,6 +156,89 @@ class GoogleServiceAccountToken:
                 try:
                     await asyncio.to_thread(self._credentials.refresh, Request())
                 except Exception as exc:
-                    raise IntegrationError("Google service-account token request failed",
-                                           integration="google") from exc  # fmt: skip
+                    raise IntegrationError(
+                        "Google service-account token request failed", integration="google"
+                    ) from exc
             return self._credentials.token
+
+
+# ------------------------------------------------------------------ AWS Signature Version 4
+
+
+def aws_sigv4_headers(
+    method: str,
+    url: str,
+    *,
+    region: str,
+    service: str,
+    access_key: str,
+    secret_key: str,
+    body: bytes = b"",
+    headers: dict[str, str] | None = None,
+    session_token: str = "",
+    now: Any = None,
+) -> dict[str, str]:
+    """Headers that sign an AWS API request (SigV4), so no AWS SDK is needed.
+
+    https://docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html
+    """
+    import hashlib
+    import hmac
+    from datetime import UTC, datetime
+    from urllib.parse import quote, urlsplit
+
+    moment = now or datetime.now(UTC)
+    amz_date = moment.strftime("%Y%m%dT%H%M%SZ")
+    day = moment.strftime("%Y%m%d")
+    parts = urlsplit(url)
+    signed = {k.lower(): str(v).strip() for k, v in (headers or {}).items()}
+    signed["host"] = parts.netloc
+    signed["x-amz-date"] = amz_date
+    if session_token:
+        signed["x-amz-security-token"] = session_token
+    query = "&".join(
+        sorted(
+            f"{quote(k, safe='-_.~')}={quote(v, safe='-_.~')}"
+            for k, _, v in (pair.partition("=") for pair in parts.query.split("&") if pair)
+        )
+    )
+    names = sorted(signed)
+    canonical = "\n".join(
+        [
+            method.upper(),
+            quote(parts.path or "/", safe="/-_.~"),
+            query,
+            "".join(f"{n}:{signed[n]}\n" for n in names),
+            ";".join(names),
+            hashlib.sha256(body).hexdigest(),
+        ]
+    )
+    scope = f"{day}/{region}/{service}/aws4_request"
+    to_sign = "\n".join(
+        ["AWS4-HMAC-SHA256", amz_date, scope, hashlib.sha256(canonical.encode()).hexdigest()]
+    )
+
+    def mac(key: bytes, message: str) -> bytes:
+        return hmac.new(key, message.encode(), hashlib.sha256).digest()
+
+    key = mac(mac(mac(mac(f"AWS4{secret_key}".encode(), day), region), service), "aws4_request")
+    signature = hmac.new(key, to_sign.encode(), hashlib.sha256).hexdigest()
+    result = {k: v for k, v in signed.items() if k != "host"}
+    result["authorization"] = (
+        f"AWS4-HMAC-SHA256 Credential={access_key}/{scope}, "
+        f"SignedHeaders={';'.join(names)}, Signature={signature}"
+    )
+    return result
+
+
+def azure_management_token(settings: Any, **kwargs: Any) -> "OAuthToken":
+    """Azure Resource Manager token (client credentials) from the AZURE_* settings."""
+    return OAuthToken(
+        "Azure",
+        f"https://login.microsoftonline.com/{settings.azure_tenant_id}/oauth2/v2.0/token",
+        settings.azure_client_id,
+        settings.azure_client_secret.get_secret_value(),
+        scope="https://management.azure.com/.default",
+        timeout=settings.connector_timeout_seconds,
+        **kwargs,
+    )

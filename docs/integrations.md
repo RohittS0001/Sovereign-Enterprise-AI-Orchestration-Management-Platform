@@ -6,10 +6,11 @@ Every integration is configured only through environment variables (`.env` local
 Kubernetes Secret/ConfigMap in production). Fill in an integration's **required**
 variables, restart the API, and its tools appear for the agent. Nothing else changes.
 
-1. Copy `.env.example` to `.env` (all variables below are already listed there).
-2. Set `DEMO_MODE=false` — demo mode replaces every integration with synthetic data.
-3. Fill in the required variables of the systems you use; leave the rest empty.
-4. Run `python -m scripts.connections` to see what is still missing, then
+1. Run `python -m scripts.connections --init`: it creates `connections.env`, one file
+   with every platform below grouped by category, where to get each value and the docs.
+2. Paste the links and keys of the platforms you use (leave the others empty); keep
+   `DEMO_MODE=false` there. The file is git-ignored and overrides `.env`.
+3. Run `python -m scripts.connections` for a checklist of what is connected, then
    `python -m scripts.connections --check` to test the live connections.
 
 Admins can see the same status in the API at `GET /api/v1/integrations?check=true`.
@@ -146,6 +147,24 @@ My Account → Security → Generate token (Browse permission); self-hosted: SON
 - Required: `SONARQUBE_TOKEN`
 - Optional: `SONARQUBE_URL`
 - API docs: https://docs.sonarsource.com/sonarqube-server/latest/extension-guide/web-api/
+
+## Cloud (resources, cost, health, security)
+
+### Amazon Web Services (`aws`)
+
+IAM user or role with a read-only policy: tag:GetResources, ec2:DescribeInstances, ec2:DescribeInstanceStatus, ec2:DescribeVolumes, rds:DescribeDBInstances, cloudwatch:DescribeAlarms, cloudwatch:GetMetricStatistics, securityhub:GetFindings (+ ce:GetCostAndUsage, ce:GetCostForecast if AWS_COST_EXPLORER_ENABLED). Tag resources project=<KEY> (and purpose / environment / owner).
+
+- Required: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
+- Optional: `AWS_SESSION_TOKEN`, `AWS_REGIONS`, `AWS_COST_EXPLORER_ENABLED`, `CLOUD_PROJECT_TAG_KEY`
+- API docs: https://docs.aws.amazon.com/resourcegroupstagging/latest/APIReference/API_GetResources.html
+
+### Microsoft Azure (`azure`)
+
+Entra ID app registration (client secret) with Reader, Cost Management Reader, Monitoring Reader and Security Reader on the subscription. Tag resources project=<KEY> (and purpose / environment / owner).
+
+- Required: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`
+- Optional: `CLOUD_PROJECT_TAG_KEY`
+- API docs: https://learn.microsoft.com/azure/governance/resource-graph/overview
 
 ## HR systems
 

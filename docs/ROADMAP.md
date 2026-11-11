@@ -69,3 +69,12 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 - [x] Retrospective generator and automatic release notes (lessons-learned library still open)
 - [ ] Enterprise readiness: SSO (OIDC/SAML) + SCIM, multi-tenancy, secrets vault, data
       retention / DPDP & GDPR tooling, SIEM export, LLMOps (prompt versions, model routing, costs)
+
+## Single-owner monitoring (added 2026-11)
+
+- [x] "Why is it late?": days lost per cause and status claims checked against the data
+- [x] Hybrid search over every connected platform (weighted RRF, filters, per-source access)
+- [x] Cloud monitoring (AWS, Azure): resources, where/why, health, storage, cost, alarms, security
+- [x] Portfolio page: every project side by side, who works on what
+- [x] One connections file (`connections.env`) with a checklist of what is connected
+- [ ] Auto-assign engine, task board with stages, updates feed, project setup from the UI

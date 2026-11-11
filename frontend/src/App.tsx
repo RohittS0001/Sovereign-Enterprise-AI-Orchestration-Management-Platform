@@ -13,6 +13,7 @@ import { KnowledgePage } from "./features/knowledge/KnowledgePage";
 import { LoginPage } from "./features/auth/LoginPage";
 import { PeoplePage } from "./features/people/PeoplePage";
 import { ProjectHealthPage, ProjectsPage } from "./features/projects/ProjectsPage";
+import { PortfolioPage } from "./features/cloud/PortfolioPage";
 import { ReportsPage } from "./features/reports/ReportsPage";
 import { McpAccessPage } from "./features/tokens/McpAccessPage";
 
@@ -38,6 +39,7 @@ export function App() {
         <Route path="home" element={<Guard permission="analytics:read"><HomePage /></Guard>} />
         <Route path="assistant" element={<Guard permission="agent:query"><AssistantPage /></Guard>} />
         <Route path="approvals" element={<ApprovalsPage />} />
+        <Route path="portfolio" element={<Guard permission="analytics:read"><PortfolioPage /></Guard>} />
         <Route path="projects" element={<Guard permission="projects:read"><ProjectsPage /></Guard>} />
         <Route path="projects/:key" element={<Guard permission="analytics:read"><ProjectHealthPage /></Guard>} />
         <Route path="reports" element={<Guard permission="reports:read"><ReportsPage /></Guard>} />

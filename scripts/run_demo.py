@@ -43,7 +43,7 @@ async def seed() -> None:
     from backend.app.core.security.permissions import Role
     from backend.app.db.models import Project, User
     from backend.app.db.session import Database
-    from backend.app.integrations.demo.seed import PHX_CONFIG
+    from backend.app.integrations.demo.seed import LDG_CONFIG, PHX_CONFIG
     from scripts.seed_demo_knowledge import seed as seed_knowledge
 
     database = Database(get_settings().database_url)
@@ -53,6 +53,8 @@ async def seed() -> None:
                 if await session.scalar(select(User.id).where(User.email == email)) is None:
                     session.add(User(email=email, full_name=name, role=Role(role),
                                      hashed_password=hash_password(DEMO_PASSWORD)))  # fmt: skip
+            if await session.scalar(select(Project.id).where(Project.key == "LDG")) is None:
+                session.add(Project(key="LDG", **LDG_CONFIG))
             project = await session.scalar(select(Project).where(Project.key == "PHX"))
             if project is None:
                 session.add(Project(key="PHX", **PHX_CONFIG))

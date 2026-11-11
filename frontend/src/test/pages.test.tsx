@@ -498,3 +498,75 @@ describe("Knowledge search over indexed platforms", () => {
     expect(JSON.parse(String(call[1]!.body)).sources).toEqual(["slack", "teams_chat"]);
   });
 });
+
+describe("Cloud monitoring", () => {
+  const resource = (name: string, kind: string, health: string, extra = {}) => ({
+    source: "aws", id: `arn:${name}`, name, kind, service: "ec2:instance", size: "m6i.large", region: "ap-south-1a",
+    state: "running", health, health_detail: null, storage_gb: null, created: "2026-10-01", environment: "production",
+    purpose: `${name} purpose`, owner: "Arjun M", url: null, ...extra,
+  });
+
+  it("shows a project's resources, where and why they run, health, storage, cost and findings", async () => {
+    const health = {
+      project: "PHX", name: "Phoenix", as_of: "2026-11-09", warnings: [], issue_counts: {},
+      risk: { score: 81, level: "high", factors: [] }, forecast: null, contradictions: [],
+      workload: { period_end: "2026-11-14", members: [], unassigned_open: [], suggestions: [] },
+    };
+    signedInAs(LEAD, {
+      "GET /projects/PHX/health": () => json(health),
+      "GET /projects/PHX/cloud": () => json({
+        project: "PHX", clouds: ["aws", "azure"], warnings: [],
+        resources: [
+          resource("phx-api-1", "instance", "ok"),
+          resource("phx-api-2", "instance", "impaired", { health_detail: "EC2 status check failing" }),
+          resource("phx-payments", "database", "ok", { storage_gb: 200, size: "db.r6g.large postgres" }),
+        ],
+        counts: { instance: 2, database: 1 }, states: { ok: 2, impaired: 1 }, storage_gb: 200,
+        storage_by_kind: { database: 200 }, owners: { "Arjun M": 3 },
+        placements: [{ region: "ap-south-1a", environment: "production", resources: 3 }],
+        cost: { currency: "USD", month_to_date: 1252.15, forecast_month_end: 2578, by_cloud: { aws: 1126.55, azure: 125.6 },
+                by_service: [{ service: "Amazon EC2", amount: 612.4 }, { service: "Amazon RDS", amount: 401.25 }] },
+        alerts: [{ source: "aws", id: "a1", title: "phx-api-2-status: StatusCheckFailed", severity: "high", state: "ALARM", resource: null, started: null }],
+        findings: null, findings_by_severity: { critical: 1 },
+      }),
+    });
+    renderApp("/projects/PHX");
+
+    await userEvent.click(await screen.findByRole("tab", { name: "Cloud & infra" }));
+    expect(await screen.findByText("phx-api-2 purpose")).toBeInTheDocument();
+    expect(screen.getByText("EC2 status check failing")).toBeInTheDocument();
+    expect(screen.getByText("3 active · 1 need attention")).toBeInTheDocument();
+    expect(screen.getByText("Amazon EC2")).toBeInTheDocument();
+    expect(screen.getByText("phx-api-2-status: StatusCheckFailed")).toBeInTheDocument();
+    expect(screen.getByText("Security findings are visible to admins and auditors.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "database (1)" }));
+    expect(screen.queryByText("phx-api-1")).not.toBeInTheDocument();
+    expect(screen.getByText("phx-payments")).toBeInTheDocument();
+  });
+
+  it("compares every project and shows who works on what", async () => {
+    signedInAs(LEAD, {
+      "GET /portfolio": () => json({
+        as_of: "2026-11-09",
+        totals: { projects: 2, resources: 12, unhealthy: 2, storage_gb: 1231, cost_month_to_date: 1999, cost_forecast: 4068, alerts: 3 },
+        projects: [
+          { project: "PHX", name: "Phoenix Payments Revamp", team: ["Arjun M", "Meera S"], resources: 10, active: 9, unhealthy: 2,
+            storage_gb: 731, cost_month_to_date: 1252, cost_forecast: 2578, currency: "USD", alerts: 3, critical_findings: 1,
+            regions: ["ap-south-1", "centralindia"], warnings: [] },
+          { project: "LDG", name: "Ledger Modernisation", team: ["Kiran P", "Meera S"], resources: 2, active: 2, unhealthy: 0,
+            storage_gb: 500, cost_month_to_date: 747, cost_forecast: 1490, currency: "USD", alerts: 0, critical_findings: 0,
+            regions: ["ap-south-1"], warnings: [] },
+        ],
+        people: { "Arjun M": ["PHX"], "Kiran P": ["LDG"], "Meera S": ["LDG", "PHX"] },
+      }),
+    });
+    renderApp("/portfolio");
+
+    expect(await screen.findByRole("link", { name: "Phoenix Payments Revamp" })).toHaveAttribute("href", "/projects/PHX");
+    expect(screen.getByText("1 critical")).toBeInTheDocument();
+    expect(screen.getByText("2 unhealthy")).toBeInTheDocument();
+    expect(screen.getByText("Meera S")).toBeInTheDocument();
+    expect(screen.getByText("1.2 TB")).toBeInTheDocument();
+  });
+});
