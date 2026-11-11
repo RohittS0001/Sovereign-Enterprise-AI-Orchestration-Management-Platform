@@ -53,15 +53,14 @@ async def seed() -> None:
                 if await session.scalar(select(User.id).where(User.email == email)) is None:
                     session.add(User(email=email, full_name=name, role=Role(role),
                                      hashed_password=hash_password(DEMO_PASSWORD)))  # fmt: skip
-            if await session.scalar(select(Project.id).where(Project.key == "LDG")) is None:
-                session.add(Project(key="LDG", **LDG_CONFIG))
-            project = await session.scalar(select(Project).where(Project.key == "PHX"))
-            if project is None:
-                session.add(Project(key="PHX", **PHX_CONFIG))
-            else:
-                # Older demo databases: add link keys introduced since (e.g. slack_channels)
-                # without overwriting anything edited by hand.
-                project.links = {**PHX_CONFIG["links"], **(project.links or {})}
+            for key, config in (("PHX", PHX_CONFIG), ("LDG", LDG_CONFIG)):
+                project = await session.scalar(select(Project).where(Project.key == key))
+                if project is None:
+                    session.add(Project(key=key, **config))
+                else:
+                    # Older demo databases: add link keys introduced since (e.g. slack_channels,
+                    # datadog_services) without overwriting anything edited by hand.
+                    project.links = {**config["links"], **(project.links or {})}
             await session.commit()
     finally:
         await database.dispose()
