@@ -5,6 +5,7 @@
 #     --from-literal=DATABASE_URL='postgresql://user:pass@postgres:5432/sovereign' \
 #     --from-literal=JWT_SECRET_KEY="$(openssl rand -base64 48)" \
 #     --from-literal=JIRA_API_TOKEN=... --from-literal=GITHUB_TOKEN=...
+#     --from-literal=METRICS_TOKEN="$(openssl rand -hex 32)"
 #
 existingSecret: sovereign-secrets
 
@@ -38,6 +39,9 @@ config:
   REPORT_SCHEDULE_ENABLED: "true"
   OTEL_EXPORTER_OTLP_ENDPOINT: ""
   OTEL_SERVICE_NAME: sovereign-api
+  # Shared rate limits and the report-scheduler lock across replicas (e.g. redis://redis:6379/0).
+  # Empty: limits are per process, so with N pods a client gets up to N× the limit.
+  REDIS_URL: ""
 
 api:
   replicas: 2
@@ -77,6 +81,11 @@ metrics:
   serviceMonitor:
     enabled: false   # requires the Prometheus Operator CRDs
     interval: 30s
+    # Prometheus authenticates with METRICS_TOKEN. Put METRICS_TOKEN in the Secret (the API
+    # reads it from there too); name defaults to existingSecret.
+    tokenSecret:
+      name: ""
+      key: METRICS_TOKEN
 
 podSecurityContext:
   runAsNonRoot: true

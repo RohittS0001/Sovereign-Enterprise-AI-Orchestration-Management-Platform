@@ -34,9 +34,12 @@ spec:
           ports:
             - name: http
               containerPort: 8000
+          # Ready = can serve (the database answers: 503 otherwise); alive = the process
+          # responds. A database outage takes pods out of the Service without restarting them.
           readinessProbe:
-            httpGet: {path: /api/v1/health, port: http}
+            httpGet: {path: /api/v1/health/ready, port: http}
             periodSeconds: 10
+            failureThreshold: 3
           livenessProbe:
             httpGet: {path: /api/v1/health, port: http}
             initialDelaySeconds: 20

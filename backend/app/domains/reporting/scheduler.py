@@ -1,16 +1,20 @@
 """In-process weekly report scheduler.
 
 Every few minutes it checks whether the configured weekday/hour (UTC) has passed this
-week and generates any missing scheduled reports. Running several API workers is safe:
-a unique constraint lets only one of them create each report.
+week and generates any missing scheduled reports. With several workers/replicas only one
+does the work: on PostgreSQL each run first takes a session-level advisory lock
+(``pg_try_advisory_lock``); the others skip that tick instead of collecting data and calling
+the LLM for nothing. The lock is released when the run ends (or its connection drops, so a
+crashed leader never blocks the rest). The unique constraint on reports still guarantees
+one report per project and week even if two runs ever overlapped.
 """
 
 import asyncio
 import contextlib
-from collections.abc import Callable
+from collections.abc import AsyncIterator, Callable
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from backend.app.core.config import Settings
 from backend.app.core.logging import get_logger
@@ -23,6 +27,32 @@ from backend.app.llm.base import AgentModels
 logger = get_logger(__name__)
 
 CHECK_INTERVAL_SECONDS = 300
+LEADER_LOCK_ID = 0x5E7E_2E90  # any constant shared by every replica of this application
+
+
+@contextlib.asynccontextmanager
+async def leader_lock(database: Database) -> AsyncIterator[bool]:
+    """Yield True when this process may run the scheduled job now.
+
+    PostgreSQL: a non-blocking advisory lock on a dedicated connection. Other backends
+    (SQLite: one process) are always the leader.
+    """
+    if database.backend != "postgresql":
+        yield True
+        return
+    async with database.engine.connect() as connection:
+        acquired = bool(
+            await connection.scalar(
+                text("SELECT pg_try_advisory_lock(:id)"), {"id": LEADER_LOCK_ID}
+            )
+        )
+        try:
+            yield acquired
+        finally:
+            if acquired:
+                await connection.execute(
+                    text("SELECT pg_advisory_unlock(:id)"), {"id": LEADER_LOCK_ID}
+                )
 
 
 class ReportScheduler:
@@ -53,6 +83,13 @@ class ReportScheduler:
         now = self.clock()
         if not self.is_due(now):
             return []
+        async with leader_lock(self.database) as leader:
+            if not leader:
+                logger.info("Another replica is generating scheduled reports; skipping")
+                return []
+            return await self._generate(now)
+
+    async def _generate(self, now: datetime) -> list[str]:
         created = []
         async with self.database.session() as session:
             keys = list(

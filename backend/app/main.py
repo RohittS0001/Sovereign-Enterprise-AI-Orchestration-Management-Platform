@@ -33,7 +33,7 @@ from backend.app.core.middleware.request_context import (
 )
 from backend.app.core.middleware.security_headers import SecurityHeadersMiddleware
 from backend.app.core.observability import configure_tracing
-from backend.app.core.security.rate_limit import RateLimiter
+from backend.app.core.security.rate_limit import build_rate_limiter
 from backend.app.db.session import Database
 from backend.app.domains.analytics.collector import SnapshotCollector
 from backend.app.domains.knowledge.embeddings import build_embedder
@@ -137,7 +137,7 @@ def create_app(
     )
     app.state.settings = settings
     app.state.database = database
-    app.state.rate_limiter = RateLimiter()
+    app.state.rate_limiter = build_rate_limiter(settings.redis_url)
     app.state.agent_models = agent_models
     app.state.tool_registry = tool_registry
     app.state.integrations = integrations

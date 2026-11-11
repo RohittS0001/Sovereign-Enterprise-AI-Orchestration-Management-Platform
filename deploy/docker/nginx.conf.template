@@ -11,6 +11,9 @@ server {
     root /usr/share/nginx/html;
     client_max_body_size 25m;  # document uploads (RAG_MAX_UPLOAD_MB defaults to 10)
 
+    # Security headers. nginx inherits add_header into a location only if that location has
+    # no add_header of its own, so every location below that adds a header repeats these
+    # (tests/unit/core/test_deploy_config.py checks that).
     add_header X-Content-Type-Options nosniff always;
     add_header X-Frame-Options DENY always;
     add_header Referrer-Policy no-referrer always;
@@ -60,11 +63,17 @@ server {
     location /assets/ {
         expires 1y;
         add_header Cache-Control "public, immutable";
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
         try_files $uri =404;
     }
 
     location / {
         add_header Cache-Control "no-cache";
+        add_header X-Content-Type-Options nosniff always;
+        add_header X-Frame-Options DENY always;
+        add_header Referrer-Policy no-referrer always;
         try_files $uri /index.html;
     }
 }

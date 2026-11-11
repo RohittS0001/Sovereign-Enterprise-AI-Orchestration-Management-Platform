@@ -41,6 +41,9 @@ _SQL_MANAGED_INDEXES = {"ix_document_chunks_fts"}
 
 
 def _include_object(obj, name, type_, reflected, compare_to):
+    # HNSW indexes depend on the deployment's embedding model (scripts/vector_index.py).
+    if type_ == "index" and name and name.startswith("ix_chunks_hnsw_"):
+        return False
     return not (type_ == "index" and name in _SQL_MANAGED_INDEXES)
 
 

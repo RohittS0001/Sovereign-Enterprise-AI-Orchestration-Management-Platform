@@ -29,6 +29,10 @@ spec:
                 port: {name: http}
 {{- end }}
 {{- if .Values.metrics.serviceMonitor.enabled }}
+{{- if not .Values.metrics.serviceMonitor.tokenSecret.key }}
+{{- fail "metrics.serviceMonitor needs tokenSecret.key: /metrics must be scraped with METRICS_TOKEN" }}
+{{- end }}
+{{- $tokenSecret := .Values.metrics.serviceMonitor.tokenSecret.name | default .Values.existingSecret }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -45,4 +49,11 @@ spec:
     - port: http
       path: /metrics
       interval: {{ .Values.metrics.serviceMonitor.interval }}
+      # /metrics requires METRICS_TOKEN (the API reads it from the same Secret), so
+      # Prometheus sends it as a bearer token; the web/Ingress path blocks /metrics anyway.
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ $tokenSecret }}
+          key: {{ .Values.metrics.serviceMonitor.tokenSecret.key }}
 {{- end }}

@@ -14,7 +14,7 @@ from backend.app.core.errors import (
     ServiceUnavailableError,
 )
 from backend.app.core.security.permissions import Permission, Principal
-from backend.app.core.security.rate_limit import RateLimiter
+from backend.app.core.security.rate_limit import RateLimiter, RedisRateLimiter
 from backend.app.core.security.tokens import decode_access_token
 from backend.app.db.models import User
 from backend.app.db.session import Database
@@ -29,7 +29,7 @@ def get_settings_dep(request: Request) -> Settings:
     return request.app.state.settings
 
 
-def get_rate_limiter(request: Request) -> RateLimiter:
+def get_rate_limiter(request: Request) -> RateLimiter | RedisRateLimiter:
     return request.app.state.rate_limiter
 
 
@@ -57,7 +57,7 @@ def get_client_info(request: Request) -> ClientInfo:
 SettingsDep = Annotated[Settings, Depends(get_settings_dep)]
 DatabaseDep = Annotated[Database, Depends(get_database)]
 SessionDep = Annotated[AsyncSession, Depends(get_session)]
-RateLimiterDep = Annotated[RateLimiter, Depends(get_rate_limiter)]
+RateLimiterDep = Annotated[RateLimiter | RedisRateLimiter, Depends(get_rate_limiter)]
 ClientInfoDep = Annotated[ClientInfo, Depends(get_client_info)]
 
 

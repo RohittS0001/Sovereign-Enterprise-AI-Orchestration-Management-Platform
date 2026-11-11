@@ -15,7 +15,19 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any, Literal
 
-from sqlalchemy import ColumnElement, Select, and_, delete, func, literal_column, or_, select, true
+from sqlalchemy import (
+    ColumnElement,
+    Select,
+    and_,
+    bindparam,
+    cast,
+    delete,
+    func,
+    literal_column,
+    or_,
+    select,
+    true,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.config import Settings
@@ -419,6 +431,18 @@ class KnowledgeService:
             dense = [i for score, i in sorted(scored, key=lambda s: -s[0]) if score > 0][:limit]
         return rows, dense, sparse
 
+    def _distance(self, query_vector: list[float]) -> Any:
+        """Cosine distance; cast to vector(N) when an HNSW index for that size exists
+        (``vector_index.py``), so the expression matches the index and is used."""
+        dims = self.settings.rag_vector_index_dimensions
+        if dims and len(query_vector) == dims:
+            from pgvector.sqlalchemy import Vector
+
+            return cast(DocumentChunk.embedding, Vector(dims)).op("<=>")(
+                bindparam("query_vector", query_vector, type_=Vector(dims))
+            )
+        return DocumentChunk.embedding.op("<=>")(query_vector)
+
     async def _postgres_candidates(
         self,
         principal: Principal,
@@ -434,7 +458,7 @@ class KnowledgeService:
             dense_statement = (
                 self._chunk_query(principal, filters)
                 .where(DocumentChunk.embedding_model == self.embedder.model)
-                .order_by(DocumentChunk.embedding.op("<=>")(query_vector))
+                .order_by(self._distance(query_vector))
                 .limit(limit)
             )
             for r in (await self.session.execute(dense_statement)).all():

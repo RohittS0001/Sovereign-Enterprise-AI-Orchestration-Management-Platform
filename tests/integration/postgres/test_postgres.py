@@ -116,3 +116,36 @@ async def test_audit_chain_and_utc_timestamps(database) -> None:
         event.occurred_at.utcoffset() is not None
         and event.occurred_at.utcoffset().total_seconds() == 0
     )
+
+
+async def test_only_one_replica_holds_the_scheduler_lock(database) -> None:
+    from backend.app.domains.reporting.scheduler import leader_lock
+
+    async with leader_lock(database) as first:
+        other = Database(POSTGRES_URL)  # another replica: its own engine and connections
+        try:
+            async with leader_lock(other) as second:
+                assert first is True and second is False
+        finally:
+            await other.dispose()
+    async with leader_lock(database) as again:  # released when the leader's run ended
+        assert again is True
+
+
+async def test_hnsw_index_is_created_and_used_by_search(database) -> None:
+    from backend.app.domains.knowledge.vector_index import create_index, existing_indexes
+
+    embedder = HashingEmbedder(64)
+    settings = Settings(_env_file=None, jwt_secret_key="k" * 40, rag_vector_index_dimensions=64)
+    async with database.engine.connect() as connection:
+        name = await create_index(connection, embedder.model, 64)
+        assert name in await existing_indexes(connection)
+    async with database.session() as session:
+        admin = await make_principal(session, Role.ADMIN)
+        await session.commit()
+        service = KnowledgeService(session, settings, embedder)
+        await service.ingest(admin, title="Rollback runbook", text="Roll back the payments API "
+                             "when the error rate stays above two percent.", source_type="demo",
+                             visibility=Visibility.ORGANIZATION, allowed_roles=[])  # fmt: skip
+        hits = await service.search(admin, "roll back payments error rate", top_k=1)
+    assert hits and hits[0].title == "Rollback runbook" and "semantic" in hits[0].matched_by

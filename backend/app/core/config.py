@@ -85,6 +85,8 @@ class Settings(ConnectorSettings):
     login_rate_limit_attempts: int = Field(default=10, ge=1)
     login_rate_limit_window_seconds: int = Field(default=60, ge=1)
     agent_rate_limit_per_minute: int = Field(default=30, ge=1)
+    # Shared state for several workers/replicas (rate limits, scheduler lock). Empty = in-process.
+    redis_url: str = ""
 
     # Local LLMs (served by Ollama or any OpenAI-compatible server such as vLLM)
     llm_provider: Literal["ollama", "openai_compatible"] = "ollama"
@@ -133,6 +135,10 @@ class Settings(ConnectorSettings):
     rag_min_relative_score: float = Field(default=0.0, ge=0, le=1)
     # Optional local reranker speaking the text-embeddings-inference /rerank API.
     reranker_url: str = ""
+    # PostgreSQL: dimension of EMBEDDING_MODEL_NAME's vectors once its HNSW index exists
+    # (python -m scripts.vector_index --create); dense search then casts to vector(N) so the
+    # planner can use the index. Empty = exact scan (no index needed).
+    rag_vector_index_dimensions: int | None = Field(default=None, ge=16, le=2000)
 
     # Agent loop limits
     agent_max_iterations: int = Field(default=4, ge=1, le=20)

@@ -18,7 +18,7 @@ from backend.app.core.config import Settings
 from backend.app.core.errors import AppException
 from backend.app.core.logging import get_logger
 from backend.app.core.security.permissions import Permission, Principal
-from backend.app.core.security.rate_limit import RateLimiter
+from backend.app.core.security.rate_limit import RateLimiter, RedisRateLimiter
 from backend.app.db.models import User
 from backend.app.db.session import Database
 from backend.app.domains.agent.service import AgentService, run_to_response
@@ -58,7 +58,7 @@ class ChatContext:
     settings: Settings
     models: AgentModels | None
     registry: ToolRegistry
-    limiter: RateLimiter
+    limiter: RateLimiter | RedisRateLimiter
 
 
 async def principal_for(context: ChatContext, email: str | None) -> Principal | None:
