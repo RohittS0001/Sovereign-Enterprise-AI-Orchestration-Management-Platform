@@ -102,3 +102,35 @@ def test_llm_chat_path_must_be_a_url_path() -> None:
     # Git Bash rewrites a leading "/" into a Windows path; fail loudly instead of 404ing.
     with pytest.raises(ValidationError, match="LLM_CHAT_PATH"):
         Settings(_env_file=None, llm_chat_path="C:/Program Files/Git/chat/completions")
+
+
+def test_connections_file_fills_in_without_blanking_dotenv(tmp_path, monkeypatch) -> None:
+    for name in ("JIRA_BASE_URL", "JIRA_EMAIL", "JIRA_TIMEOUT_SECONDS", "AWS_REGIONS", "DEMO_MODE"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".env").write_text(
+        "JIRA_BASE_URL=https://from-dotenv.atlassian.net\nJIRA_TIMEOUT_SECONDS=12\nDEMO_MODE=true\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "connections.env").write_text(
+        "DEMO_MODE=\n"
+        "JIRA_BASE_URL=    # required\n"  # empty: must not blank out .env
+        "JIRA_EMAIL=me@example.com    # required\n"
+        "JIRA_TIMEOUT_SECONDS=    # default: 30.0\n"
+        'AWS_REGIONS=["ap-south-1"]\n',
+        encoding="utf-8",
+    )
+
+    settings = Settings()
+
+    assert settings.jira_base_url == "https://from-dotenv.atlassian.net"
+    assert settings.jira_timeout_seconds == 12 and settings.demo_mode is True
+    assert settings.jira_email == "me@example.com" and settings.aws_regions == ["ap-south-1"]
+
+
+def test_connections_file_is_ignored_when_env_files_are_disabled(tmp_path, monkeypatch) -> None:
+    monkeypatch.delenv("JIRA_EMAIL", raising=False)
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "connections.env").write_text("JIRA_EMAIL=real@example.com\n", encoding="utf-8")
+
+    assert Settings(_env_file=None).jira_email == ""  # tests never pick up real credentials

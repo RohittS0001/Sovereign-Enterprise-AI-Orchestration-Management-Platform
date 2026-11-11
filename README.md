@@ -151,7 +151,11 @@ Migrations run as a pre-install/pre-upgrade hook. See [values.yaml](deploy/helm/
 ## Connecting your systems (one file)
 
 Every link and key lives in **one file, `connections.env`**: every platform grouped by category,
-with where to get each value and a link to its docs. It is git-ignored and overrides `.env`.
+with where to get each value and a link to its docs. It is git-ignored; every value starts empty
+and empty lines are ignored, so a filled-in value overrides `.env` and an empty one changes nothing.
+Docker Compose mounts it read-only into the API container; on Kubernetes create a Secret from it
+(`kubectl create secret generic sovereign-connections --from-file=connections.env`) and set the
+chart's `connectionsSecret: sovereign-connections`.
 
 ```bash
 python -m scripts.connections --init     # create connections.env (from connections.env.example)

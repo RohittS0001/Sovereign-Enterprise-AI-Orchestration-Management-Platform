@@ -45,6 +45,22 @@ spec:
             {{- toYaml .Values.api.resources | nindent 12 }}
           securityContext:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          {{- if .Values.connectionsSecret }}
+          volumeMounts:
+            - name: connections
+              mountPath: /app/connections.env
+              subPath: connections.env
+              readOnly: true
+          {{- end }}
+      {{- if .Values.connectionsSecret }}
+      volumes:
+        - name: connections
+          secret:
+            secretName: {{ .Values.connectionsSecret }}
+            items:
+              - key: connections.env
+                path: connections.env
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

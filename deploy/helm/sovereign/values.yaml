@@ -8,6 +8,13 @@
 #
 existingSecret: sovereign-secrets
 
+# Integration links and keys from one file (python -m scripts.connections --init), mounted into
+# the API pods as /app/connections.env. Create it with:
+#
+#   kubectl create secret generic sovereign-connections --from-file=connections.env
+#
+connectionsSecret: ""   # e.g. sovereign-connections; empty = not mounted
+
 image:
   api:
     repository: ghcr.io/your-org/sovereign-api

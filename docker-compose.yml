@@ -56,6 +56,15 @@ services:
     image: sovereign-api:local
     restart: unless-stopped
     environment: *api-env
+    # Every integration's links and keys, from one file (python -m scripts.connections --init).
+    # Mounted as a file, not env_file, so its empty lines stay "not set" instead of "".
+    volumes:
+      - type: bind
+        source: ./connections.env
+        target: /app/connections.env
+        read_only: true
+        bind:
+          create_host_path: false
     depends_on:
       db:
         condition: service_healthy
