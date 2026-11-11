@@ -1,0 +1,7 @@
+# For the GPU machine that runs qlora_finetune.py (not needed by the platform itself).
+# Install a CUDA build of PyTorch first if pip picks a CPU one: https://pytorch.org/get-started/
+torch>=2.4
+transformers>=4.51   # Qwen3 and Phi-4-mini chat templates
+peft>=0.13           # LoRA with target_modules="all-linear"
+bitsandbytes>=0.44   # 4-bit NF4 quantization and paged 8-bit AdamW
+accelerate>=1.0

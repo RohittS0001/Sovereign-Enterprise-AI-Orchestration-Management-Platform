@@ -59,6 +59,8 @@ ignore = [
 "evaluation/suites/**" = ["E501"]
 "tests/**" = ["S101", "S105", "S106", "S107", "E731", "E501"]
 "scripts/**" = ["T201", "S603", "S607"]  # dev tooling runs fixed commands
+# Standalone fine-tuning (run by hand on a GPU box): seeded RNG for synthetic data, prompt text.
+"finetuning/**" = ["E501", "S101", "S311", "T201"]
 # Regex patterns read better unwrapped.
 "backend/app/domains/governance/guardrails/injection.py" = ["E501"]
 "backend/app/integrations/connectors/*" = ["E501"]  # compact declarative specs

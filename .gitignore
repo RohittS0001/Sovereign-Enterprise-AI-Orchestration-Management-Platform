@@ -66,3 +66,5 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+# Fine-tuning outputs (adapters, merged models) are large and machine-specific
+finetuning/outputs/
