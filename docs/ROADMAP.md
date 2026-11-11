@@ -47,8 +47,8 @@ agent capability goes through the tool gateway (permissions, approvals, audit).
 - [x] **AI chief of staff** — always-on agent watching every project, preparing weekly decisions,
       drafting escalations and scope trade-offs; everything through approvals
 - [x] **Predictive risk model** — learn early slip signals from your own history (done: logistic
-      model on daily project signals; not done: LoRA fine-tuning, which needs a GPU); optional LoRA
-      fine-tuning on org data, kept on-premises
+      model on daily project signals). LoRA: a standalone QLoRA pipeline and synthetic datasets
+      for both models are in `finetuning/`; no model has been trained yet (needs a GPU)
 - [x] **Voice briefings** — "what's at risk today?" as a 2-minute spoken summary
 - [x] **Negotiation assistant** — when a deadline is at risk, generate options (scope cut,
       added people, phased release) with simulated outcomes and draft stakeholder messages

@@ -62,6 +62,12 @@ npm --prefix frontend test                        # Vitest + Testing Library
 - Frontend: Windows Application Control on this machine blocks Rollup's native binary, so
   `frontend/package.json` overrides `rollup` with `@rollup/wasm-node`. Keep that override.
 - `.pre-commit-config.yaml` runs ruff, a secret-file blocker and the frontend type check.
+- `finetuning/` is standalone (run by hand on a GPU box): `qlora_finetune.py` trains/evaluates the
+  planner and responder; `python -m finetuning.build_datasets` regenerates `finetuning/data/` from
+  the real prompts and tool schemas (rerun it when those change). No model has been trained yet.
+- Shared state: `REDIS_URL` → `RedisRateLimiter` (falls back to in-process limits);
+  `reporting/scheduler.py:leader_lock` (PG advisory lock); `knowledge/vector_index.py` +
+  `scripts/vector_index.py` (HNSW per embedding model, `RAG_VECTOR_INDEX_DIMENSIONS`).
 
 ## Architecture (paths relative to `backend/app/`)
 
@@ -118,6 +124,8 @@ settles the run (agent not re-run); approver needs `approvals:decide` *and* the 
 optional four-eyes, TTL, `APPROVAL_EXEMPT_TOOLS` (ignored once a run is injection-flagged).
 `audit/service.py`: SHA-256 hash-chained events written *in the caller's transaction* after locking
 `audit_chain_head` — commit promptly; action names in `audit/actions.py`; never update/delete events.
+Deciding is an atomic conditional UPDATE out of `pending` (status `approved` while executing), committed
+before the external write, so concurrent approvals run an action at most once.
 `guardrails/`: `redact_text`/`redact_data` (secrets, cards, Aadhaar, PAN, SSN, IBAN; contact info
 optional) and heuristic `scan_for_injection`.
 

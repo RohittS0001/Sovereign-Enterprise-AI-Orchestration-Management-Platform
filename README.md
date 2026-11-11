@@ -238,6 +238,18 @@ planted causes, false-contradiction rate), forecasting calibration, guardrails, 
 sandbox. Ragas/DeepEval export and Phoenix-compatible traces included. CI fails if any gate
 regresses. Full method, results and limitations: [docs/evaluation.md](docs/evaluation.md).
 
+## Scaling out
+
+- **Several workers/replicas**: set `REDIS_URL` and rate limits are shared (sliding-window counters;
+  if Redis is down each process falls back to its own limits, never to none). The weekly report
+  scheduler takes a PostgreSQL advisory lock, so one replica does the work.
+- **Vector search at scale**: `python -m scripts.vector_index --create` builds a pgvector HNSW index
+  for the configured embedding model; set `RAG_VECTOR_INDEX_DIMENSIONS` so search uses it.
+- **Kubernetes**: readiness (`/api/v1/health/ready`, 503 when the database is down) is separate from
+  liveness; the ServiceMonitor scrapes `/metrics` with `METRICS_TOKEN`.
+- Not built yet: a job queue for long indexing runs (they run in the request today), read
+  replicas, and multi-tenancy.
+
 ## Monitoring
 
 - `GET /metrics` exposes Prometheus metrics: HTTP by route, agent runs and duration, tool calls,
@@ -248,10 +260,19 @@ regresses. Full method, results and limitations: [docs/evaluation.md](docs/evalu
 
 ## Security
 
-- **Local models only**: prompts and data stay on your servers.
-- **Short-lived JWTs**: refresh tokens rotate, and reusing an old one revokes every session.
+- **Model endpoints you choose**: with local/self-hosted models prompts and data stay on your
+  servers. An external endpoint is reported as such by the compliance report, and text sent to an
+  external embedding server is redacted first (`EMBEDDING_REDACTION`).
+- **Short-lived JWTs**: refresh tokens rotate atomically (two concurrent refreshes yield one
+  new token), and reusing an old one revokes every session.
+- **Data isolation**: document ACLs from Confluence, SharePoint and Drive are mirrored; unknown
+  ACLs (Notion) fail closed to admin-only. Search, the knowledge graph and the agent all apply the
+  same SQL access filter, and a partial or failed source fetch never deletes indexed records.
+- **Safe outbound HTTP**: connector downloads only follow https redirects to the vendor's own
+  domains (credentials are never forwarded to another host) and every response body is streamed
+  with a byte limit.
 - **Approval for writes**: agent writes wait for a human. The approver needs both `approvals:decide`
-  and the action's own permission.
+  and the action's own permission; an atomic claim guarantees an approved action runs at most once.
 - **Untrusted tool output**: it is redacted, truncated, scanned for injection and wrapped as
   untrusted data before a model sees it. A flagged run loses its approval exemptions.
 - **Tamper-evident audit log**: entries are append-only and hash-chained.
@@ -273,7 +294,7 @@ docs/               architecture, ADRs, roadmap
 
 ## Roadmap
 
-Phases 1–10 are complete, including every integration and moonshot in the backlog (LoRA fine-tuning
-aside), plus most lifecycle features (backlog planning, estimation, critical path, DORA, release notes,
+Phases 1–10 are complete, including every integration and moonshot in the backlog (a QLoRA
+pipeline for both models is ready in [`finetuning/`](finetuning/README.md) but has not been run), plus most lifecycle features (backlog planning, estimation, critical path, DORA, release notes,
 retrospectives). Next: project intake, staffing, standup digest and enterprise readiness; everything is
 tracked in [docs/ROADMAP.md](docs/ROADMAP.md).
