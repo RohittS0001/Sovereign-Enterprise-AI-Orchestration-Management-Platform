@@ -25,10 +25,32 @@ def _leave_days(
     return days, periods
 
 
-def _assigned(issue: IssueFacts, member: Member) -> bool:
-    if member.jira_account_id and issue.assignee_id:
-        return issue.assignee_id == member.jira_account_id
-    return bool(issue.assignee) and issue.assignee == member.name
+def _norm(name: str | None) -> str:
+    return " ".join((name or "").split()).casefold()
+
+
+def owner_of(issue: IssueFacts, members: list[Member]) -> Member | None:
+    """The member an issue counts against.
+
+    1. The Jira account id (stable, unique) when a member is configured with it.
+    2. Otherwise the display name (case/space-insensitive), but only if exactly one member
+       has it and that member is not tied to a *different* account id; two people with the
+       same name are never both charged, and a renamed account never lands on a namesake.
+    Unmatched or ambiguous issues belong to nobody (they do not inflate anyone's load).
+    """
+    if issue.assignee_id:
+        for member in members:
+            if member.jira_account_id and member.jira_account_id == issue.assignee_id:
+                return member
+    if not issue.assignee:
+        return None
+    named = [
+        m
+        for m in members
+        if _norm(m.name) == _norm(issue.assignee)
+        and not (m.jira_account_id and issue.assignee_id and m.jira_account_id != issue.assignee_id)
+    ]
+    return named[0] if len(named) == 1 else None
 
 
 def compute_workload(snapshot: ProjectSnapshot) -> Workload:
@@ -53,8 +75,9 @@ def compute_workload(snapshot: ProjectSnapshot) -> Workload:
     loads: list[MemberLoad] = []
     assigned_keys: set[str] = set()
     member_issues: dict[str, list[IssueFacts]] = {}
+    owners = {i.key: owner_of(i, snapshot.members) for i in open_issues}
     for member in snapshot.members:
-        mine = [i for i in open_issues if _assigned(i, member)]
+        mine = [i for i in open_issues if owners[i.key] is member]
         member_issues[member.name] = mine
         assigned_keys.update(i.key for i in mine)
         leave_days, periods = _leave_days(snapshot, member, period_start, period_end)

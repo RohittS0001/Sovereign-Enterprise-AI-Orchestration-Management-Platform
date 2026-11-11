@@ -205,7 +205,18 @@ class SnapshotCollector:
             return
         sprint_end = snapshot.sprint.end if snapshot.sprint and snapshot.sprint.end else None
         end = max(sprint_end or snapshot.today, snapshot.today) + timedelta(days=14)
-        by_id = {i.lower(): m for m in snapshot.members for i in m.ids}
+        by_id: dict[str, Member | None] = {}
+        for m in snapshot.members:
+            for i in m.ids:
+                # Two members sharing a name (or an id): ambiguous, so never matched by it.
+                by_id[i.lower()] = None if i.lower() in by_id else m
+        ambiguous = sorted(k.removeprefix("name:") for k, v in by_id.items() if v is None)
+        if ambiguous:
+            snapshot.warnings.append(
+                "Leave cannot be matched by name for "
+                + ", ".join(ambiguous)
+                + " (several members share it): set hr_employee_id / keka_employee_id"
+            )
         for source, service in services.items():
             try:
                 records = await service.list_leave(snapshot.today, end)
@@ -214,7 +225,7 @@ class SnapshotCollector:
                 continue
             for record in records:
                 member = by_id.get(record.employee_id.lower()) or by_id.get(
-                    f"name:{(record.name or '').lower()}"
+                    f"name:{' '.join((record.name or '').split()).lower()}"
                 )
                 if member is not None:
                     member_id = next(
