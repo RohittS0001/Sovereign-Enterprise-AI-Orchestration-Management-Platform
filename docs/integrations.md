@@ -148,6 +148,21 @@ My Account → Security → Generate token (Browse permission); self-hosted: SON
 - Optional: `SONARQUBE_URL`
 - API docs: https://docs.sonarsource.com/sonarqube-server/latest/extension-guide/web-api/
 
+### Datadog (`datadog`)
+
+Datadog → Organization Settings → API Keys + Application Keys (scopes incident_read, monitors_read); EU or other regions set DATADOG_SITE (e.g. datadoghq.eu).
+
+- Required: `DATADOG_API_KEY`, `DATADOG_APP_KEY`
+- Optional: `DATADOG_SITE`
+- API docs: https://docs.datadoghq.com/api/latest/
+
+### ServiceNow (`servicenow`)
+
+A ServiceNow user with the itil (read) role; instance URL https://<company>.service-now.com.
+
+- Required: `SERVICENOW_INSTANCE_URL`, `SERVICENOW_USERNAME`, `SERVICENOW_PASSWORD`
+- API docs: https://developer.servicenow.com/dev.do#!/reference/api/latest/rest/c_TableAPI
+
 ## Cloud (resources, cost, health, security)
 
 ### Amazon Web Services (`aws`)
@@ -165,6 +180,23 @@ Entra ID app registration (client secret) with Reader, Cost Management Reader, M
 - Required: `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_SUBSCRIPTION_ID`
 - Optional: `CLOUD_PROJECT_TAG_KEY`
 - API docs: https://learn.microsoft.com/azure/governance/resource-graph/overview
+
+### Google Cloud (`gcp`)
+
+Service account key (GOOGLE_SERVICE_ACCOUNT_FILE) with Cloud Asset Viewer, Monitoring Viewer and Security Center Findings Viewer on each project in GCP_PROJECT_IDS. Label resources project=<key in lowercase> (and purpose / environment / owner). Cost needs a BigQuery billing export and is not shown.
+
+- Required: `GOOGLE_SERVICE_ACCOUNT_FILE`, `GCP_PROJECT_IDS`
+- Optional: `CLOUD_PROJECT_TAG_KEY`
+- API docs: https://cloud.google.com/asset-inventory/docs/reference/rest/v1/TopLevel/searchAllResources
+
+## Customer support
+
+### Zendesk (`zendesk`)
+
+Zendesk Admin Center → Apps and integrations → Zendesk API → enable token access, add a token; tag tickets with the project key (lowercase).
+
+- Required: `ZENDESK_SUBDOMAIN`, `ZENDESK_EMAIL`, `ZENDESK_API_TOKEN`
+- API docs: https://developer.zendesk.com/api-reference/ticketing/ticket-management/search/
 
 ## HR systems
 

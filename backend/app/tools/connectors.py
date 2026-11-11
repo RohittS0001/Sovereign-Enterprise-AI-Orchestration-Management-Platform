@@ -59,10 +59,11 @@ class ListPullRequestsInput(SourceInput):
 
 class OpsInput(SourceInput):
     scope: list[str] = Field(
-        default_factory=list, max_length=20,
+        default_factory=list,
+        max_length=20,
         description="Records to read: PagerDuty service ids, Sentry project slugs, Jenkins jobs, "
         "Argo CD apps, SonarQube project keys (see the project's links)",
-    )  # fmt: skip
+    )
     limit: int = Field(default=25, ge=1, le=50)
 
 
@@ -89,6 +90,12 @@ class BudgetInput(SourceInput):
 
 class DealsInput(SourceInput):
     project_key: str | None = Field(default=None, description="Jira project key, e.g. PHX")
+    open_only: bool = True
+    limit: int = Field(default=25, ge=1, le=100)
+
+
+class TicketsInput(SourceInput):
+    project_key: str = Field(description="Project key, e.g. PHX (tickets tagged with it)")
     open_only: bool = True
     limit: int = Field(default=25, ge=1, le=100)
 
@@ -147,9 +154,10 @@ class ConnectorTools:
         self, category: str, source: str | None, capability: str | None = None
     ) -> dict[str, Any]:
         services = {
-            name: svc for name, svc in self.hub.by_category(category).items()
+            name: svc
+            for name, svc in self.hub.by_category(category).items()
             if capability is None or callable(getattr(svc, capability, None))
-        }  # fmt: skip
+        }
         if source is None:
             return services
         if source not in services:
@@ -157,9 +165,12 @@ class ConnectorTools:
         return {source: services[source]}
 
     async def _fan_out(
-        self, category: str, source: str | None, call: Callable[[Any], Awaitable[Any]],
+        self,
+        category: str,
+        source: str | None,
+        call: Callable[[Any], Awaitable[Any]],
         capability: str | None = None,
-    ) -> dict[str, Any]:  # fmt: skip
+    ) -> dict[str, Any]:
         services = self._pick(category, source, capability)
         names = list(services)
         outcomes = await asyncio.gather(*(call(services[n]) for n in names), return_exceptions=True)
@@ -180,10 +191,18 @@ class ConnectorTools:
 
     async def search_work_items(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "tracker", "search work items", payload, SearchWorkItemsInput,
-            lambda i: self._fan_out("tracker", i.source, lambda s: s.search_work_items(
-                project=i.project, query=i.query, status=i.status, limit=i.limit)),
-        )  # fmt: skip
+            "tracker",
+            "search work items",
+            payload,
+            SearchWorkItemsInput,
+            lambda i: self._fan_out(
+                "tracker",
+                i.source,
+                lambda s: s.search_work_items(
+                    project=i.project, query=i.query, status=i.status, limit=i.limit
+                ),
+            ),
+        )
 
     async def get_work_item(self, payload: dict[str, Any]) -> ToolResult:
         async def get(i: GetWorkItemInput) -> Any:
@@ -194,40 +213,75 @@ class ConnectorTools:
 
     async def list_pull_requests(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "tracker", "list pull requests", payload, ListPullRequestsInput,
-            lambda i: self._fan_out("tracker", i.source, lambda s: s.list_pull_requests(
-                repository=i.repository, state=i.state, limit=i.limit)),
-        )  # fmt: skip
+            "tracker",
+            "list pull requests",
+            payload,
+            ListPullRequestsInput,
+            lambda i: self._fan_out(
+                "tracker",
+                i.source,
+                lambda s: s.list_pull_requests(
+                    repository=i.repository, state=i.state, limit=i.limit
+                ),
+            ),
+        )
 
     # ---------------------------------------------------------------- ops
 
     async def list_incidents(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "ops", "list incidents", payload, IncidentsInput,
-            lambda i: self._fan_out("ops", i.source, lambda s: s.list_incidents(
-                open_only=i.open_only, scope=i.scope or None, limit=i.limit), "list_incidents"),
-        )  # fmt: skip
+            "ops",
+            "list incidents",
+            payload,
+            IncidentsInput,
+            lambda i: self._fan_out(
+                "ops",
+                i.source,
+                lambda s: s.list_incidents(
+                    open_only=i.open_only, scope=i.scope or None, limit=i.limit
+                ),
+                "list_incidents",
+            ),
+        )
 
     async def list_errors(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "ops", "list errors", payload, OpsInput,
-            lambda i: self._fan_out("ops", i.source, lambda s: s.list_errors(
-                scope=i.scope or None, limit=i.limit), "list_errors"),
-        )  # fmt: skip
+            "ops",
+            "list errors",
+            payload,
+            OpsInput,
+            lambda i: self._fan_out(
+                "ops",
+                i.source,
+                lambda s: s.list_errors(scope=i.scope or None, limit=i.limit),
+                "list_errors",
+            ),
+        )
 
     async def list_deployments(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "ops", "list deployments", payload, OpsInput,
-            lambda i: self._fan_out("ops", i.source, lambda s: s.list_deployments(
-                scope=i.scope or None, limit=i.limit), "list_deployments"),
-        )  # fmt: skip
+            "ops",
+            "list deployments",
+            payload,
+            OpsInput,
+            lambda i: self._fan_out(
+                "ops",
+                i.source,
+                lambda s: s.list_deployments(scope=i.scope or None, limit=i.limit),
+                "list_deployments",
+            ),
+        )
 
     async def quality_gates(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "ops", "quality gates", payload, OpsInput,
-            lambda i: self._fan_out("ops", i.source, lambda s: s.quality_gates(
-                scope=i.scope or None), "quality_gates"),
-        )  # fmt: skip
+            "ops",
+            "quality gates",
+            payload,
+            OpsInput,
+            lambda i: self._fan_out(
+                "ops", i.source, lambda s: s.quality_gates(scope=i.scope or None), "quality_gates"
+            ),
+        )
 
     # ---------------------------------------------------------------- hr / finance
 
@@ -245,19 +299,44 @@ class ConnectorTools:
 
     async def budget_vs_actual(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "finance", "budget vs actual", payload, BudgetInput,
-            lambda i: self._fan_out("finance", i.source,
-                                    lambda s: s.budget_lines(scope=i.scope or None)),
-        )  # fmt: skip
+            "finance",
+            "budget vs actual",
+            payload,
+            BudgetInput,
+            lambda i: self._fan_out(
+                "finance", i.source, lambda s: s.budget_lines(scope=i.scope or None)
+            ),
+        )
 
     # ---------------------------------------------------------------- crm
 
     async def list_deals(self, payload: dict[str, Any]) -> ToolResult:
         return await run_tool(
-            "crm", "list deals", payload, DealsInput,
-            lambda i: self._fan_out("crm", i.source, lambda s: s.list_deals(
-                project=i.project_key, open_only=i.open_only, limit=i.limit)),
-        )  # fmt: skip
+            "crm",
+            "list deals",
+            payload,
+            DealsInput,
+            lambda i: self._fan_out(
+                "crm",
+                i.source,
+                lambda s: s.list_deals(project=i.project_key, open_only=i.open_only, limit=i.limit),
+            ),
+        )
+
+    async def list_tickets(self, payload: dict[str, Any]) -> ToolResult:
+        return await run_tool(
+            "support",
+            "list tickets",
+            payload,
+            TicketsInput,
+            lambda i: self._fan_out(
+                "support",
+                i.source,
+                lambda s: s.list_tickets(
+                    [i.project_key.lower()], open_only=i.open_only, limit=i.limit
+                ),
+            ),
+        )
 
     # ---------------------------------------------------------------- calendar & meetings
 
@@ -272,9 +351,12 @@ class ConnectorTools:
             from backend.app.integrations.connectors.base import BusySlot
 
             slots = [BusySlot(**b) for b in busy["results"]]
-            return {"sources": busy["sources"], "warnings": busy["warnings"],
-                    "free": free_slots(slots, start, end, i.duration_minutes),
-                    "note": "Weekdays 09:00-18:00 UTC; busy, tentative and out-of-office count as busy."}  # fmt: skip
+            return {
+                "sources": busy["sources"],
+                "warnings": busy["warnings"],
+                "free": free_slots(slots, start, end, i.duration_minutes),
+                "note": "Weekdays 09:00-18:00 UTC; busy, tentative and out-of-office count as busy.",
+            }
 
         return await run_tool("calendar", "find free slots", payload, FreeSlotsInput, run)
 

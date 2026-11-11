@@ -10,7 +10,12 @@ LDG_CONFIG = {
     "github_repos": [],
     "default_branch": "main",
     "active_sprint_id": None,
-    "links": {"cost_centers": ["Ledger Modernisation"], "slack_channels": ["C0LEDGER01"]},
+    "links": {
+        "cost_centers": ["Ledger Modernisation"],
+        "slack_channels": ["C0LEDGER01"],
+        "datadog_services": ["ledger-api"],
+        "servicenow_services": ["Ledger API"],
+    },
     "members": [
         {"name": "Kiran P", "capacity_points": 10},
         {"name": "Ravi A", "capacity_points": 8},

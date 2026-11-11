@@ -420,6 +420,30 @@ async def cloud_items(hub: Any, project: Project, today: date) -> list[IndexItem
     return items
 
 
+async def support_items(hub: Any, project: Project) -> list[IndexItem]:
+    tags = list((project.links or {}).get("zendesk_tags") or [project.key.lower()])
+    items = []
+    for source, service in hub.by_category("support").items():
+        for ticket in await service.list_tickets(tags, open_only=False, limit=100):
+            items.append(
+                IndexItem(
+                    source,
+                    ticket.id,
+                    f"Ticket {ticket.id}: {ticket.subject}",
+                    _lines(
+                        f"Customer ticket {ticket.id} ({source}) · {ticket.subject}",
+                        f"Status: {ticket.status} · priority {ticket.priority or '—'} · opened "
+                        f"{ticket.created or '—'} · updated {ticket.updated or '—'} · "
+                        f"project {project.key}",
+                    ),
+                    permission=Permission.ANALYTICS_READ,
+                    occurred_at=_at(ticket.updated or ticket.created),
+                    url=ticket.url,
+                )
+            )
+    return items
+
+
 def people_items(snapshot: ProjectSnapshot) -> list[IndexItem]:
     names = {i.lower(): m.name for m in snapshot.members for i in m.ids}
     items = []
@@ -504,6 +528,8 @@ async def collect_items(
     await guarded("incidents", lambda: ops_items(hub, snapshot))
     await guarded("trackers", lambda: tracker_items(hub, project))
     await guarded("meetings", lambda: meeting_items(hub, project, snapshot.today))
+    if hub.by_category("support"):
+        await guarded("support", lambda: support_items(hub, project))
     if hub.by_category("cloud"):
         await guarded("cloud", lambda: cloud_items(hub, project, snapshot.today))
     for item in people_items(snapshot) + business_items(snapshot):

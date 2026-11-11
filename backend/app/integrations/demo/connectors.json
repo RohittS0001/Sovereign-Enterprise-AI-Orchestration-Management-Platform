@@ -1,4 +1,56 @@
 {
+  "support": {
+    "zendesk": {
+      "tickets": [
+        {
+          "id": "48211",
+          "subject": "Refund still not received after 10 days",
+          "status": "open",
+          "priority": "high",
+          "created": "{today-3}",
+          "updated": "{today-1}",
+          "tags": [
+            "phx",
+            "refunds"
+          ]
+        },
+        {
+          "id": "48230",
+          "subject": "Payment failed with timeout at checkout",
+          "status": "pending",
+          "priority": "urgent",
+          "created": "{today-1}",
+          "updated": "{today}",
+          "tags": [
+            "phx",
+            "checkout"
+          ]
+        },
+        {
+          "id": "48102",
+          "subject": "Duplicate charge on card",
+          "status": "solved",
+          "priority": "normal",
+          "created": "{today-9}",
+          "updated": "{today-6}",
+          "tags": [
+            "phx"
+          ]
+        },
+        {
+          "id": "48177",
+          "subject": "Ledger export missing last week's entries",
+          "status": "open",
+          "priority": "normal",
+          "created": "{today-4}",
+          "updated": "{today-2}",
+          "tags": [
+            "ldg"
+          ]
+        }
+      ]
+    }
+  },
   "_comment": "Synthetic data for the connectors beyond the core four. Dates use {today±N}.",
   "tracker": {
     "linear": {
@@ -110,6 +162,52 @@
     }
   },
   "ops": {
+    "servicenow": {
+      "incidents": [
+        {
+          "id": "INC0012045",
+          "title": "Month-end close report failing for two entities",
+          "status": "in progress",
+          "severity": "high",
+          "service": "Ledger API",
+          "created": "{today-2}"
+        }
+      ],
+      "deployments": [
+        {
+          "name": "Ledger API",
+          "status": "success",
+          "finished": "{today-4}",
+          "detail": "CHG0031002: Reconciliation batch v2.3"
+        },
+        {
+          "name": "Ledger API",
+          "status": "failure",
+          "finished": "{today-11}",
+          "detail": "CHG0030871: Schema migration rolled back"
+        }
+      ]
+    },
+    "datadog": {
+      "incidents": [
+        {
+          "id": "DD-312",
+          "title": "Ledger reconciliation lag above 30 minutes",
+          "status": "active",
+          "severity": "SEV-2",
+          "service": "ledger-api",
+          "created": "{today-1}"
+        },
+        {
+          "id": "monitor-88",
+          "title": "Monitor: ledger-api error rate > 2%",
+          "status": "triggered",
+          "severity": "high",
+          "service": "ledger-api",
+          "created": "{today}"
+        }
+      ]
+    },
     "pagerduty": {
       "incidents": [
         {
@@ -335,6 +433,75 @@
     }
   },
   "cloud": {
+    "gcp": {
+      "resources": [
+        {
+          "id": "//container.googleapis.com/projects/acme-data/locations/asia-south1/clusters/ledger-gke",
+          "name": "ledger-gke",
+          "kind": "container",
+          "service": "container.googleapis.com/Cluster",
+          "size": "e2-standard-4 x3",
+          "region": "asia-south1",
+          "state": "RUNNING",
+          "health": "ok",
+          "created": "{today-150}",
+          "tags": {
+            "project": "ldg",
+            "environment": "production",
+            "purpose": "Ledger services on GKE",
+            "owner": "kiran-p"
+          }
+        },
+        {
+          "id": "//storage.googleapis.com/acme-ledger-archive",
+          "name": "acme-ledger-archive",
+          "kind": "bucket",
+          "service": "storage.googleapis.com/Bucket",
+          "region": "asia-south1",
+          "state": "available",
+          "health": "ok",
+          "storage_gb": 1840.0,
+          "created": "{today-700}",
+          "tags": {
+            "project": "ldg",
+            "environment": "production",
+            "purpose": "7-year ledger archive (compliance)",
+            "owner": "kiran-p"
+          }
+        },
+        {
+          "id": "//run.googleapis.com/projects/acme-web/locations/asia-south1/services/phx-receipts-api",
+          "name": "phx-receipts-api",
+          "kind": "container",
+          "service": "run.googleapis.com/Service",
+          "region": "asia-south1",
+          "state": "READY",
+          "health": "ok",
+          "created": "{today-30}",
+          "tags": {
+            "project": "phx",
+            "environment": "production",
+            "purpose": "Receipt PDF rendering",
+            "owner": "priya-n"
+          }
+        }
+      ],
+      "alerts": [],
+      "findings": [
+        {
+          "id": "organizations/1/sources/2/findings/ledger-open-bucket",
+          "title": "Public bucket acl",
+          "severity": "high",
+          "status": "ACTIVE",
+          "resource": "//storage.googleapis.com/acme-ledger-archive",
+          "created": "{today-2}",
+          "recommendation": "Remove allUsers from the bucket IAM policy.",
+          "tags": {
+            "project": "ldg"
+          }
+        }
+      ]
+    },
     "aws": {
       "resources": [
         {

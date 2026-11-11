@@ -788,6 +788,163 @@ class AzureCloudService(ConnectorService):
         return {"subscription": self.subscription}
 
 
+# ------------------------------------------------------------------ Google Cloud
+
+
+_GCP_KINDS = {
+    "compute.googleapis.com/Instance": "instance",
+    "compute.googleapis.com/Disk": "disk",
+    "storage.googleapis.com/Bucket": "bucket",
+    "sqladmin.googleapis.com/Instance": "database",
+    "run.googleapis.com/Service": "container",
+    "container.googleapis.com/Cluster": "container",
+    "cloudfunctions.googleapis.com/Function": "function",
+    "compute.googleapis.com/ForwardingRule": "network",
+}
+_GCP_HEALTH = {
+    "RUNNING": "ok",
+    "RUNNABLE": "ok",
+    "READY": "ok",
+    "ACTIVE": "ok",
+    "TERMINATED": "stopped",
+    "STOPPED": "stopped",
+    "SUSPENDED": "stopped",
+    "PROVISIONING": "warning",
+    "STAGING": "warning",
+    "REPAIRING": "impaired",
+}
+_GCP_LABEL = re.compile(r"^[a-z0-9_-]{1,63}$")
+
+
+def gcp_label(value: str) -> str:
+    """GCP label keys/values are lowercase letters, digits, - and _."""
+    value = value.lower()
+    if not _GCP_LABEL.fullmatch(value):
+        raise ValueError(f"Invalid Google Cloud label: {value!r}")
+    return value
+
+
+class GcpCloudService(ConnectorService):
+    """Cloud Asset Inventory (resources by label), Cloud Monitoring alerts, Security Command
+    Center findings. Cost needs a BigQuery billing export, so it is not reported here."""
+
+    source = "gcp"
+
+    def __init__(self, client_factory: Any, projects: list[str], label_key: str) -> None:
+        super().__init__(client_factory)
+        self.projects = [tag_value(p) for p in projects]
+        self.label_key = gcp_label(label_key)
+
+    async def resources(self, values: list[str]) -> list[CloudResource]:
+        query = " OR ".join(f"labels.{self.label_key}={gcp_label(v)}" for v in values)
+        results = []
+        for project in self.projects:
+            body = await self.client.get(
+                f"https://cloudasset.googleapis.com/v1/projects/{project}:searchAllResources",
+                {"query": query, "pageSize": 500},
+            )
+            for r in body.get("results") or []:
+                labels = {str(k): str(v) for k, v in (r.get("labels") or {}).items()}
+                extra = r.get("additionalAttributes") or {}
+                asset_type = r.get("assetType", "")
+                state = r.get("state")
+                size_gb = extra.get("sizeGb") or extra.get("diskSizeGb")
+                results.append(
+                    CloudResource(
+                        source="gcp",
+                        id=r.get("name", ""),
+                        name=r.get("displayName") or r.get("name", ""),
+                        kind=_GCP_KINDS.get(asset_type, "other"),
+                        service=asset_type,
+                        size=extra.get("machineType", "").rsplit("/", 1)[-1]
+                        or extra.get("tier")
+                        or None,
+                        region=r.get("location"),
+                        state=state,
+                        health=_GCP_HEALTH.get(str(state).upper(), "unknown")
+                        if state
+                        else "unknown",
+                        storage_gb=float(size_gb) if size_gb else None,
+                        created=to_date(r.get("createTime")),
+                        tags=labels,
+                        **_meta(labels),
+                        url=f"https://console.cloud.google.com/home/dashboard?project={project}",
+                    )
+                )
+        return results
+
+    async def costs(self, values: list[str], today: date) -> CostReport | None:
+        return None  # Cloud Billing has no per-label cost API; it needs a BigQuery export
+
+    async def alerts(
+        self, values: list[str], resource_ids: set[str] | None = None
+    ) -> list[CloudAlert]:
+        alerts = []
+        for project in self.projects:
+            try:
+                body = await self.client.get(
+                    f"https://monitoring.googleapis.com/v3/projects/{project}/alerts",
+                    {"filter": 'state="OPEN"', "pageSize": 100},
+                )
+            except IntegrationError:
+                continue  # the Alerts API is not enabled in every project
+            for a in body.get("alerts") or []:
+                labels = (a.get("resource") or {}).get("labels") or {}
+                metadata = (a.get("metadata") or {}).get("userLabels") or {}
+                if values and str(metadata.get(self.label_key, "")).lower() not in {
+                    v.lower() for v in values
+                }:
+                    continue
+                opened = a.get("openTime")
+                alerts.append(
+                    CloudAlert(
+                        source="gcp",
+                        id=a.get("name", ""),
+                        title=(a.get("policy") or {}).get("displayName") or a.get("name", ""),
+                        severity=str((a.get("policy") or {}).get("severity") or "medium").lower(),
+                        state=a.get("state", "OPEN"),
+                        resource=labels.get("instance_id") or labels.get("project_id"),
+                        started=datetime.fromisoformat(opened.replace("Z", "+00:00"))
+                        if opened
+                        else None,
+                    )
+                )
+        return alerts
+
+    async def findings(
+        self, values: list[str], resource_ids: set[str] | None = None
+    ) -> list[SecurityFinding]:
+        ids = set(resource_ids or set())
+        found = []
+        for project in self.projects:
+            body = await self.client.get(
+                f"https://securitycenter.googleapis.com/v1/projects/{project}/sources/-/findings",
+                {"filter": 'state="ACTIVE"', "pageSize": 200},
+            )
+            for item in body.get("listFindingsResults") or []:
+                f = item.get("finding") or {}
+                resource = f.get("resourceName")
+                if ids and resource not in ids:
+                    continue
+                found.append(
+                    SecurityFinding(
+                        source="gcp",
+                        id=f.get("name", ""),
+                        title=f.get("category", "").replace("_", " ").capitalize(),
+                        severity=str(f.get("severity") or "informational").lower(),
+                        status=f.get("state", "ACTIVE"),
+                        resource=resource,
+                        created=to_date(f.get("eventTime")),
+                        recommendation=f.get("nextSteps"),
+                        url=f.get("externalUri"),
+                    )
+                )
+        return found
+
+    async def health_check(self) -> dict[str, Any]:
+        return {"projects": self.projects}
+
+
 # ------------------------------------------------------------------ demo twin
 
 
@@ -896,6 +1053,25 @@ def _demo(source: str):
     return build
 
 
+def _gcp(s: Settings) -> GcpCloudService:
+    from backend.app.integrations.connectors.auth import GoogleServiceAccountToken
+
+    token = GoogleServiceAccountToken(
+        s.google_service_account_file,  # type: ignore[arg-type]
+        ["https://www.googleapis.com/auth/cloud-platform"],
+    )
+    return GcpCloudService(
+        lambda: ConnectorClient(
+            "Google Cloud",
+            base_url="https://cloudasset.googleapis.com",
+            timeout=s.connector_timeout_seconds,
+            token_provider=token,
+        ),
+        s.gcp_project_ids,
+        s.cloud_project_tag_key,
+    )
+
+
 CLOUD_SPECS = (
     ConnectorSpec(
         "aws",
@@ -934,5 +1110,19 @@ CLOUD_SPECS = (
         docs_url="https://learn.microsoft.com/azure/governance/resource-graph/overview",
         build=_azure,
         demo=_demo("azure"),
+    ),
+    ConnectorSpec(
+        "gcp",
+        "Google Cloud",
+        "cloud",
+        required=("google_service_account_file", "gcp_project_ids"),
+        optional=("cloud_project_tag_key",),
+        setup="Service account key (GOOGLE_SERVICE_ACCOUNT_FILE) with Cloud Asset Viewer, Monitoring "
+        "Viewer and Security Center Findings Viewer on each project in GCP_PROJECT_IDS. Label "
+        "resources project=<key in lowercase> (and purpose / environment / owner). Cost needs a "
+        "BigQuery billing export and is not shown",
+        docs_url="https://cloud.google.com/asset-inventory/docs/reference/rest/v1/TopLevel/searchAllResources",
+        build=_gcp,
+        demo=_demo("gcp"),
     ),
 )

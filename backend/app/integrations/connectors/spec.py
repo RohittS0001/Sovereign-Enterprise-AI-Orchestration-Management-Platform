@@ -34,6 +34,7 @@ CATEGORY_TITLES: dict[str, str] = {
     "tracker": "Issue trackers & code hosting",
     "ops": "Engineering operations",
     "cloud": "Cloud (resources, cost, health, security)",
+    "support": "Customer support",
     "hr": "HR systems",
     "finance": "Finance & accounting",
     "crm": "CRM",

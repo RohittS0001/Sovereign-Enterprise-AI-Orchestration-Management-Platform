@@ -183,8 +183,9 @@ Docker/Helm is runnable locally — CI is the only check.
 token-provider auth, `get_bytes`/`get_text`), `ConnectorService` (lazy client), `safe_id`, and common
 models (WorkItem, PullRequest, Incident, ErrorGroup, Deployment, QualityGate, LeaveRecord, BudgetLine,
 Deal, CalendarEvent, Transcript, SourceDocument). `auth.py`: OAuth client-credentials/refresh tokens,
-Microsoft/Zoho/Google helpers. Category modules: `trackers`, `ops`, `hr_finance`, `crm`, `docs`,
-`calendar_meetings`, `chat`, `cloud` (AWS via in-house SigV4 in `auth.py:aws_sigv4_headers` — tagging API
+Microsoft/Zoho/Google helpers. Category modules: `trackers`, `ops` (incl. Datadog, ServiceNow), `hr_finance`, `crm`, `docs`,
+`calendar_meetings`, `chat`, `support` (Zendesk tickets by project tag), `cloud` (Google Cloud via Cloud Asset
+Inventory/Monitoring/SCC — no cost API; AWS via in-house SigV4 in `auth.py:aws_sigv4_headers` — tagging API
 inventory, EC2/EBS/RDS/S3 details, CloudWatch alarms, opt-in cached Cost Explorer, Security Hub; Azure via
 Resource Graph KQL, Cost Management, Alerts; resources belong to a project by the `CLOUD_PROJECT_TAG_KEY`
 tag = key or `links.cloud_tag_values`). `domains/cloud/service.py` (`project_cloud`, `portfolio`;

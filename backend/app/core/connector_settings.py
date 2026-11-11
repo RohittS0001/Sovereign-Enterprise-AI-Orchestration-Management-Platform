@@ -119,6 +119,14 @@ class ConnectorSettings(BaseSettings):
     zoom_client_id: str = ""
     zoom_client_secret: SecretStr = SecretStr("")
 
+    # Datadog and ServiceNow (ops)
+    datadog_api_key: SecretStr = SecretStr("")
+    datadog_app_key: SecretStr = SecretStr("")
+    datadog_site: str = "datadoghq.com"
+    servicenow_instance_url: str = ""
+    servicenow_username: str = ""
+    servicenow_password: SecretStr = SecretStr("")
+
     # ---------------------------------------------------------------- cloud
     # Resources are attributed to a project by this tag (value = the project key, or the
     # values listed in the project's cloud_tag_values link).
@@ -136,6 +144,15 @@ class ConnectorSettings(BaseSettings):
     azure_client_id: str = ""
     azure_client_secret: SecretStr = SecretStr("")
     azure_subscription_id: str = ""
+
+    # Google Cloud: the service account in GOOGLE_SERVICE_ACCOUNT_FILE with Cloud Asset Viewer,
+    # Monitoring Viewer and Security Center Findings Viewer; labels use lowercase values.
+    gcp_project_ids: list[str] = Field(default_factory=list)
+
+    # ---------------------------------------------------------------- support
+    zendesk_subdomain: str = ""  # <subdomain>.zendesk.com
+    zendesk_email: str = ""
+    zendesk_api_token: SecretStr = SecretStr("")
 
     # ---------------------------------------------------------------- chat
     slack_bot_token: SecretStr = SecretStr("")

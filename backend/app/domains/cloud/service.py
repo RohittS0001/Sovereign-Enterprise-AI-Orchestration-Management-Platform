@@ -84,6 +84,7 @@ class PortfolioRow(BaseModel):
     currency: str | None
     alerts: int
     critical_findings: int | None
+    open_tickets: int | None = None
     regions: list[str]
     warnings: list[str]
 
@@ -93,6 +94,21 @@ class Portfolio(BaseModel):
     projects: list[PortfolioRow]
     totals: dict[str, float]
     people: dict[str, list[str]] = Field(description="Person → projects they work on")
+
+
+async def _open_tickets(hub: Any, project: Project) -> int | None:
+    """Open customer tickets tagged with the project (None when no support tool is connected)."""
+    services = hub.by_category("support")
+    if not services:
+        return None
+    tags = list((project.links or {}).get("zendesk_tags") or [project.key.lower()])
+    total = 0
+    for service in services.values():
+        try:
+            total += len(await service.list_tickets(tags, open_only=True, limit=100))
+        except Exception:  # noqa: BLE001, S112 - a support outage must not break the portfolio
+            continue
+    return total
 
 
 def tag_values(project: Project) -> list[str]:
@@ -191,7 +207,8 @@ async def portfolio(
     summaries = await asyncio.gather(
         *(project_cloud(hub, p, today, include_security=include_security) for p in projects)
     )
-    for project, cloud in zip(projects, summaries, strict=True):
+    tickets = await asyncio.gather(*(_open_tickets(hub, p) for p in projects))
+    for project, cloud, open_tickets in zip(projects, summaries, tickets, strict=True):
         team = [m.get("name", "") for m in project.members or [] if m.get("name")]
         for person in team:
             people[person].add(project.key)
@@ -215,6 +232,7 @@ async def portfolio(
                 else None,
                 regions=sorted({p.region for p in cloud.placements}),
                 warnings=cloud.warnings,
+                open_tickets=open_tickets,
             )
         )
     totals = {
@@ -225,6 +243,7 @@ async def portfolio(
         "cost_month_to_date": round(sum(r.cost_month_to_date or 0 for r in rows), 2),
         "cost_forecast": round(sum(r.cost_forecast or 0 for r in rows), 2),
         "alerts": sum(r.alerts for r in rows),
+        "open_tickets": sum(r.open_tickets or 0 for r in rows),
     }
     return Portfolio(
         as_of=today,

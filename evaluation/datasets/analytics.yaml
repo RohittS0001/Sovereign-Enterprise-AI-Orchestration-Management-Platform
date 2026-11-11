@@ -33,7 +33,7 @@ expected:
     contradicted_claims_by: [Priya N, priya.n@acme.example, priya.n@acme.example]
   # cloud monitoring (AWS + Azure demo twins, resources tagged project=PHX)
   cloud:
-    resources: 10
+    resources: 11  # 7 AWS + 3 Azure + 1 Google Cloud
     unhealthy: [phx-api-2, phx-checkout-staging]
     storage_gb: 731.0
     cost_month_to_date: 1252.15

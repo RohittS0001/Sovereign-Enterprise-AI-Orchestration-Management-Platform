@@ -335,6 +335,20 @@ class SecurityFinding(BaseModel):
     url: str | None = None
 
 
+class SupportTicket(BaseModel):
+    """A customer support ticket (Zendesk …), tied to a project by tag."""
+
+    source: str
+    id: str
+    subject: str
+    status: str
+    priority: str | None = None
+    created: date | None = None
+    updated: date | None = None
+    tags: list[str] = Field(default_factory=list)
+    url: str | None = None
+
+
 class ChannelMessage(BaseModel):
     """A message in a team chat channel (Slack, Teams)."""
 

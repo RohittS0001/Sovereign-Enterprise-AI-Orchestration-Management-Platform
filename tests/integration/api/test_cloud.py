@@ -23,11 +23,12 @@ async def test_project_cloud_and_portfolio(
 
     assert as_admin.status_code == 200, as_admin.text
     body = as_admin.json()
-    assert len(body["resources"]) == 10 and body["cost"]["month_to_date"] > 0
+    assert len(body["resources"]) == 11 and body["cost"]["month_to_date"] > 0
     assert body["findings"][0]["severity"] == "critical"
     assert {r["purpose"] for r in body["resources"]} >= {"Payments API (capture + refunds)"}
     assert as_lead.json()["findings"] is None  # security findings: admins and auditors only
     assert denied.status_code == 403 and missing.status_code == 404
     row = overview.json()["projects"][0]
-    assert row["project"] == "PHX" and row["resources"] == 10 and row["unhealthy"] == 2
+    assert row["project"] == "PHX" and row["resources"] == 11 and row["unhealthy"] == 2
+    assert row["open_tickets"] == 2  # Zendesk tickets tagged phx that are not solved
     assert "Arjun M" in overview.json()["people"]

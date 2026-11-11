@@ -113,6 +113,16 @@ def register_connector_tools(
             description=f"Customer deals (stage, amount, close date) tagged with a project key "
             f"from {', '.join(tools.sources('crm'))}: which commitments depend on a project.",
         )  # fmt: skip
+    if tools.sources("support"):
+        registry.register(
+            "support.list_tickets",
+            tools.list_tickets,
+            input_model=cx.TicketsInput,
+            operation=READ,
+            permission=Permission.ANALYTICS_READ,
+            description=f"Customer support tickets tagged with a project key from "
+            f"{', '.join(tools.sources('support'))}: open customer issues and their priority.",
+        )
     if tools.sources("finance"):
         registry.register(
             "finance.budget_vs_actual", tools.budget_vs_actual, input_model=cx.BudgetInput,

@@ -333,7 +333,7 @@ async def test_project_summary_portfolio_and_security_visibility() -> None:
     lead_view = await project_cloud(hub, phx, TODAY, include_security=False)
     overview = await portfolio(hub, [phx, ldg], TODAY, include_security=True)
 
-    assert admin_view.clouds == ["aws", "azure"] and len(admin_view.resources) == 10
+    assert admin_view.clouds == ["aws", "azure", "gcp"] and len(admin_view.resources) == 11
     assert admin_view.states["impaired"] == 1 and admin_view.states["warning"] == 1
     assert admin_view.storage_gb == pytest.approx(731.0)
     assert admin_view.cost.month_to_date == pytest.approx(1252.15)
@@ -342,6 +342,6 @@ async def test_project_summary_portfolio_and_security_visibility() -> None:
     assert lead_view.findings is None and lead_view.findings_by_severity["critical"] == 1
     assert {p.region for p in admin_view.placements} >= {"ap-south-1", "centralindia"}
     rows = {r.project: r for r in overview.projects}
-    assert rows["LDG"].resources == 2 and rows["LDG"].critical_findings == 0
+    assert rows["LDG"].resources == 4 and rows["LDG"].critical_findings == 0
     assert overview.people["Kiran P"] == ["LDG"] and "PHX" in overview.people["Arjun M"]
     assert overview.totals["projects"] == 2

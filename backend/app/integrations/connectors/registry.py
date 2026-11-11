@@ -9,6 +9,7 @@ from backend.app.integrations.connectors.docs import DOCS_SPECS
 from backend.app.integrations.connectors.hr_finance import FINANCE_SPECS, HR_SPECS
 from backend.app.integrations.connectors.ops import OPS_SPECS
 from backend.app.integrations.connectors.spec import ConnectorSpec
+from backend.app.integrations.connectors.support import SUPPORT_SPECS
 from backend.app.integrations.connectors.trackers import TRACKER_SPECS
 
 CORE_SPECS: tuple[ConnectorSpec, ...] = (
@@ -51,6 +52,7 @@ CONNECTOR_SPECS: tuple[ConnectorSpec, ...] = (
     *TRACKER_SPECS,
     *OPS_SPECS,
     *CLOUD_SPECS,
+    *SUPPORT_SPECS,
     *HR_SPECS,
     *FINANCE_SPECS,
     *CRM_SPECS,
