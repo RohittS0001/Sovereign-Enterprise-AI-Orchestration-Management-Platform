@@ -32,13 +32,21 @@ def _assigned(issue: IssueFacts, member: Member) -> bool:
 
 
 def compute_workload(snapshot: ProjectSnapshot) -> Workload:
+    """Open work vs. the capacity *left*: a member's capacity is per sprint, so mid-sprint it
+    is scaled by the share of the sprint's working days still ahead (today included), then by
+    the share of those days they are not on leave. Leave is counted once, inside that window.
+    """
     today = snapshot.today
-    period_end = (
-        snapshot.sprint.end
-        if snapshot.sprint and snapshot.sprint.end and snapshot.sprint.end >= today
-        else today + timedelta(days=13)
-    )
-    period_days = max(1, working_days(today, period_end))
+    sprint = snapshot.sprint
+    sprint_days: int | None = None
+    if sprint and sprint.end and sprint.end >= today:
+        period_start, period_end = max(today, sprint.start or today), sprint.end
+        if sprint.start:
+            sprint_days = max(1, working_days(sprint.start, sprint.end))
+    else:
+        period_start, period_end = today, today + timedelta(days=13)
+    period_days = max(1, working_days(period_start, period_end))
+    remaining_share = min(1.0, period_days / sprint_days) if sprint_days else 1.0
     scope = snapshot.sprint_issues or snapshot.issues
     open_issues = [i for i in scope if i.is_open]
 
@@ -49,9 +57,9 @@ def compute_workload(snapshot: ProjectSnapshot) -> Workload:
         mine = [i for i in open_issues if _assigned(i, member)]
         member_issues[member.name] = mine
         assigned_keys.update(i.key for i in mine)
-        leave_days, periods = _leave_days(snapshot, member, today, period_end)
+        leave_days, periods = _leave_days(snapshot, member, period_start, period_end)
         availability = max(0.0, 1 - leave_days / period_days)
-        effective = member.capacity_points * availability
+        effective = member.capacity_points * remaining_share * availability
         points = sum(i.points for i in mine)
         ratio = points / effective if effective else (float("inf") if points else 0.0)
         status = (

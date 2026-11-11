@@ -45,11 +45,15 @@ class Placement(BaseModel):
 
 
 class CostSummary(BaseModel):
-    currency: str
-    month_to_date: float
+    """Cloud cost; amounts in different currencies are never added together."""
+
+    currency: str | None = Field(description="None when the clouds bill in several currencies")
+    month_to_date: float | None = Field(description="None when currencies differ")
     forecast_month_end: float | None
     by_service: list[CostLine]
     by_cloud: dict[str, float]
+    by_currency: dict[str, float] = Field(default_factory=dict, description="Month to date")
+    cloud_currency: dict[str, str] = Field(default_factory=dict)
 
 
 class ProjectCloud(BaseModel):
@@ -94,6 +98,11 @@ class Portfolio(BaseModel):
     projects: list[PortfolioRow]
     totals: dict[str, float]
     people: dict[str, list[str]] = Field(description="Person → projects they work on")
+    cost_by_currency: dict[str, dict[str, float]] = Field(
+        default_factory=dict,
+        description="Currency → month_to_date / forecast; portfolio cost totals are only "
+        "in `totals` when every project bills in one currency",
+    )
 
 
 async def _open_tickets(hub: Any, project: Project) -> int | None:
@@ -129,15 +138,25 @@ async def _from_cloud(name: str, service: Any, values: list[str], today: date) -
 def _merge_costs(reports: list[CostReport]) -> CostSummary | None:
     if not reports:
         return None
+    currencies = {r.currency for r in reports}
+    single = len(currencies) == 1
     by_service: dict[str, float] = defaultdict(float)
     for report in reports:
         for line in report.by_service:
-            by_service[f"{line.service}"] += line.amount
+            # With mixed currencies a service line keeps its currency in its name.
+            by_service[line.service if single else f"{line.service} ({report.currency})"] += (
+                line.amount
+            )
+    by_currency: dict[str, float] = defaultdict(float)
+    for report in reports:
+        by_currency[report.currency] += report.total
     forecasts = [r.forecast_month_end for r in reports if r.forecast_month_end is not None]
     return CostSummary(
-        currency=reports[0].currency,
-        month_to_date=round(sum(r.total for r in reports), 2),
-        forecast_month_end=round(sum(forecasts), 2) if forecasts else None,
+        currency=next(iter(currencies)) if single else None,
+        month_to_date=round(sum(r.total for r in reports), 2) if single else None,
+        forecast_month_end=round(sum(forecasts), 2) if forecasts and single else None,
+        by_currency={c: round(v, 2) for c, v in sorted(by_currency.items())},
+        cloud_currency={r.source: r.currency for r in reports},
         by_service=sorted(
             (CostLine(service=s, amount=round(a, 2)) for s, a in by_service.items()),
             key=lambda line: -line.amount,
@@ -235,19 +254,35 @@ async def portfolio(
                 open_tickets=open_tickets,
             )
         )
+    cost_by_currency: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"month_to_date": 0.0, "forecast": 0.0}
+    )
+    for _, cloud in zip(projects, summaries, strict=True):
+        if cloud.cost is None:
+            continue
+        for currency, amount in cloud.cost.by_currency.items():
+            cost_by_currency[currency]["month_to_date"] += amount
+        if cloud.cost.currency and cloud.cost.forecast_month_end is not None:
+            cost_by_currency[cloud.cost.currency]["forecast"] += cloud.cost.forecast_month_end
+    single_currency = len(cost_by_currency) <= 1
     totals = {
         "projects": len(rows),
         "resources": sum(r.resources for r in rows),
         "unhealthy": sum(r.unhealthy for r in rows),
         "storage_gb": round(sum(r.storage_gb for r in rows), 2),
-        "cost_month_to_date": round(sum(r.cost_month_to_date or 0 for r in rows), 2),
-        "cost_forecast": round(sum(r.cost_forecast or 0 for r in rows), 2),
         "alerts": sum(r.alerts for r in rows),
         "open_tickets": sum(r.open_tickets or 0 for r in rows),
     }
+    if single_currency:  # one currency: a portfolio total is meaningful
+        totals["cost_month_to_date"] = round(sum(r.cost_month_to_date or 0 for r in rows), 2)
+        totals["cost_forecast"] = round(sum(r.cost_forecast or 0 for r in rows), 2)
     return Portfolio(
         as_of=today,
         projects=rows,
         totals=totals,
+        cost_by_currency={
+            c: {k: round(v, 2) for k, v in values.items()}
+            for c, values in sorted(cost_by_currency.items())
+        },
         people={p: sorted(keys) for p, keys in sorted(people.items())},
     )

@@ -102,13 +102,15 @@ export interface ProjectHealth {
     sources: string[];
     currency: string | null;
     budget_at_completion: number | null;
-    actual_cost: number;
+    actual_cost: number | null;
     percent_complete: number | null;
     earned_value: number | null;
     cpi: number | null;
     estimate_at_completion: number | null;
     variance_at_completion: number | null;
     note: string | null;
+    /** Per currency; earned value is never computed across currencies. */
+    by_currency?: Record<string, { budget: number | null; actual: number | null }>;
   } | null;
   /** Present when ops connectors cover this project (see project links). */
   production?: {

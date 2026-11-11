@@ -24,6 +24,13 @@ export function FinanceCard({ finance: f }: { finance: NonNullable<ProjectHealth
           {money(f.variance_at_completion, f.currency)})
         </div>
       )}
+      {f.by_currency && Object.keys(f.by_currency).length > 1 && (
+        <div className="small">
+          {Object.entries(f.by_currency)
+            .map(([cur, v]) => `${cur}: budget ${money(v.budget, null)} · spent ${money(v.actual, null)}`)
+            .join(" | ")}
+        </div>
+      )}
       {f.note && <div className="small muted">{f.note}</div>}
       <div className="small muted">Source: {f.sources.join(", ")}</div>
     </Card>

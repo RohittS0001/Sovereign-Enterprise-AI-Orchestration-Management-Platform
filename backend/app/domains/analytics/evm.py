@@ -7,6 +7,10 @@
 
 There is no project-level schedule baseline (planned value) in Jira, so SPI is not
 computed here; schedule confidence comes from the digital twin (``twin.py``).
+
+Amounts in different currencies are never added: with more than one currency (and no
+exchange rates configured) only the per-currency budget/actual totals are reported and
+BAC/AC/EV/CPI/EAC stay empty, with a note saying why.
 """
 
 from pydantic import BaseModel
@@ -19,27 +23,44 @@ class EarnedValue(BaseModel):
     sources: list[str]
     currency: str | None
     budget_at_completion: float | None
-    actual_cost: float
+    actual_cost: float | None
     percent_complete: float | None
     earned_value: float | None
     cpi: float | None
     estimate_at_completion: float | None
     variance_at_completion: float | None
     note: str | None = None
+    # Per currency: {"USD": {"budget": 1000.0, "actual": 400.0}}
+    by_currency: dict[str, dict[str, float | None]] = {}
 
 
 def earned_value(snapshot: ProjectSnapshot) -> EarnedValue | None:
     lines = snapshot.finance
     if not lines:
         return None
-    budgets = [line.budget for line in lines if line.budget is not None]
-    bac = sum(budgets) if budgets else None
-    ac = sum(line.actual or 0 for line in lines)
-    currencies = {line.currency for line in lines if line.currency}
+    by_currency: dict[str, dict[str, float | None]] = {}
+    for line in lines:
+        bucket = by_currency.setdefault(line.currency or "unknown", {"budget": None, "actual": 0.0})
+        if line.budget is not None:
+            bucket["budget"] = round((bucket["budget"] or 0) + line.budget, 2)
+        bucket["actual"] = round((bucket["actual"] or 0) + (line.actual or 0), 2)
+    currencies = set(by_currency)
     total = sum(i.points for i in snapshot.issues)
     done = sum(i.points for i in snapshot.issues if i.category == "done")
     pct = done / total if total else None
-
+    if len(currencies) > 1:
+        return EarnedValue(
+            sources=sorted({line.source for line in lines}), currency=None,
+            budget_at_completion=None, actual_cost=None,
+            percent_complete=round(pct, 3) if pct is not None else None,
+            earned_value=None, cpi=None, estimate_at_completion=None, variance_at_completion=None,
+            note=f"Budget lines use different currencies ({', '.join(sorted(currencies))}); "
+                 "earned value is not computed across currencies",
+            by_currency=by_currency,
+        )  # fmt: skip
+    budgets = [line.budget for line in lines if line.budget is not None]
+    bac = sum(budgets) if budgets else None
+    ac = sum(line.actual or 0 for line in lines)
     ev = cpi = eac = vac = None
     note = None
     if bac is None:
@@ -54,7 +75,7 @@ def earned_value(snapshot: ProjectSnapshot) -> EarnedValue | None:
             vac = bac - eac if eac is not None else None
     return EarnedValue(
         sources=sorted({line.source for line in lines}),
-        currency=next(iter(currencies)) if len(currencies) == 1 else None,
+        currency=next(iter(currencies)) if currencies != {"unknown"} else None,
         budget_at_completion=round(bac, 2) if bac is not None else None,
         actual_cost=round(ac, 2),
         percent_complete=round(pct, 3) if pct is not None else None,
@@ -62,7 +83,8 @@ def earned_value(snapshot: ProjectSnapshot) -> EarnedValue | None:
         cpi=round(cpi, 2) if cpi is not None else None,
         estimate_at_completion=round(eac, 2) if eac is not None else None,
         variance_at_completion=round(vac, 2) if vac is not None else None,
-        note=note if len(currencies) <= 1 else "Budget lines use different currencies",
+        note=note,
+        by_currency=by_currency,
     )
 
 

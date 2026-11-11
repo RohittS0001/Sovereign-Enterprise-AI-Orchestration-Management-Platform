@@ -26,6 +26,8 @@ interface Portfolio {
   projects: PortfolioRow[];
   totals: Record<string, number>;
   people: Record<string, string[]>;
+  /** Cost totals per currency; `totals` only has a cost total when there is one currency. */
+  cost_by_currency?: Record<string, { month_to_date: number; forecast: number }>;
 }
 
 export function PortfolioPage() {
@@ -43,8 +45,14 @@ export function PortfolioPage() {
         <>
           <div className="grid grid-4">
             <Kpi icon="folder" label="Active projects" value={p.totals.projects} foot={`${Object.keys(p.people).length} people`} />
-            <Kpi icon="dollar" label="Cloud cost this month" value={money(p.totals.cost_month_to_date, currency)}
-                 foot={`Forecast ${money(p.totals.cost_forecast, currency)}`} />
+            {p.totals.cost_month_to_date === undefined && Object.keys(p.cost_by_currency ?? {}).length > 1 ? (
+              <Kpi icon="dollar" label="Cloud cost this month"
+                   value={Object.entries(p.cost_by_currency ?? {}).map(([cur, v]) => money(v.month_to_date, cur)).join(" · ")}
+                   foot="Billed in several currencies (not added up)" />
+            ) : (
+              <Kpi icon="dollar" label="Cloud cost this month" value={money(p.totals.cost_month_to_date, currency)}
+                   foot={`Forecast ${money(p.totals.cost_forecast, currency)}`} />
+            )}
             <Kpi icon="cloud" label="Cloud resources" value={p.totals.resources}
                  foot={`${p.totals.unhealthy} need attention`} tone={p.totals.unhealthy ? "warn" : undefined} />
             <Kpi icon="database" label="Storage used" value={gb(p.totals.storage_gb)} foot={`${p.totals.alerts} alerts firing`} />

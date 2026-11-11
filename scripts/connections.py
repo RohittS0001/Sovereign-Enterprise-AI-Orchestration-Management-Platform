@@ -27,10 +27,17 @@ def _default(field: str) -> str:
 
     from pydantic import SecretStr
 
+    from backend.app.core.config import PROJECT_ROOT
+
     info = Settings.model_fields[field]
     value = info.get_default(call_default_factory=True)
     if value is None or isinstance(value, SecretStr) or value == "":
         return ""
+    if isinstance(value, Path):  # project-relative and with / so the template is portable
+        try:
+            return value.relative_to(PROJECT_ROOT).as_posix()
+        except ValueError:
+            return value.as_posix()
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list | dict):

@@ -40,7 +40,10 @@ def forecast_sprint(snapshot: ProjectSnapshot) -> SprintForecast | None:
 
     today = snapshot.today
     total = working_days(sprint.start, sprint.end)
-    elapsed = working_days(sprint.start, min(today, sprint.end) - timedelta(days=1))
+    # Days fully elapsed: up to yesterday while the sprint runs (today is not over yet);
+    # once it has ended, all of it, including its final day.
+    last_elapsed = sprint.end if today > sprint.end else today - timedelta(days=1)
+    elapsed = working_days(sprint.start, last_elapsed)
     left = max(0, total - elapsed)
     rate = done / elapsed if elapsed else 0.0
     projected = min(committed, done + rate * left) if elapsed else done

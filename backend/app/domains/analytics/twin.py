@@ -88,6 +88,12 @@ class _Inputs:
     dates: list[date] = field(default_factory=list)
 
 
+def _blocked(issue: IssueFacts, open_keys: set[str]) -> bool:
+    """Blocked when its status says so (e.g. PHX-7 "Blocked", no links) or an open issue
+    blocks it; a link to an issue that is already done no longer blocks."""
+    return issue.status.lower() == "blocked" or any(b in open_keys for b in issue.blocked_by)
+
+
 def _working_dates(start: date, count: int) -> list[date]:
     days, current = [], start
     while len(days) < count:
@@ -151,7 +157,7 @@ def _prepare(snapshot: ProjectSnapshot, scenario: Scenario) -> _Inputs:
     open_keys = {i.key for i in open_issues}
     work = [
         _Work(i.key, i.points or default_points,
-              blocked=not scenario.resolve_blockers and any(b in open_keys for b in i.blocked_by),
+              blocked=not scenario.resolve_blockers and _blocked(i, open_keys),
               rank=PRIORITY_ORDER.get(i.priority.lower(), 2))
         for i in open_issues
     ]  # fmt: skip

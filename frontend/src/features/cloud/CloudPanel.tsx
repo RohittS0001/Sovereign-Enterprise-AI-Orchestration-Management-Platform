@@ -33,11 +33,14 @@ interface ProjectCloud {
   placements: { region: string; environment: string | null; resources: number }[];
   owners: Record<string, number>;
   cost: {
-    currency: string;
-    month_to_date: number;
+    /** null when the clouds bill in different currencies (amounts are never added up). */
+    currency: string | null;
+    month_to_date: number | null;
     forecast_month_end: number | null;
     by_service: { service: string; amount: number }[];
     by_cloud: Record<string, number>;
+    by_currency?: Record<string, number>;
+    cloud_currency?: Record<string, string>;
   } | null;
   alerts: { source: string; id: string; title: string; severity: string | null; state: string; resource: string | null; started: string | null }[];
   findings: { source: string; id: string; title: string; severity: string; status: string; resource: string | null; recommendation: string | null }[] | null;
@@ -49,8 +52,15 @@ export const HEALTH_TONE: Record<string, string> = { ok: "good", warning: "warn"
 const SEVERITY_TONE: Record<string, string> = { critical: "bad", high: "bad", medium: "warn", low: "info", informational: "muted" };
 const CLOUD_LABEL: Record<string, string> = { aws: "AWS", azure: "Azure" };
 
-export const money = (amount: number | null | undefined, currency = "USD") =>
-  amount == null ? "—" : new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount);
+export const money = (amount: number | null | undefined, currency: string | null = "USD") =>
+  amount == null
+    ? "—"
+    : currency
+      ? new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(amount)
+      : Math.round(amount).toLocaleString();
+/** One amount per currency, e.g. "$1,200 · ₹40,000"; never a sum across currencies. */
+export const perCurrency = (amounts: Record<string, number> | undefined) =>
+  Object.entries(amounts ?? {}).map(([cur, v]) => money(v, cur)).join(" · ") || "—";
 export const gb = (value: number) => (value >= 1024 ? `${(value / 1024).toFixed(1)} TB` : `${Math.round(value)} GB`);
 
 export function CloudPanel({ projectKey }: { projectKey: string }) {
@@ -77,7 +87,7 @@ export function CloudPanel({ projectKey }: { projectKey: string }) {
     <>
       {c.warnings.map((w) => <div key={w} className="notice small">Unavailable: {w}</div>)}
       <div className="grid grid-4">
-        <Kpi icon="dollar" label="Cloud cost this month" value={money(c.cost?.month_to_date, c.cost?.currency)}
+        <Kpi icon="dollar" label="Cloud cost this month" value={c.cost && c.cost.currency === null ? perCurrency(c.cost.by_currency) : money(c.cost?.month_to_date, c.cost?.currency)}
              foot={c.cost ? `Forecast ${money(c.cost.forecast_month_end, c.cost.currency)} by month end` : "Cost data not enabled"} />
         <Kpi icon="cloud" label="Resources" value={c.resources.length}
              foot={`${active} active · ${unhealthy} need attention`} tone={unhealthy ? "warn" : undefined} />
@@ -112,11 +122,11 @@ export function CloudPanel({ projectKey }: { projectKey: string }) {
                 <div key={s.service} className="cost-row">
                   <span className="small">{s.service}</span>
                   <span className="loss-bar"><span style={{ width: `${(s.amount / maxCost) * 100}%`, background: "var(--accent)" }} /></span>
-                  <span className="small num">{money(s.amount, c.cost!.currency)}</span>
+                  <span className="small num">{money(s.amount, c.cost!.currency ?? null)}</span>
                 </div>
               ))}
               <p className="xs faint" style={{ margin: 0 }}>
-                By cloud: {Object.entries(c.cost.by_cloud).map(([k, v]) => `${CLOUD_LABEL[k] ?? k} ${money(v, c.cost!.currency)}`).join(" · ")}
+                By cloud: {Object.entries(c.cost.by_cloud).map(([k, v]) => `${CLOUD_LABEL[k] ?? k} ${money(v, c.cost!.cloud_currency?.[k] ?? c.cost!.currency)}`).join(" · ")}
               </p>
             </div>
           )}

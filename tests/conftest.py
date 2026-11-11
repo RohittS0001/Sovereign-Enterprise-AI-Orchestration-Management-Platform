@@ -39,6 +39,14 @@ def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item
             item.add_marker(skip_live)
 
 
+@pytest.fixture(autouse=True)
+def _no_real_gmail_credentials(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The repository root holds the developer's real Gmail token; Settings built anywhere in a
+    test (even with _env_file=None) must never find it, so the paths point at tmp_path."""
+    monkeypatch.setenv("GMAIL_CREDENTIALS_FILE", str(tmp_path / "no-credentials.json"))
+    monkeypatch.setenv("GMAIL_TOKEN_FILE", str(tmp_path / "no-token.json"))
+
+
 @pytest.fixture
 def test_settings(tmp_path: Path) -> Settings:
     """Settings isolated from the developer's .env and real credentials."""

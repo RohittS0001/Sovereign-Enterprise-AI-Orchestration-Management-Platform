@@ -9,7 +9,7 @@ expected:
   committed_points: 31
   done_points: 7
   working_days_left: 5
-  overloaded: [Arjun M]
+  overloaded: [Arjun M, Meera S]   # capacity scales with the sprint days left (5 of 10)
   at_risk: {Arjun M: [PHX-5]}
   suggestions: [[PHX-5, Dev R]]
   contradictions: [[merged_but_not_done, PHX-4], [done_but_pr_open, PHX-6]]

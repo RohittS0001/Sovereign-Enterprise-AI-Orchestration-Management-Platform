@@ -10,7 +10,8 @@ from pydantic_settings import DotEnvSettingsSource, SettingsConfigDict
 
 from backend.app.core.connector_settings import ConnectorSettings
 
-PROJECT_ROOT = Path(__file__).resolve().parents[4]
+# backend/app/core/config.py → parents[3] is the repository root (/app in the image).
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
 Environment = Literal["development", "test", "staging", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]

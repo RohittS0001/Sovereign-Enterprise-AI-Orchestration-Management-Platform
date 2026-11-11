@@ -113,7 +113,10 @@ def test_leave_aware_workload_and_suggestions(snapshot) -> None:
     assert arjun.availability == 0.2
     assert arjun.status == "overloaded"
     assert arjun.at_risk_issues == ["PHX-5"]
-    assert members["Meera S"].status == "balanced"
+    # Half the sprint is left (5 of 10 working days): Meera's 8 open points meet 5 points of
+    # remaining capacity (10 per sprint), so she is overloaded too.
+    assert members["Meera S"].status == "overloaded"
+    assert members["Meera S"].effective_capacity == 5.0
     assert members["Dev R"].status == "underused"
     # Only not-started, unblocked work is suggested for reassignment (PHX-7 is blocked).
     assert [(s.issue, s.to_member) for s in workload.suggestions] == [("PHX-5", "Dev R")]
