@@ -98,18 +98,36 @@ class AuthService:
         if as_utc(record.expires_at) <= utcnow():
             raise AuthenticationError("Refresh token has expired", code="token_expired")
 
-        user = await self.session.get(User, record.user_id)
-        if user is None or not user.is_active:
-            raise AuthenticationError("Invalid refresh token")
-
+        user = await self._check_user_for_refresh(record)
         new_record, raw_refresh = self._new_refresh_token(user.id, client)
-        record.revoked_at = utcnow()
-        record.replaced_by_id = new_record.id
         self.session.add(new_record)
+        await self.session.flush()
+        # Atomic rotation: only the request whose UPDATE still finds the token unrevoked gets
+        # a replacement. A concurrent refresh with the same token loses here (PostgreSQL
+        # re-checks the WHERE after the row lock; SQLite serialises writers), its new token
+        # is rolled back, and it is refused. Later replays are caught above (revoked_at set)
+        # and still end every session.
+        rotated = await self.session.execute(
+            update(RefreshToken)
+            .where(RefreshToken.id == record.id, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=utcnow(), replaced_by_id=new_record.id)
+            .execution_options(synchronize_session=False)
+        )
+        if rotated.rowcount != 1:
+            user_id = str(user.id)  # read before the rollback expires the object
+            await self.session.rollback()
+            logger.warning("Concurrent refresh with one token refused", extra={"user_id": user_id})
+            raise AuthenticationError("Refresh token has already been used")
         await self.session.commit()
 
         access_token, _ = create_access_token(user.id, user.role, self.settings)
         return self._token_pair(access_token, raw_refresh)
+
+    async def _check_user_for_refresh(self, record: RefreshToken) -> User:
+        user = await self.session.get(User, record.user_id)
+        if user is None or not user.is_active:
+            raise AuthenticationError("Invalid refresh token")
+        return user
 
     async def logout(self, raw_token: str) -> None:
         """Revoke one session. Unknown tokens are ignored so logout is idempotent."""

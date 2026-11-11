@@ -24,7 +24,7 @@ PeopleReader = Annotated[Principal, Depends(require_permissions(Permission.PEOPL
 async def graph_summary(
     principal: PeopleReader, session: SessionDep, request: Request
 ) -> GraphSummary:
-    return summary(await build_graph(session, request.app.state.analytics_collector))
+    return summary(await build_graph(session, request.app.state.analytics_collector, principal))
 
 
 @router.get("/who-knows", response_model=list[Expert])
@@ -35,7 +35,9 @@ async def experts(
     topic: Annotated[str, Query(min_length=2, max_length=200)],
 ) -> list[Expert]:
     """People ranked by delivered work and documents about the topic, with evidence."""
-    return who_knows(await build_graph(session, request.app.state.analytics_collector), topic)
+    return who_knows(
+        await build_graph(session, request.app.state.analytics_collector, principal), topic
+    )
 
 
 @router.get("/people/{person}/impact", response_model=Absence)
@@ -47,5 +49,5 @@ async def absence(
 ) -> Absence:
     """What stalls if this person is away: sole work, blocked work, concentrated repos, backups."""
     return impact_of_absence(
-        await build_graph(session, request.app.state.analytics_collector), person
+        await build_graph(session, request.app.state.analytics_collector, principal), person
     )

@@ -137,10 +137,12 @@ class AnalyticsTools:
         return ToolResult(status=ToolStatus.SUCCESS, data=data)
 
     async def _graph(self):
+        from backend.app.core.context import principal_var
         from backend.app.domains.graph.service import build_graph
 
+        # The gateway sets the calling principal; documents are filtered by its access.
         async with self.database.session() as session:
-            return await build_graph(session, self.collector)
+            return await build_graph(session, self.collector, principal_var.get(None))
 
     async def who_knows(self, payload: dict[str, Any]) -> ToolResult:
         from backend.app.domains.graph.service import who_knows

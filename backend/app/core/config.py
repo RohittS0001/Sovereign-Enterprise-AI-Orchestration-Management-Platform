@@ -20,6 +20,42 @@ LogFormat = Literal["json", "text"]
 CONNECTIONS_FILE = "connections.env"
 
 
+Locality = Literal["local", "self_hosted", "external"]
+_PRIVATE_SUFFIXES = (".localhost", ".local", ".internal", ".lan", ".svc", ".cluster.local")
+
+
+def endpoint_locality(url: str) -> Locality:
+    """Where a model endpoint runs: this machine, your own network/cluster, or a third party.
+
+    ``local``: localhost / loopback. ``self_hosted``: a private IP, a single-label host (a
+    Compose/Kubernetes service name such as ``ollama``) or an internal DNS suffix. Anything
+    else (a public hostname or IP) is ``external`` and is reported as data leaving your
+    infrastructure.
+    """
+    import ipaddress
+    from urllib.parse import urlsplit
+
+    try:
+        host = (urlsplit(url if "//" in url else f"//{url}").hostname or "").lower().rstrip(".")
+    except ValueError:
+        return "external"
+    if not host:
+        return "external"
+    if host == "localhost" or host.endswith(".localhost"):
+        return "local"
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        if "." not in host or host.endswith(_PRIVATE_SUFFIXES):
+            return "self_hosted"
+        return "external"
+    if ip.is_loopback:
+        return "local"
+    if ip.is_private or ip.is_link_local:
+        return "self_hosted"
+    return "external"
+
+
 class Settings(ConnectorSettings):
     # Application
     app_name: str = "Sovereign Enterprise AI Orchestration & Management Platform"
@@ -71,6 +107,10 @@ class Settings(ConnectorSettings):
     embedding_model_name: str = ""
     embedding_base_url: str = ""  # empty = LLM_BASE_URL
     embedding_dimensions: int = Field(default=384, ge=16, le=4096)  # hashing embedder only
+    # Redact secrets/PII from text before it is sent to the embedding server. "auto" =
+    # only when that server is external (not localhost / a private network / a cluster
+    # service); "always" also for self-hosted servers.
+    embedding_redaction: Literal["auto", "always", "never"] = "auto"
 
     # Retrieval (RAG)
     rag_chunk_size: int = Field(default=1200, ge=200, le=8000)  # characters
@@ -291,6 +331,26 @@ class Settings(ConnectorSettings):
     @property
     def llm_configured(self) -> bool:
         return bool(self.llm1_model_name and self.llm_base_url)
+
+    @property
+    def llm_locality(self) -> "Locality":
+        return endpoint_locality(self.llm_base_url)
+
+    @property
+    def embedding_locality(self) -> "Locality | None":
+        """None when embeddings are computed in-process (hashing) or disabled."""
+        provider = self.embedding_provider
+        if provider in {"hashing", "none"} or (
+            provider == "auto" and not self.embedding_model_name
+        ):
+            return None
+        return endpoint_locality(self.embedding_base_url or self.llm_base_url)
+
+    @property
+    def embedding_redacts(self) -> bool:
+        if self.embedding_redaction == "never" or self.embedding_locality is None:
+            return False
+        return self.embedding_redaction == "always" or self.embedding_locality == "external"
 
     @property
     def gmail_configured(self) -> bool:

@@ -8,7 +8,7 @@ own hosts (no fetching arbitrary URLs from API responses).
 import re
 from datetime import UTC, date, datetime, time, timedelta
 from typing import Any
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote
 
 from backend.app.core.config import Settings
 from backend.app.integrations.connectors.auth import (
@@ -22,6 +22,7 @@ from backend.app.integrations.connectors.base import (
     ConnectorClient,
     ConnectorService,
     Transcript,
+    checked_url,
     safe_id,
     to_date,
 )
@@ -177,11 +178,17 @@ class OutlookCalendarService(ConnectorService):
 # ------------------------------------------------------------------ Zoom
 
 
-def _allowed_host(url: str, suffixes: tuple[str, ...]) -> str:
-    parts = urlsplit(url)
-    if parts.scheme != "https" or not parts.hostname or not parts.hostname.endswith(suffixes):
-        raise ValueError("Refusing to download a transcript from an unexpected host")
-    return url
+ZOOM_HOSTS = ("zoom.us",)
+GRAPH_HOSTS = ("graph.microsoft.com",)
+
+
+def _allowed_host(url: str, domains: tuple[str, ...]) -> str:
+    """The transcript URL comes from the API response: only https to the vendor's own domain
+    (exact or a real subdomain, default port, no credentials) is downloaded."""
+    try:
+        return checked_url(url, domains)
+    except ValueError as exc:
+        raise ValueError("Refusing to download a transcript from an unexpected host") from exc
 
 
 class ZoomService(ConnectorService):
@@ -204,7 +211,8 @@ class ZoomService(ConnectorService):
             if with_text:
                 text = vtt_to_text(
                     await self.client.get_text(
-                        _allowed_host(files[0]["download_url"], ("zoom.us",))
+                        _allowed_host(files[0]["download_url"], ZOOM_HOSTS),
+                        redirect_hosts=ZOOM_HOSTS,
                     )
                 )
             results.append(Transcript(source=self.source, meeting_id=str(meeting.get("uuid") or meeting.get("id")),
@@ -244,8 +252,12 @@ class TeamsMeetingsService(ConnectorService):
                                             {"$select": "subject"})  # fmt: skip
             text = ""
             if with_text:
-                url = _allowed_host(item["transcriptContentUrl"], ("graph.microsoft.com",))
-                text = vtt_to_text(await self.client.get_text(f"{url}?$format=text/vtt"))
+                url = _allowed_host(item["transcriptContentUrl"], GRAPH_HOSTS)
+                text = vtt_to_text(
+                    await self.client.get_text(
+                        f"{url}?$format=text/vtt", redirect_hosts=GRAPH_HOSTS
+                    )
+                )
             results.append(Transcript(source=self.source, meeting_id=f"{item['meetingId']}/{item['id']}",
                                       title=meeting.get("subject") or "Teams meeting", held_on=created,
                                       text=text))  # fmt: skip

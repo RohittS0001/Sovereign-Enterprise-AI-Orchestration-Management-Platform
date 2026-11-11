@@ -116,6 +116,27 @@ class HttpEmbedder:
         await self._client.aclose()
 
 
+class RedactingEmbedder:
+    """Redacts secrets and personal data (the guardrails used for model observations)
+    before texts leave for an embedding server. Stored chunk text is unchanged; only what
+    is transmitted, and therefore embedded, is redacted."""
+
+    def __init__(self, inner: Embedder, *, include_contact_info: bool = False) -> None:
+        self.inner = inner
+        self.include_contact_info = include_contact_info
+
+    async def embed(self, texts: list[str]) -> list[list[float]]:
+        from backend.app.domains.governance.guardrails.redaction import redact_text
+
+        cleaned = [
+            redact_text(t, include_contact_info=self.include_contact_info).text for t in texts
+        ]
+        return await self.inner.embed(cleaned)
+
+    async def close(self) -> None:
+        await self.inner.close()
+
+
 def build_embedder(settings: Settings) -> Embedder | None:
     provider = settings.embedding_provider
     if provider == "none":
@@ -128,13 +149,18 @@ def build_embedder(settings: Settings) -> Embedder | None:
         return HashingEmbedder(settings.embedding_dimensions)
     if not settings.embedding_model_name:
         raise ValueError("EMBEDDING_MODEL_NAME is required for this embedding provider")
-    return HttpEmbedder(
+    embedder: Embedder = HttpEmbedder(
         provider=provider,
         base_url=settings.embedding_base_url or settings.llm_base_url,
         model=settings.embedding_model_name,
         timeout=settings.llm_timeout_seconds,
         api_key=settings.llm_api_key.get_secret_value(),
     )
+    if settings.embedding_redacts:  # documents and queries are both embedded through here
+        embedder = RedactingEmbedder(
+            embedder, include_contact_info=settings.guardrails_redact_contact_info
+        )
+    return embedder
 
 
 def cosine(a: list[float], b: list[float]) -> float:

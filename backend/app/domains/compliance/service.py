@@ -15,7 +15,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.config import Settings
+from backend.app.core.config import Settings, endpoint_locality
 from backend.app.core.security.permissions import Role
 from backend.app.db.base import as_utc
 from backend.app.db.models import ApiToken, ApprovalRequest, AuditEvent, Project, User
@@ -237,13 +237,48 @@ async def _change(session: AsyncSession, collector: SnapshotCollector) -> Contro
     )
 
 
+_WHERE = {
+    "local": "on this host",
+    "self_hosted": "on your own network/cluster",
+    "external": "on an external (third-party) endpoint",
+}
+
+
 def _data_protection(settings: Settings) -> ControlResult:
     evidence = [
         "Secrets, card numbers, Aadhaar, PAN, SSN and IBAN are redacted before any model sees data",
         "Tool output is wrapped as untrusted data and scanned for prompt injection",
-        "All models run on infrastructure you control (no third-party LLM)",
     ]
     gaps = []
+    # Where data goes depends on configuration; never claim more than it says.
+    if settings.llm_configured:
+        llm = settings.llm_locality
+        evidence.append(f"Language models run {_WHERE[llm]} ({settings.llm_provider})")
+        if llm == "external":
+            gaps.append(
+                "LLM_BASE_URL is an external service: redacted prompts and project data leave "
+                "your infrastructure; use a self-hosted model to keep them in"
+            )
+    else:
+        evidence.append("No language model configured (agent endpoints disabled)")
+    embedding = settings.embedding_locality
+    if embedding is None:
+        evidence.append("Embeddings are computed in-process (no embedding server)")
+    else:
+        redacted = " (inputs redacted before sending)" if settings.embedding_redacts else ""
+        evidence.append(f"Embeddings run {_WHERE[embedding]}{redacted}")
+        if embedding == "external" and not settings.embedding_redacts:
+            gaps.append(
+                "Document text and queries go unredacted to an external embedding server "
+                "(EMBEDDING_REDACTION=never)"
+            )
+        elif embedding == "external":
+            gaps.append(
+                "Document text (redacted) and queries leave your infrastructure for an external "
+                "embedding server"
+            )
+    if settings.reranker_url and endpoint_locality(settings.reranker_url) == "external":
+        gaps.append("RERANKER_URL is external: queries and passages leave your infrastructure")
     if not settings.gmail_allowed_recipient_domains:
         gaps.append("E-mail drafts may go to any domain; set GMAIL_ALLOWED_RECIPIENT_DOMAINS")
     if not settings.github_allowed_repos and settings.github_configured:

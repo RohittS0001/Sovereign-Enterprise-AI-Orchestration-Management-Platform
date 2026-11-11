@@ -13,6 +13,9 @@ class ApprovalStatus(StrEnum):
     PENDING = "pending"
     REJECTED = "rejected"
     EXPIRED = "expired"
+    APPROVED = "approved"  # claimed by an approver; the action is running (or its outcome
+    # is unknown after a crash: it is never re-run automatically, an external write may
+    # already have happened)
     EXECUTED = "executed"  # approved and the action succeeded
     FAILED = "failed"  # approved but the action failed
 

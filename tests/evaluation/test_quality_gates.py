@@ -207,7 +207,7 @@ async def test_rag_detects_restricted_documents_leaking_after_sync(monkeypatch) 
 
     # Regression: ignoring the source's restriction would publish confidential pages.
     monkeypatch.setattr(
-        sync, "_visibility", lambda settings, restricted: (Visibility.ORGANIZATION, [])
+        sync, "_visibility", lambda settings, restricted, source: (Visibility.ORGANIZATION, [])
     )
 
     result = await rag.run()

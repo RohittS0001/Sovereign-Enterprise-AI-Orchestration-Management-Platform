@@ -20,8 +20,11 @@ finance, crm       budget lines and customer deals tied to the project          
 "Who may read it" becomes the document's role list (``Visibility.ROLES``; admins always), so
 the same SQL access filter that runs before ranking keeps e-mail, HR and finance records away
 from roles without that permission. Re-indexing is incremental: unchanged records are
-skipped (checksum), changed ones re-embedded, vanished ones removed — only for sources that
-were read successfully, so an outage never wipes the index.
+skipped (checksum), changed ones re-embedded, vanished ones removed — only for sources whose
+fetch was *complete*: a failed source, a capped page (Jira beyond 100 issues, GitHub beyond 50
+pull requests, a tracker/support page of 100, more than MAX_ITEMS_PER_SOURCE items) or a
+time-windowed source (e-mail, chat, meetings) keeps its existing documents, so an outage or a
+partial page never wipes the index.
 """
 
 import hashlib
@@ -48,6 +51,9 @@ from backend.app.domains.knowledge.service import KnowledgeService
 logger = get_logger(__name__)
 
 MAX_ITEMS_PER_SOURCE = 300
+PAGE_LIMIT = 100  # one page from trackers / support desks
+# Fetched for a recent time window only: older records are not "deleted at the source".
+WINDOWED_SOURCES = frozenset({"email", "meetings"})
 CHAT_DAYS = 30
 MEETING_DAYS = 30
 
@@ -71,6 +77,7 @@ class SourceResult:
     unchanged: int = 0
     removed: int = 0
     error: str | None = None
+    complete: bool = True  # False: partial fetch, so nothing was removed
 
 
 @dataclass
@@ -304,10 +311,13 @@ async def ops_items(hub: Any, snapshot: ProjectSnapshot) -> list[IndexItem]:
     return items
 
 
-async def tracker_items(hub: Any, project: Project) -> list[IndexItem]:
+async def tracker_items(hub: Any, project: Project, incomplete: set[str]) -> list[IndexItem]:
     items = []
     for source, service in hub.by_category("tracker").items():
-        for item in await service.search_work_items(limit=100):
+        found = await service.search_work_items(limit=PAGE_LIMIT)
+        if len(found) >= PAGE_LIMIT:
+            incomplete.add(source)
+        for item in found:
             if not (item.project == project.key or _mentions(f"{item.key} {item.title}", project)):
                 continue
             text = _lines(
@@ -420,11 +430,14 @@ async def cloud_items(hub: Any, project: Project, today: date) -> list[IndexItem
     return items
 
 
-async def support_items(hub: Any, project: Project) -> list[IndexItem]:
+async def support_items(hub: Any, project: Project, incomplete: set[str]) -> list[IndexItem]:
     tags = list((project.links or {}).get("zendesk_tags") or [project.key.lower()])
     items = []
     for source, service in hub.by_category("support").items():
-        for ticket in await service.list_tickets(tags, open_only=False, limit=100):
+        tickets = await service.list_tickets(tags, open_only=False, limit=PAGE_LIMIT)
+        if len(tickets) >= PAGE_LIMIT:
+            incomplete.add(source)
+        for ticket in tickets:
             items.append(
                 IndexItem(
                     source,
@@ -499,12 +512,14 @@ def business_items(snapshot: ProjectSnapshot) -> list[IndexItem]:
 
 async def collect_items(
     hub: Any, project: Project, snapshot: ProjectSnapshot
-) -> tuple[dict[str, list[IndexItem]], dict[str, str]]:
-    """Items per source, plus the sources that could not be read (left untouched)."""
+) -> tuple[dict[str, list[IndexItem]], dict[str, str], set[str]]:
+    """Items per source, the sources that could not be read (left untouched), and the
+    sources whose items are not their complete set (updated, but nothing removed)."""
     from backend.app.domains.delivery.delay import collect_delay_facts
 
     items: dict[str, list[IndexItem]] = {}
     errors: dict[str, str] = {}
+    incomplete: set[str] = set(snapshot.incomplete)
 
     async def guarded(name: str, factory) -> None:
         try:
@@ -521,22 +536,27 @@ async def collect_items(
     facts = await collect_delay_facts(hub, snapshot, include_email=True)
     if hub.jira is not None:
         items["jira"] = jira_items(snapshot, facts)
-    items["email"] = email_items(facts) if getattr(hub, "email", None) is not None else []
+    if getattr(hub, "email", None) is not None:
+        items["email"] = email_items(facts)
     if hub.github is not None:
         items["github"] = github_items(snapshot)
+    chat_before = set(items)
     await guarded("chat", lambda: chat_items(hub, snapshot))
+    incomplete.update(set(items) - chat_before)  # channel history is a recent window
     await guarded("incidents", lambda: ops_items(hub, snapshot))
-    await guarded("trackers", lambda: tracker_items(hub, project))
+    await guarded("trackers", lambda: tracker_items(hub, project, incomplete))
     await guarded("meetings", lambda: meeting_items(hub, project, snapshot.today))
     if hub.by_category("support"):
-        await guarded("support", lambda: support_items(hub, project))
+        await guarded("support", lambda: support_items(hub, project, incomplete))
     if hub.by_category("cloud"):
         await guarded("cloud", lambda: cloud_items(hub, project, snapshot.today))
     for item in people_items(snapshot) + business_items(snapshot):
         items.setdefault(item.source, []).append(item)
     for warning in snapshot.warnings + facts.warnings:
         errors.setdefault("warnings", warning)
-    return {s: v[:MAX_ITEMS_PER_SOURCE] for s, v in items.items()}, errors
+    incomplete.update(WINDOWED_SOURCES)
+    incomplete.update(s for s, v in items.items() if len(v) > MAX_ITEMS_PER_SOURCE)
+    return {s: v[:MAX_ITEMS_PER_SOURCE] for s, v in items.items()}, errors, incomplete
 
 
 async def index_project(
@@ -550,7 +570,7 @@ async def index_project(
 ) -> IndexResult:
     """Bring the knowledge base in line with what the project's systems hold now."""
     knowledge = KnowledgeService(session, settings, embedder)
-    items_by_source, errors = await collect_items(hub, project, snapshot)
+    items_by_source, errors, incomplete = await collect_items(hub, project, snapshot)
     result = IndexResult(project.key)
 
     existing: dict[tuple[str, str], Document] = {
@@ -560,7 +580,7 @@ async def index_project(
         )
     }
     for source, items in sorted(items_by_source.items()):
-        outcome = SourceResult(source)
+        outcome = SourceResult(source, complete=source not in incomplete)
         seen: set[str] = set()
         for item in items:
             text = item.text.strip()
@@ -598,7 +618,7 @@ async def index_project(
             outcome.updated += current is not None
             outcome.added += current is None
         for (doc_source, source_id), document in existing.items():
-            if doc_source == source and source_id not in seen:
+            if outcome.complete and doc_source == source and source_id not in seen:
                 await session.delete(document)
                 outcome.removed += 1
         result.sources.append(outcome)

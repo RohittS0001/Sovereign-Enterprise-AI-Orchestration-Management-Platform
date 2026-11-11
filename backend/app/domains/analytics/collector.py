@@ -35,6 +35,9 @@ def _error(exc: Exception) -> str:
     return str(getattr(exc, "message", None) or exc.__class__.__name__)[:200]
 
 
+PULL_LIMIT = 50  # most recent pull requests per repository
+
+
 class SnapshotCollector:
     def __init__(self, hub: IntegrationHub, settings: Settings) -> None:
         self.hub = hub
@@ -95,8 +98,10 @@ class SnapshotCollector:
             )
             snapshot.issues = [normalize_issue(i, points_field) for i in result.get("issues", [])]
             if not result.get("isLast", True):
+                snapshot.incomplete.add("jira")
                 snapshot.warnings.append("Only the 100 most recently updated issues were analysed")
         except Exception as exc:
+            snapshot.incomplete.add("jira")
             snapshot.warnings.append(f"Jira issues unavailable: {_error(exc)}")
             return
 
@@ -122,6 +127,7 @@ class SnapshotCollector:
                 if i.get("key") not in known
             )
         except Exception as exc:
+            snapshot.incomplete.add("jira")
             snapshot.warnings.append(f"Sprint data unavailable: {_error(exc)}")
 
     async def _github(self, project: Project, snapshot: ProjectSnapshot) -> None:
@@ -135,15 +141,17 @@ class SnapshotCollector:
             return
         for repo in project.github_repos:
             try:
-                pulls = await github.list_pull_requests(repo, state="all", limit=50)
-                snapshot.pulls.extend(
-                    normalize_pull(repo, p) for p in pulls.get("pull_requests", [])
-                )
+                pulls = await github.list_pull_requests(repo, state="all", limit=PULL_LIMIT)
+                listed = pulls.get("pull_requests", [])
+                if len(listed) >= PULL_LIMIT:  # older pull requests exist beyond the page
+                    snapshot.incomplete.add("github")
+                snapshot.pulls.extend(normalize_pull(repo, p) for p in listed)
                 runs = await github.list_workflow_runs(
                     repo, branch=project.default_branch, limit=10
                 )
                 snapshot.runs.extend(normalize_run(repo, r) for r in runs.get("workflow_runs", []))
             except Exception as exc:
+                snapshot.incomplete.add("github")
                 snapshot.warnings.append(f"GitHub data for {repo} unavailable: {_error(exc)}")
 
     async def _keka(self, snapshot: ProjectSnapshot) -> None:

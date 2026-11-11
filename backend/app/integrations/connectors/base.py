@@ -8,11 +8,52 @@ Personal data is kept to what project management needs (names, not emails/phones
 import re
 from datetime import date, datetime
 from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 import httpx
 from pydantic import BaseModel, Field
 
-from backend.app.integrations.common.http import HttpIntegrationClient
+from backend.app.core.errors import IntegrationError
+from backend.app.integrations.common.http import HttpIntegrationClient, read_limited
+
+MAX_REDIRECTS = 5
+_REDIRECTS = {301, 302, 303, 307, 308}
+_HOSTNAME = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+def host_matches(hostname: str | None, domains: tuple[str, ...]) -> bool:
+    """True when ``hostname`` is one of ``domains`` or a subdomain of one (label boundary).
+
+    ``zoom.us`` and ``us02web.zoom.us`` match ("zoom.us",); ``evilzoom.us`` and
+    ``zoom.us.evil.com`` do not.
+    """
+    if not hostname:
+        return False
+    host = hostname.lower().rstrip(".")
+    if not _HOSTNAME.fullmatch(host):
+        return False
+    wanted = [d.lower().strip(".") for d in domains]
+    return any(host == d or host.endswith("." + d) for d in wanted)
+
+
+def checked_url(url: str, domains: tuple[str, ...]) -> str:
+    """Return ``url`` if it is https on the default port, has no credentials and its host is
+    one of ``domains`` (or a subdomain); raise ValueError otherwise."""
+    try:
+        parts = urlsplit(url)
+        port = parts.port
+    except ValueError as exc:
+        raise ValueError("Refusing a malformed URL") from exc
+    if (
+        parts.scheme != "https"
+        or parts.username is not None
+        or parts.password is not None
+        or port not in (None, 443)
+        or not host_matches(parts.hostname, domains)
+    ):
+        raise ValueError(f"Refusing to call an unexpected host: {parts.hostname!r}")
+    return url
+
 
 # ------------------------------------------------------------------ client
 
@@ -69,24 +110,79 @@ class ConnectorClient(HttpIntegrationClient):
     ) -> Any:
         return await self._request("POST", path, params=params, payload=payload)
 
-    async def get_bytes(self, url: str, max_bytes: int = 20_000_000) -> bytes:
-        """Download a file (e.g. a PDF from SharePoint), following redirects, size-capped."""
-        async with self._client.stream("GET", url, headers=await self._auth_headers(),
-                                       follow_redirects=True) as response:  # fmt: skip
-            response.raise_for_status()
-            data = bytearray()
-            async for chunk in response.aiter_bytes():
-                data.extend(chunk)
-                if len(data) > max_bytes:
-                    raise ValueError(f"File larger than {max_bytes // 1_000_000} MB")
-            return bytes(data)
+    async def _download(
+        self, url: str, max_bytes: int, redirect_hosts: tuple[str, ...] | None
+    ) -> httpx.Response:
+        """GET ``url`` following redirects by hand: each hop must be https to an allowed host
+        (``redirect_hosts``, default: the first host only), and credentials (auth headers,
+        static API-key headers, Basic auth) are only ever sent to the first origin."""
+        target = self._client.build_request("GET", url).url
+        origin = (target.scheme, target.host, target.port)
+        allowed = redirect_hosts or (target.host,)
+        for _ in range(MAX_REDIRECTS + 1):
+            if (target.scheme, target.host, target.port) == origin:
+                request = self._client.build_request(
+                    "GET", target, headers=await self._auth_headers()
+                )
+                auth: Any = httpx.USE_CLIENT_DEFAULT
+            else:  # a bare request to another host: no client headers, no auth
+                request = httpx.Request("GET", target, headers={"Accept": "*/*"})
+                auth = None
+            try:
+                response = await self._client.send(
+                    request, auth=auth, stream=True, follow_redirects=False
+                )
+            except httpx.HTTPError as exc:
+                raise IntegrationError(
+                    f"Could not download from {self.display_name}: {exc.__class__.__name__}",
+                    integration=self.integration,
+                ) from exc
+            try:
+                if response.status_code in _REDIRECTS and "location" in response.headers:
+                    nxt = target.join(response.headers["location"])
+                    try:
+                        checked_url(str(nxt), allowed)
+                    except ValueError as exc:
+                        raise IntegrationError(
+                            f"{self.display_name} redirected to an untrusted host ({nxt.host})",
+                            integration=self.integration,
+                        ) from exc
+                    target = nxt
+                    continue
+                if response.is_error:
+                    raise IntegrationError(
+                        f"{self.display_name} returned {response.status_code} for a download",
+                        integration=self.integration,
+                        upstream_status=response.status_code,
+                    )
+                body = await read_limited(response, max_bytes, integration=self.integration)
+                content_type = response.headers.get("content-type", "")
+                return httpx.Response(
+                    response.status_code, headers={"content-type": content_type}, content=body
+                )
+            finally:
+                await response.aclose()
+        raise IntegrationError(
+            f"{self.display_name}: too many redirects", integration=self.integration
+        )
 
-    async def get_text(self, url: str) -> str:
-        """Download a text body (e.g. a transcript), following redirects, size-capped."""
-        response = await self._client.get(url, headers=await self._auth_headers(),
-                                          follow_redirects=True)  # fmt: skip
-        response.raise_for_status()
-        return response.text[:2_000_000]
+    async def get_bytes(
+        self,
+        url: str,
+        max_bytes: int = 20_000_000,
+        redirect_hosts: tuple[str, ...] | None = None,
+    ) -> bytes:
+        """Download a file (e.g. a PDF from SharePoint): streamed, size-capped, safe redirects."""
+        return (await self._download(url, max_bytes, redirect_hosts)).content
+
+    async def get_text(
+        self,
+        url: str,
+        max_bytes: int = 2_000_000,
+        redirect_hosts: tuple[str, ...] | None = None,
+    ) -> str:
+        """Download a text body (e.g. a transcript): streamed, size-capped, safe redirects."""
+        return (await self._download(url, max_bytes, redirect_hosts)).text
 
 
 class ConnectorService:
@@ -362,6 +458,18 @@ class ChannelMessage(BaseModel):
     url: str | None = None
 
 
+class Listing(list):  # type: ignore[type-arg]
+    """A list of records plus whether it is the source's *complete* set.
+
+    ``complete=False`` (a page cap was hit, a page failed) tells a sync not to delete local
+    copies of records that are merely missing from this partial result.
+    """
+
+    def __init__(self, items: Any = (), complete: bool = True) -> None:
+        super().__init__(items)
+        self.complete = complete
+
+
 class SourceDocument(BaseModel):
     source: str
     id: str
@@ -369,6 +477,8 @@ class SourceDocument(BaseModel):
     text: str
     url: str | None = None
     updated: date | None = None
-    restricted: bool = False  # the source limits who may read it
+    # True: the source limits who may read it; False: readable by the whole organization;
+    # None: the ACL could not be read or mapped, so the sync treats it as restricted.
+    restricted: bool | None = None
     content: bytes | None = None  # raw file (PDF, DOCX, ...) when text is empty
     filename: str | None = None

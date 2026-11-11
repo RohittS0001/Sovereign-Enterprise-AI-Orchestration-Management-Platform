@@ -1,9 +1,18 @@
 """Document sources for the knowledge base: Confluence, Notion, SharePoint/OneDrive, Drive.
 
 Each service lists documents as ``SourceDocument`` (text, or raw bytes + filename for the
-knowledge parsers) with a ``restricted`` flag when the source limits who may read it.
-The knowledge sync (``domains/knowledge/sync.py``) maps that to platform visibility, so
-search keeps applying access control before ranking.
+knowledge parsers) with a ``restricted`` flag mirrored from the source's ACL:
+
+- Confluence: page read restrictions (any user/group restriction → restricted);
+- SharePoint: item permissions (an organization/anonymous sharing link or a grant to
+  "Everyone (except external users)" → organization-wide, otherwise restricted);
+- Google Drive: file permissions (``anyone`` or ``domain`` → organization-wide);
+- Notion: the API does not expose page sharing, so ``restricted`` stays ``None`` (unknown).
+
+Unknown or unreadable ACLs fail closed: the sync (``domains/knowledge/sync.py``) makes them
+admin-only unless the admin lists the source in ``DOCS_OPEN_SOURCES``. Every listing is a
+``Listing`` whose ``complete`` flag is False when a page cap was hit, so the sync never
+deletes documents that were only missing from a partial listing.
 """
 
 import html
@@ -15,7 +24,9 @@ from backend.app.integrations.connectors.auth import GoogleServiceAccountToken, 
 from backend.app.integrations.connectors.base import (
     ConnectorClient,
     ConnectorService,
+    Listing,
     SourceDocument,
+    checked_url,
     safe_id,
     to_date,
 )
@@ -51,7 +62,12 @@ class ConfluenceService(ConnectorService):
         self.spaces = spaces
 
     async def _restricted(self, page_id: str) -> bool:
-        body = await self.client.get(f"/rest/api/content/{page_id}/restriction/byOperation/read")
+        try:
+            body = await self.client.get(
+                f"/rest/api/content/{safe_id(page_id, 'Confluence page')}/restriction/byOperation/read"
+            )
+        except Exception:  # noqa: BLE001 - unreadable restrictions: fail closed
+            return True
         restrictions = body.get("restrictions") or {}
         return any((restrictions.get(kind) or {}).get("results") for kind in ("user", "group"))
 
@@ -60,7 +76,7 @@ class ConfluenceService(ConnectorService):
             raise ValueError("Set CONFLUENCE_SPACES to the space keys to sync")
         keys = ",".join(safe_id(k, "Confluence space") for k in self.spaces)
         spaces = (await self.client.get("/api/v2/spaces", {"keys": keys})).get("results") or []
-        documents: list[SourceDocument] = []
+        documents = Listing()
         for space in spaces:
             params: dict[str, Any] | None = {"body-format": "storage", "limit": 50}
             path = f"/api/v2/spaces/{space['id']}/pages"
@@ -78,7 +94,11 @@ class ConfluenceService(ConnectorService):
                 next_link = (body.get("_links") or {}).get("next")
                 path = next_link.removeprefix("/wiki") if next_link else ""
                 params = None  # the next link carries its own cursor
-        return documents[:limit]
+            if path:  # stopped at the cap with pages left
+                documents.complete = False
+        if len(documents) > limit:
+            documents = Listing(documents[:limit], complete=False)
+        return documents
 
     async def health_check(self) -> dict[str, Any]:
         body = await self.client.get("/api/v2/spaces", {"limit": 1})
@@ -126,7 +146,7 @@ class NotionService(ConnectorService):
             cursor = body.get("next_cursor")
 
     async def list_documents(self, limit: int = MAX_DOCUMENTS) -> list[SourceDocument]:
-        documents: list[SourceDocument] = []
+        documents = Listing(complete=False)
         cursor: str | None = None
         while len(documents) < limit:
             payload: dict[str, Any] = {
@@ -141,11 +161,15 @@ class NotionService(ConnectorService):
                     source=self.source, id=page.get("id", ""), title=notion_title(page),
                     text=await self._text(page.get("id", "")), url=page.get("url"),
                     updated=to_date(page.get("last_edited_time")),
+                    restricted=None,  # Notion's API does not expose who a page is shared with
                 ))  # fmt: skip
             if not body.get("has_more"):
+                documents.complete = True
                 break
             cursor = body.get("next_cursor")
-        return documents[:limit]
+        if len(documents) > limit:
+            documents = Listing(documents[:limit], complete=False)
+        return documents
 
     async def health_check(self) -> dict[str, Any]:
         body = await self.client.get("/v1/users/me")
@@ -153,6 +177,29 @@ class NotionService(ConnectorService):
 
 
 # ------------------------------------------------------------------ SharePoint / OneDrive
+
+
+GRAPH_HOSTS = ("graph.microsoft.com",)
+SHAREPOINT_DOWNLOAD_HOSTS = ("graph.microsoft.com", "sharepoint.com")
+_ORG_WIDE_PRINCIPALS = {"everyone", "everyone except external users"}
+
+
+def sharepoint_restricted(permissions: list[dict[str, Any]]) -> bool:
+    """Map a drive item's Graph permissions to the platform: organization-wide only when an
+    organization/anonymous sharing link or a grant to the "Everyone" claims exists."""
+    for permission in permissions:
+        if (permission.get("link") or {}).get("scope") in {"organization", "anonymous"}:
+            return False
+        grants = [
+            permission.get("grantedToV2") or {},
+            *(permission.get("grantedToIdentitiesV2") or []),
+        ]
+        for grant in grants:
+            for kind in ("group", "siteGroup", "siteUser", "user"):
+                name = str((grant.get(kind) or {}).get("displayName") or "").strip().lower()
+                if name in _ORG_WIDE_PRINCIPALS:
+                    return False
+    return True
 
 
 class SharePointService(ConnectorService):
@@ -163,22 +210,44 @@ class SharePointService(ConnectorService):
         self.drive = (f"/drives/{safe_id(drive_id, 'drive id')}" if drive_id
                       else f"/sites/{safe_id(site_id, 'site id')}/drive")  # fmt: skip
 
+    async def _restricted(self, item_id: str) -> bool:
+        try:
+            body = await self.client.get(
+                f"{self.drive}/items/{safe_id(item_id, 'item id')}/permissions"
+            )
+        except Exception:  # noqa: BLE001 - unreadable permissions: fail closed
+            return True
+        return sharepoint_restricted(body.get("value") or [])
+
     async def list_documents(self, limit: int = MAX_DOCUMENTS) -> list[SourceDocument]:
-        body = await self.client.get(
-            f"{self.drive}/root/children",
-            {"$select": "id,name,file,lastModifiedDateTime,webUrl", "$top": min(limit, 200)},
-        )
-        documents = []
-        for item in body.get("value") or []:
-            name = item.get("name", "")
-            if "file" not in item or not name.lower().endswith(SUPPORTED_FILES):
-                continue
-            content = await self.client.get_bytes(f"{self.drive}/items/{item['id']}/content")
-            documents.append(SourceDocument(
-                source=self.source, id=item["id"], title=name.rsplit(".", 1)[0], text="",
-                content=content, filename=name, url=item.get("webUrl"),
-                updated=to_date(item.get("lastModifiedDateTime")),
-            ))  # fmt: skip
+        documents = Listing(complete=False)
+        url: str | None = f"{self.drive}/root/children"
+        params: dict[str, Any] | None = {
+            "$select": "id,name,file,lastModifiedDateTime,webUrl",
+            "$top": 200,
+        }
+        while url:
+            body = await self.client.get(url, params)
+            for item in body.get("value") or []:
+                name = item.get("name", "")
+                if "file" not in item or not name.lower().endswith(SUPPORTED_FILES):
+                    continue
+                if len(documents) >= limit:
+                    return documents  # capped: complete stays False
+                content = await self.client.get_bytes(
+                    f"{self.drive}/items/{safe_id(item['id'], 'item id')}/content",
+                    redirect_hosts=SHAREPOINT_DOWNLOAD_HOSTS,
+                )
+                documents.append(SourceDocument(
+                    source=self.source, id=item["id"], title=name.rsplit(".", 1)[0], text="",
+                    content=content, filename=name, url=item.get("webUrl"),
+                    updated=to_date(item.get("lastModifiedDateTime")),
+                    restricted=await self._restricted(item["id"]),
+                ))  # fmt: skip
+            next_link = body.get("@odata.nextLink")
+            url = checked_url(next_link, GRAPH_HOSTS) if next_link else None
+            params = None  # the next link carries $skiptoken and the original query
+        documents.complete = True
         return documents
 
     async def health_check(self) -> dict[str, Any]:
@@ -192,6 +261,17 @@ _GOOGLE_DOC = "application/vnd.google-apps.document"
 _FOLDER = re.compile(r"^[A-Za-z0-9_-]{10,100}$")
 
 
+DRIVE_DOWNLOAD_HOSTS = ("googleapis.com", "googleusercontent.com")
+
+
+def drive_restricted(permissions: list[dict[str, Any]] | None) -> bool | None:
+    """Organization-wide when shared with ``anyone`` or the whole ``domain``; restricted when
+    only users/groups are listed; None (unknown, fails closed) when the list is not visible."""
+    if permissions is None:
+        return None
+    return not any(p.get("type") in {"anyone", "domain"} for p in permissions)
+
+
 class GoogleDriveService(ConnectorService):
     source = "google_drive"
 
@@ -202,28 +282,44 @@ class GoogleDriveService(ConnectorService):
         self.folder_id = folder_id
 
     async def list_documents(self, limit: int = MAX_DOCUMENTS) -> list[SourceDocument]:
-        body = await self.client.get("/drive/v3/files", {
-            "q": f"'{self.folder_id}' in parents and trashed = false",
-            "fields": "files(id,name,mimeType,modifiedTime,webViewLink)",
-            "pageSize": min(limit, 100), "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
-        })  # fmt: skip
-        documents = []
-        for f in body.get("files") or []:
-            name, mime = f.get("name", ""), f.get("mimeType", "")
-            if mime == _GOOGLE_DOC:
-                text = await self.client.get_text(
-                    f"/drive/v3/files/{f['id']}/export?mimeType=text/plain"
-                )
-                doc = SourceDocument(source=self.source, id=f["id"], title=name, text=text)
-            elif name.lower().endswith(SUPPORTED_FILES):
-                content = await self.client.get_bytes(f"/drive/v3/files/{f['id']}?alt=media")
-                doc = SourceDocument(source=self.source, id=f["id"], title=name.rsplit(".", 1)[0],
-                                     text="", content=content, filename=name)  # fmt: skip
-            else:
-                continue
-            doc.url, doc.updated = f.get("webViewLink"), to_date(f.get("modifiedTime"))
-            documents.append(doc)
-        return documents
+        documents = Listing(complete=False)
+        page_token: str | None = None
+        while True:
+            params: dict[str, Any] = {
+                "q": f"'{self.folder_id}' in parents and trashed = false",
+                "fields": "nextPageToken,files(id,name,mimeType,modifiedTime,webViewLink,"
+                          "permissions(type,role,domain))",
+                "pageSize": 100, "supportsAllDrives": "true", "includeItemsFromAllDrives": "true",
+            }  # fmt: skip
+            if page_token:
+                params["pageToken"] = page_token
+            body = await self.client.get("/drive/v3/files", params)
+            for f in body.get("files") or []:
+                name, mime = f.get("name", ""), f.get("mimeType", "")
+                if mime != _GOOGLE_DOC and not name.lower().endswith(SUPPORTED_FILES):
+                    continue
+                if len(documents) >= limit:
+                    return documents  # capped: complete stays False
+                file_id = safe_id(f["id"], "Drive file id")
+                if mime == _GOOGLE_DOC:
+                    text = await self.client.get_text(
+                        f"/drive/v3/files/{file_id}/export?mimeType=text/plain",
+                        redirect_hosts=DRIVE_DOWNLOAD_HOSTS,
+                    )
+                    doc = SourceDocument(source=self.source, id=f["id"], title=name, text=text)
+                else:
+                    content = await self.client.get_bytes(
+                        f"/drive/v3/files/{file_id}?alt=media", redirect_hosts=DRIVE_DOWNLOAD_HOSTS
+                    )
+                    doc = SourceDocument(source=self.source, id=f["id"], title=name.rsplit(".", 1)[0],
+                                         text="", content=content, filename=name)  # fmt: skip
+                doc.url, doc.updated = f.get("webViewLink"), to_date(f.get("modifiedTime"))
+                doc.restricted = drive_restricted(f.get("permissions"))
+                documents.append(doc)
+            page_token = body.get("nextPageToken")
+            if not page_token:
+                documents.complete = True
+                return documents
 
     async def health_check(self) -> dict[str, Any]:
         body = await self.client.get(f"/drive/v3/files/{self.folder_id}", {"fields": "id,name",
@@ -237,7 +333,10 @@ class GoogleDriveService(ConnectorService):
 class DemoDocs:
     def __init__(self, source: str, data: dict[str, Any]) -> None:
         self.source = source
-        self.documents = [SourceDocument(source=source, **d) for d in data.get("documents", [])]
+        self.documents = [
+            SourceDocument(source=source, **{"restricted": False, **d})
+            for d in data.get("documents", [])
+        ]
 
     async def list_documents(self, limit: int = MAX_DOCUMENTS) -> list[SourceDocument]:
         return self.documents[:limit]

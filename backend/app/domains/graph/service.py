@@ -19,8 +19,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from backend.app.core.security.permissions import Principal
 from backend.app.db.models import Document, Project, User
 from backend.app.domains.analytics.collector import SnapshotCollector
+from backend.app.domains.knowledge.service import access_filter
 
 _WORD = re.compile(r"[a-z][a-z0-9]{2,}")
 _STOP = {
@@ -120,7 +122,12 @@ WEIGHTS = {
 }
 
 
-async def build_graph(session: AsyncSession, collector: SnapshotCollector) -> OrgGraph:
+async def build_graph(
+    session: AsyncSession, collector: SnapshotCollector, principal: Principal | None = None
+) -> OrgGraph:
+    """The graph as ``principal`` may see it: documents go through the same access filter as
+    knowledge search (``access_filter``) before their titles or owners become graph items.
+    Without a principal no documents are included (fail closed)."""
     graph = OrgGraph()
     projects = await session.scalars(select(Project).where(Project.is_active.is_(True)))
     for project in projects:
@@ -149,8 +156,10 @@ async def build_graph(session: AsyncSession, collector: SnapshotCollector) -> Or
                 people={author},
             )
             graph.repo_authors[pull.repository][author] += 1
+    if principal is None:
+        return graph
     owners = {u.id: u.full_name for u in await session.scalars(select(User))}
-    for doc in await session.scalars(select(Document)):
+    for doc in await session.scalars(select(Document).where(access_filter(principal))):
         if doc.owner_id in owners:
             graph.items[f"doc:{doc.id}"] = Item(
                 "document", str(doc.id), doc.title, people={owners[doc.owner_id]}

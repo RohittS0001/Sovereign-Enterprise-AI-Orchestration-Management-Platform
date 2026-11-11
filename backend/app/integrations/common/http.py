@@ -3,7 +3,9 @@
 Gives every integration the same behaviour: errors mapped to ``IntegrationError``
 (with the upstream status, so tools can mark them retryable), empty 201/204 bodies
 handled, and polite waiting on rate limits (``Retry-After`` / GitHub's
-``x-ratelimit-reset``) for idempotent GET requests.
+``x-ratelimit-reset``) for idempotent GET requests. Response bodies are streamed and
+reading stops at ``max_response_bytes``, so an oversized (or decompression-bomb) response
+never ends up in memory.
 """
 
 import asyncio
@@ -19,6 +21,39 @@ from backend.app.core.errors import IntegrationError
 from backend.app.core.logging import get_logger
 
 logger = get_logger(__name__)
+
+DEFAULT_MAX_RESPONSE_BYTES = 25_000_000
+_HOP_HEADERS = {"content-encoding", "content-length", "transfer-encoding"}
+
+
+async def read_limited(response: httpx.Response, max_bytes: int, *, integration: str) -> bytes:
+    """Read a streamed response body, stopping as soon as it exceeds ``max_bytes``.
+
+    The limit applies to the decoded bytes, so a small gzip body that expands past it is
+    stopped too. A declared Content-Length above the limit is refused before reading.
+    """
+    declared = response.headers.get("content-length", "")
+    too_large = IntegrationError(
+        f"Response from {integration} is larger than {max_bytes} bytes",
+        integration=integration,
+        upstream_status=response.status_code,
+    )
+    if declared.isdigit() and int(declared) > max_bytes:
+        raise too_large
+    data = bytearray()
+    async for chunk in response.aiter_bytes():
+        data.extend(chunk)
+        if len(data) > max_bytes:
+            raise too_large
+    return bytes(data)
+
+
+def buffered(response: httpx.Response, body: bytes) -> httpx.Response:
+    """A plain, already-read Response holding ``body`` (decoded, so encoding headers go)."""
+    headers = [(k, v) for k, v in response.headers.multi_items() if k.lower() not in _HOP_HEADERS]
+    return httpx.Response(
+        response.status_code, headers=headers, content=body, request=response.request
+    )
 
 
 def error_message(response: httpx.Response) -> str:
@@ -64,8 +99,10 @@ class HttpIntegrationClient:
         max_rate_limit_waits: int = 2,
         max_wait_seconds: float = 10.0,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
+        max_response_bytes: int = DEFAULT_MAX_RESPONSE_BYTES,
     ) -> None:
         self.base_url = base_url.rstrip("/")
+        self.max_response_bytes = max_response_bytes
         self.max_rate_limit_waits = max_rate_limit_waits
         self.max_wait_seconds = max_wait_seconds
         self._sleep = sleep
@@ -172,10 +209,18 @@ class HttpIntegrationClient:
         params: dict[str, Any] | None,
         payload: dict[str, Any] | None,
     ) -> httpx.Response:
+        request = self._client.build_request(
+            method, path, params=params, json=payload, headers=await self._auth_headers()
+        )
         try:
-            return await self._client.request(
-                method, path, params=params, json=payload, headers=await self._auth_headers()
-            )
+            response = await self._client.send(request, stream=True)
+            try:
+                body = await read_limited(
+                    response, self.max_response_bytes, integration=self.integration
+                )
+            finally:
+                await response.aclose()
+            return buffered(response, body)
         except httpx.TimeoutException as exc:
             raise IntegrationError(
                 f"{self.display_name} request timed out: {method} {path}",

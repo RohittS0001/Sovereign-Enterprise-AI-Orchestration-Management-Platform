@@ -113,6 +113,9 @@ class ConnectorSettings(BaseSettings):
     # Synced documents get this visibility unless the source marks them restricted.
     docs_default_visibility: Literal["organization", "roles"] = "organization"
     docs_default_roles: list[str] = Field(default_factory=list)
+    # Sources whose ACL cannot be read (Notion) are admin-only unless listed here, i.e. the
+    # admin confirms everything shared with the integration may be read organization-wide.
+    docs_open_sources: list[str] = Field(default_factory=list)
 
     # ---------------------------------------------------------------- meetings
     zoom_account_id: str = ""

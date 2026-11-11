@@ -127,6 +127,9 @@ class ApprovalService:
         )
         rows = result.all()
         if not rows:
+            # End the (empty) write transaction now: on SQLite an open one holds the database
+            # write lock for the rest of the request, serialising every other writer.
+            await self.session.commit()
             return
         for run_id in {run_id for (run_id,) in rows if run_id is not None}:
             await self._settle_run(run_id)
@@ -160,9 +163,33 @@ class ApprovalService:
         ):
             raise AuthorizationError("Another person must approve your own request")
 
-        approval.decided_by_id = approver.user_id
-        approval.decided_at = utcnow()
-        approval.decision_note = note
+        # Atomic claim: one conditional UPDATE moves the request out of PENDING. Under
+        # concurrency exactly one decider matches the WHERE (PostgreSQL re-checks it after
+        # the row lock; SQLite serialises writers), so the action runs at most once.
+        decided_at = utcnow()
+        claimed = await self.session.execute(
+            update(ApprovalRequest)
+            .where(
+                ApprovalRequest.id == approval.id,
+                ApprovalRequest.status == ApprovalStatus.PENDING,
+                ApprovalRequest.expires_at > decided_at,
+            )
+            .values(
+                status=ApprovalStatus.APPROVED if approve else ApprovalStatus.REJECTED,
+                decided_by_id=approver.user_id,
+                decided_at=decided_at,
+                decision_note=note,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if claimed.rowcount != 1:
+            approval_key = approval_id  # objects expire on rollback: no lazy loads after it
+            await self.session.rollback()
+            state = await self.session.scalar(
+                select(ApprovalRequest.status).where(ApprovalRequest.id == approval_key)
+            )
+            raise ConflictError(f"Approval request is already {state.value if state else 'gone'}")
+        await self.session.refresh(approval)
 
         await self.audit.record(
             actions.APPROVAL_DECIDE,
@@ -174,9 +201,10 @@ class ApprovalService:
             details={"decision": "approved" if approve else "rejected", "note": note},
         )
 
-        if not approve:
-            approval.status = ApprovalStatus.REJECTED
-        else:
+        # Commit the claim (and its audit event) before any external write, so a second
+        # decider sees it and the decision survives even if execution crashes.
+        await self.session.commit()
+        if approve:
             await self._execute(approval, approver)
 
         if approval.run_id is not None:

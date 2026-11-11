@@ -143,6 +143,9 @@ class ProjectSnapshot:
     members: list[Member] = field(default_factory=list)
     default_branch: str = "main"
     warnings: list[str] = field(default_factory=list)
+    # Sources whose records here are not the complete set (a page cap was hit or the fetch
+    # failed): consumers must not treat a missing record as deleted.
+    incomplete: set[str] = field(default_factory=set)
     links: dict[str, list[str]] = field(default_factory=dict)
     ops: OpsFacts | None = None  # None when no ops connector covers this project
     finance: list[Any] | None = None  # BudgetLines when a finance connector covers it

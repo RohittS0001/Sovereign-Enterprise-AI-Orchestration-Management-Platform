@@ -28,6 +28,7 @@ import httpx
 
 from backend.app.core.config import Settings
 from backend.app.core.errors import IntegrationError
+from backend.app.integrations.common.http import buffered, read_limited
 from backend.app.integrations.connectors.auth import aws_sigv4_headers, azure_management_token
 from backend.app.integrations.connectors.base import (
     CloudAlert,
@@ -73,6 +74,9 @@ def month_bounds(today: date) -> tuple[date, date, date]:
 # ------------------------------------------------------------------ AWS
 
 
+AWS_MAX_RESPONSE_BYTES = 10_000_000
+
+
 class AwsClient:
     """Signs every request with SigV4; JSON, query (XML) and REST-JSON protocols."""
 
@@ -101,17 +105,25 @@ class AwsClient:
             headers=headers,
             session_token=self.session_token,
         )
+        request = self._client.build_request(method, url, content=body, headers=signed)
         try:
-            response = await self._client.request(method, url, content=body, headers=signed)
+            streamed = await self._client.send(request, stream=True)
+            try:
+                data = await read_limited(streamed, AWS_MAX_RESPONSE_BYTES, integration="aws")
+            finally:
+                await streamed.aclose()
         except httpx.TimeoutException as exc:
-            raise IntegrationError(f"AWS {service} timed out", status_code=504) from exc
+            raise IntegrationError(f"AWS {service} timed out", integration="aws") from exc
         except httpx.HTTPError as exc:
-            raise IntegrationError(f"AWS {service} unreachable: {exc}", status_code=502) from exc
+            raise IntegrationError(
+                f"AWS {service} unreachable: {exc.__class__.__name__}", integration="aws"
+            ) from exc
+        response = buffered(streamed, data)
         if response.status_code >= 400:
             raise IntegrationError(
                 f"AWS {service} error {response.status_code}: {response.text[:200]}",
-                status_code=502,
-                details={"upstream_status": response.status_code},
+                integration="aws",
+                upstream_status=response.status_code,
             )
         return response
 
@@ -439,6 +451,8 @@ class AwsCloudService(ConnectorService):
         self, values: list[str], resource_ids: set[str] | None = None
     ) -> list[CloudAlert]:
         alerts: list[CloudAlert] = []
+        if not values:  # no project scope = nothing in scope (never the whole account)
+            return alerts
         for region in self.regions:
             alarm_arns = [
                 i["ResourceARN"]
@@ -480,6 +494,8 @@ class AwsCloudService(ConnectorService):
         self, values: list[str], resource_ids: set[str] | None = None
     ) -> list[SecurityFinding]:
         found: list[SecurityFinding] = []
+        if not values:  # an empty ResourceTags filter would match every finding
+            return found
         for region in self.regions:
             body = await self.client.rest(
                 "securityhub",
@@ -729,16 +745,18 @@ class AzureCloudService(ConnectorService):
     async def alerts(
         self, values: list[str], resource_ids: set[str] | None = None
     ) -> list[CloudAlert]:
+        ids = {i.lower() for i in resource_ids or set()}
+        if not ids:  # the project has no resources here: nothing is in scope
+            return []
         body = await self.client.get(
             f"/subscriptions/{self.subscription}/providers/Microsoft.AlertsManagement/alerts",
             {"api-version": "2019-05-05-preview", "monitorCondition": "Fired", "alertState": "New"},
         )
-        ids = {i.lower() for i in resource_ids or set()}
         alerts = []
         for alert in body.get("value") or []:
             essentials = (alert.get("properties") or {}).get("essentials") or {}
             target = str(essentials.get("targetResource") or "")
-            if ids and target.lower() not in ids:
+            if target.lower() not in ids:
                 continue
             started = essentials.get("startDateTime")
             alerts.append(
@@ -759,6 +777,9 @@ class AzureCloudService(ConnectorService):
     async def findings(
         self, values: list[str], resource_ids: set[str] | None = None
     ) -> list[SecurityFinding]:
+        ids = {i.lower() for i in resource_ids or set()}
+        if not ids:  # assessments are subscription-wide: no project resources, no findings
+            return []
         rows = await self._graph(
             "SecurityResources | where type == 'microsoft.security/assessments' "
             "| extend status=tostring(properties.status.code), severity=tostring(properties.metadata.severity), "
@@ -767,7 +788,6 @@ class AzureCloudService(ConnectorService):
             "created=tostring(properties.status.firstEvaluationDate) "
             "| where status == 'Unhealthy' | project id, title, severity, resourceId, remediation, created"
         )
-        ids = {i.lower() for i in resource_ids or set()}
         return [
             SecurityFinding(
                 source="azure",
@@ -780,7 +800,7 @@ class AzureCloudService(ConnectorService):
                 recommendation=r.get("remediation"),
             )
             for r in rows
-            if not ids or str(r.get("resourceId") or "").lower() in ids
+            if str(r.get("resourceId") or "").lower() in ids
         ]
 
     async def health_check(self) -> dict[str, Any]:
@@ -879,7 +899,10 @@ class GcpCloudService(ConnectorService):
     async def alerts(
         self, values: list[str], resource_ids: set[str] | None = None
     ) -> list[CloudAlert]:
-        alerts = []
+        alerts: list[CloudAlert] = []
+        wanted = {v.lower() for v in values}
+        if not wanted:
+            return alerts
         for project in self.projects:
             try:
                 body = await self.client.get(
@@ -891,9 +914,7 @@ class GcpCloudService(ConnectorService):
             for a in body.get("alerts") or []:
                 labels = (a.get("resource") or {}).get("labels") or {}
                 metadata = (a.get("metadata") or {}).get("userLabels") or {}
-                if values and str(metadata.get(self.label_key, "")).lower() not in {
-                    v.lower() for v in values
-                }:
+                if str(metadata.get(self.label_key, "")).lower() not in wanted:
                     continue
                 opened = a.get("openTime")
                 alerts.append(
@@ -915,7 +936,9 @@ class GcpCloudService(ConnectorService):
         self, values: list[str], resource_ids: set[str] | None = None
     ) -> list[SecurityFinding]:
         ids = set(resource_ids or set())
-        found = []
+        found: list[SecurityFinding] = []
+        if not ids:  # findings are project-wide in GCP: keep only this project's resources
+            return found
         for project in self.projects:
             body = await self.client.get(
                 f"https://securitycenter.googleapis.com/v1/projects/{project}/sources/-/findings",
@@ -924,7 +947,7 @@ class GcpCloudService(ConnectorService):
             for item in body.get("listFindingsResults") or []:
                 f = item.get("finding") or {}
                 resource = f.get("resourceName")
-                if ids and resource not in ids:
+                if resource not in ids:
                     continue
                 found.append(
                     SecurityFinding(

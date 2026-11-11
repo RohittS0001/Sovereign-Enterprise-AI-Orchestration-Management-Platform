@@ -4,10 +4,13 @@ For each source the sync:
 
 - adds new documents and re-ingests changed ones (matched by source + source id, compared
   by content checksum), so search always sees the current text;
-- removes documents that disappeared from the source;
+- removes documents that disappeared from the source, but only after a *complete* listing
+  (a capped or partial listing keeps the local copies);
 - mirrors permissions: documents the source marks restricted become admin-only
-  (``Visibility.ROLES`` with no roles); others get ``DOCS_DEFAULT_VISIBILITY`` /
-  ``DOCS_DEFAULT_ROLES``. Access control stays in the SQL filter applied before ranking.
+  (``Visibility.ROLES`` with no roles), and so do documents whose ACL is unknown
+  (``restricted is None``) unless the source is in ``DOCS_OPEN_SOURCES``; the rest get
+  ``DOCS_DEFAULT_VISIBILITY`` / ``DOCS_DEFAULT_ROLES``. Access control stays in the SQL
+  filter applied before ranking.
 """
 
 import hashlib
@@ -42,7 +45,11 @@ class SyncResult:
     error: str | None = None
 
 
-def _visibility(settings: Settings, restricted: bool) -> tuple[Visibility, list[str]]:
+def _visibility(
+    settings: Settings, restricted: bool | None, source: str
+) -> tuple[Visibility, list[str]]:
+    if restricted is None:  # the ACL could not be read: fail closed unless the admin opted in
+        restricted = source not in settings.docs_open_sources
     if restricted:
         return Visibility.ROLES, []  # admins only
     if settings.docs_default_visibility == "roles":
@@ -90,7 +97,7 @@ async def sync_source(
                 continue
             await session.delete(current)
             await session.flush()
-        visibility, roles = _visibility(settings, item.restricted)
+        visibility, roles = _visibility(settings, item.restricted, name)
         try:
             document = await knowledge.ingest(
                 principal, title=item.title[:300], text=text, source_type=name,
@@ -102,14 +109,17 @@ async def sync_source(
         document.extra = {
             "source_id": item.id,
             "url": item.url,
-            "restricted": item.restricted,
+            "restricted": item.restricted is not False,
             "updated": item.updated.isoformat() if item.updated else None,
         }
         result.updated += current is not None
         result.added += current is None
 
+    complete = getattr(incoming, "complete", True)
+    if not complete:
+        result.skipped.append("listing incomplete (page cap or partial result): nothing removed")
     for source_id, document in existing.items():
-        if source_id not in seen:
+        if complete and source_id not in seen:
             await session.delete(document)
             result.removed += 1
 
