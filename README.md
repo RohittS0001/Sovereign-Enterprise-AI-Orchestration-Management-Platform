@@ -1,13 +1,58 @@
 # Sovereign Enterprise AI Orchestration & Management Platform
 
-A self-hosted, agentic AI platform for project and delivery management. Ask a question in plain
-language ("Is PHX going to make the sprint? Who is overloaded?") and an agent answers it by calling
-governed tools over **Jira, GitHub, Keka (HRMS), Gmail, your knowledge base and project analytics**,
-with citations. It runs entirely on local LLMs, so no data leaves your infrastructure.
+**Your project is late. The status report says "on track". This platform shows you the real reason,
+from your own data.**
 
-Writes need human approval. Access is role-based, every action is recorded in a tamper-evident
-audit log, and guardrails redact personal data and detect prompt injection before any model sees
-tool output.
+It connects to the tools a delivery organization already uses (Jira, GitHub, Slack/Teams, e-mail,
+Keka and other HR systems, incident tools, meetings, finance, CRM: 36 integrations), indexes them
+for hybrid search, and answers questions with evidence: *how many days were lost, to what, and is
+what people reported actually true?* An AI agent works over the same data through governed tools,
+with human approval for every write, role-based access and a tamper-evident audit log. It runs on
+local or self-hosted models, so the data stays yours.
+
+> All screenshots use the built-in demo company (synthetic data). Run it yourself with
+> `python -m scripts.dev demo`.
+
+### Why is it late? Days lost per cause, and status claims checked against the data
+
+![Why is it late: the verdict, where the time went, and reported vs actual](docs/images/02-why-is-it-late.png)
+
+The project is 5 working days late; the main reason is a vendor block that also holds up a second
+issue (7 of 16.7 person-days). The manager's Slack message *"keep reporting Phoenix as on track to
+leadership"* and two e-mail claims are each contradicted by what the data showed on the day they
+were made.
+
+### Check anything you were told
+
+![A status claim checked against Jira history, the forecast and the roadmap](docs/images/03-check-a-claim.png)
+
+### One search across every connected tool
+
+![Hybrid search finds the Slack message, the policy and the meeting transcript](docs/images/07-hybrid-search.png)
+
+Keyword (BM25) and vector search fused with weighted reciprocal rank fusion, tuned by evaluation;
+exact IDs such as `PHX-7` first; filters by source, project and date; e-mail, HR and finance records
+only for roles allowed to see them, enforced in SQL before ranking.
+
+<details>
+<summary><b>More screens</b>: project health, critical path, DORA metrics, integrations</summary>
+
+![Project health: risk score with evidence and the sprint forecast](docs/images/06-project-health.png)
+![Critical path: dependencies plus each person's queue set the finish date](docs/images/04-critical-path.png)
+![DORA metrics with bands, evidence and recommendations](docs/images/05-dora-metrics.png)
+![36 integrations configured from .env, each with a demo twin](docs/images/09-integrations.png)
+![Home: portfolio KPIs and decisions to take](docs/images/08-home.png)
+
+</details>
+
+### How it is evaluated
+
+Ten evaluation suites with their own datasets, thresholds and bootstrap 95% confidence intervals,
+nine of them CI gates. Highlights on the demo data: retrieval MRR **0.93**, Hit@3 **1.0**;
+cross-platform search Hit@1 **0.92** over 10 sources with **0** permission leaks; RAG context
+recall **1.0**, faithfulness **1.0**; delay attribution **91%** top-cause accuracy on 140 synthetic
+sprints with **0** false contradictions; red-team containment **100%**. Method, findings and honest
+limitations: [docs/evaluation.md](docs/evaluation.md).
 
 ## Features
 
